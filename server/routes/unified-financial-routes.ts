@@ -12,7 +12,7 @@ import { sql } from 'drizzle-orm';
 import { eq } from 'drizzle-orm'; // Import eq for where clause
 import { invoices } from '../../shared/schema.js'; // Assuming invoices schema is available
 import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
-import { storage } from '../utils/storage.js'; // Assuming storage utility exists
+import { storage } from '../storage.js';
 import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
 
 const router = Router();
