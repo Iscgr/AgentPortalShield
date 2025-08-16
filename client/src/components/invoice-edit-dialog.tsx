@@ -1,54 +1,22 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/auth-context";
-import { 
-  Edit3, 
-  Save, 
-  Plus, 
-  Trash2, 
-  AlertTriangle, 
-  History,
-  Calculator,
-  RotateCcw,
-  Wifi,
-  WifiOff
-} from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Edit3, Plus, Trash2, Save, AlertTriangle, History, DollarSign, Clock, User, Calendar, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
+import { useCrmAuth } from "@/hooks/use-crm-auth";
 import { apiRequest } from "@/lib/queryClient";
-import { formatCurrency, toPersianDigits, getCurrentPersianDate } from "@/lib/persian-date";
-
-// Generate unique ID for records
-const generateId = () => Math.random().toString(36).substring(2, 15);
 
 interface EditableUsageRecord {
   id: string;
@@ -98,10 +66,18 @@ export default function InvoiceEditDialog({
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  
+  // SHERLOCK v1.0: UNIFIED AUTHENTICATION SYSTEM
+  const adminAuth = useAuth();
+  const crmAuth = useCrmAuth();
+  
+  // Determine authentication status
+  const isAuthenticated = adminAuth.isAuthenticated || crmAuth.isAuthenticated;
+  const currentUser = adminAuth.isAuthenticated ? adminAuth.user : crmAuth.user;
+  const currentUsername = currentUser?.username || 'unknown';
 
-  // ✅ SHERLOCK v24.1: Authentication check
-  if (!user || !user.authenticated) {
+  // Authentication check with proper error handling
+  if (!isAuthenticated || !currentUser) {
     return (
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
@@ -110,9 +86,66 @@ export default function InvoiceEditDialog({
             ویرایش ریز جزئیات (نیاز به ورود مجدد)
           </Button>
         </DialogTrigger>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">خطای احراز هویت</DialogTitle>
+          </DialogHeader>
+          <div className="text-center py-6">
+            <AlertTriangle className="w-12 h-12 mx-auto text-red-500 mb-4" />
+            <p className="text-gray-600 mb-4">جلسه شما منقضی شده است</p>
+            <Button onClick={() => window.location.reload()} className="w-full">
+              رفرش صفحه و ورود مجدد
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
     );
   }
+
+  // Generate unique ID for new records
+  const generateId = () => `record_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Session health check function
+  const checkSessionHealth = async () => {
+    try {
+      const endpoint = adminAuth.isAuthenticated ? '/api/auth/check' : '/api/crm/auth/user';
+      const response = await fetch(endpoint, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      setSessionHealthy(response.ok);
+      return response.ok;
+    } catch (error) {
+      console.error('Session health check failed:', error);
+      setSessionHealthy(false);
+      return false;
+    }
+  };
+
+  // Start session monitoring when dialog opens
+  useEffect(() => {
+    if (isOpen && editMode) {
+      checkSessionHealth();
+      
+      const interval = setInterval(() => {
+        checkSessionHealth();
+      }, 2 * 60 * 1000); // Every 2 minutes
+      
+      setSessionCheckInterval(interval);
+      
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }
+  }, [isOpen, editMode]);
+
+  // Calculate total amount from records
+  const calculateTotalAmount = (records: EditableUsageRecord[]) => {
+    return records
+      .filter(record => !record.isDeleted)
+      .reduce((sum, record) => sum + (record.amount || 0), 0);
+  };
 
   // Fetch invoice usage details
   const { data: usageDetails, isLoading } = useQuery({
@@ -132,93 +165,74 @@ export default function InvoiceEditDialog({
     enabled: isOpen && activeTab === "transactions"
   });
 
-  // Edit mutation with financial synchronization
+  // Edit mutation with enhanced error handling
   const editMutation = useMutation({
     mutationFn: async (editData: any) => {
       setIsProcessing(true);
       
-      // Ensure session is healthy before attempting to save
-      await checkSessionHealth();
-      if (!sessionHealthy) {
-        throw new Error("جلسه منقضی شده است. لطفاً صفحه را بازخوانی کنید.");
+      // Enhanced session validation before save
+      const isSessionValid = await checkSessionHealth();
+      if (!isSessionValid) {
+        throw new Error("جلسه منقضی شده است. لطفاً صفحه را بازخوانی کنید و مجدداً وارد شوید.");
       }
       
-      const response = await apiRequest('/api/invoices/edit', { method: 'POST', data: editData });
+      const response = await apiRequest('/api/invoices/edit', { 
+        method: 'POST', 
+        data: editData 
+      });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'خطا در ذخیره تغییرات');
-      }
-      
-      return response.json();
+      return response;
     },
     onSuccess: async (data) => {
       const transactionId = data.transactionId;
       const editId = data.editId;
-      const amountDifference = calculatedAmount - originalAmount;
-
-      toast({
-        title: "فاکتور ویرایش شد",
-        description: `تغییرات با موفقیت ذخیره شد | تراکنش: ${transactionId?.slice(-8) || 'نامشخص'} | تفاوت: ${formatCurrency(amountDifference.toString())} تومان`,
-      });
-
-      // ✅ SHERLOCK v24.1: Force financial synchronization
-      try {
-        if (Math.abs(amountDifference) > 0) {
-          console.log(`🔄 SHERLOCK v24.1: Synchronizing financial data for representative ${representativeCode}, amount difference: ${amountDifference}`);
-
-          // Force sync representative debt immediately
-          await apiRequest(`/api/unified-financial/sync-representative/${representativeCode}`, {
-            method: 'POST',
-            data: { 
-              amountDifference,
-              newTotalAmount: calculatedAmount,
-              oldTotalAmount: originalAmount,
-              invoiceId: invoice.id,
-              reason: 'INVOICE_EDIT_SYNC'
-            }
-          });
-
-          // Force invalidate all financial caches
-          queryClient.invalidateQueries({ queryKey: ['/api/unified-financial'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
-          queryClient.invalidateQueries({ queryKey: [`/api/unified-financial/representative`] });
-
-          console.log(`✅ SHERLOCK v24.1: Financial synchronization completed for representative ${representativeCode}`);
-        }
-      } catch (syncError) {
-        console.warn('⚠️ Financial sync warning (non-critical):', syncError);
-      }
-
-      // Mark all records as saved (remove modified/new flags)
-      setEditableRecords(prevRecords => 
-        prevRecords
-          .filter(record => !record.isDeleted)
-          .map(record => ({
-            ...record,
-            isNew: false,
-            isModified: false
-          }))
-      );
-
-      setEditMode(false);
-      setEditReason("");
+      
+      console.log(`✅ SHERLOCK v1.0: Invoice edit successful - Transaction: ${transactionId}, Edit: ${editId}`);
+      
+      // Refresh relevant queries
+      await queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/usage-details`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      
       setIsProcessing(false);
-
-      // Invalidate related queries
-      queryClient.invalidateQueries({ queryKey: [`/api/representatives/${representativeCode}`] });
-      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] });
-
-      onEditComplete?.();
+      setEditMode(false);
+      setIsOpen(false);
+      
+      if (onEditComplete) {
+        onEditComplete();
+      }
+      
+      toast({
+        title: "ویرایش موفق",
+        description: `فاکتور ${invoice.invoiceNumber} با موفقیت ویرایش شد`,
+        variant: "default",
+      });
     },
     onError: (error: any) => {
       setIsProcessing(false);
-      toast({
-        title: "خطا در ویرایش فاکتور",
-        description: error.message || 'خطای ناشناخته در ویرایش فاکتور',
-        variant: "destructive",
-      });
+      console.error('Invoice edit error:', error);
+      
+      const errorMessage = error?.message || error?.response?.data?.error || 'خطای ناشناخته در ویرایش فاکتور';
+      
+      if (errorMessage.includes('جلسه منقضی')) {
+        toast({
+          title: "جلسه منقضی شده",
+          description: "لطفاً صفحه را بازخوانی کرده و مجدداً وارد شوید",
+          variant: "destructive",
+          action: (
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              رفرش صفحه
+            </Button>
+          )
+        });
+      } else {
+        toast({
+          title: "خطا در ویرایش فاکتور",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     }
   });
 
@@ -240,10 +254,10 @@ export default function InvoiceEditDialog({
       const initialAmount = calculateTotalAmount(records);
       setEditableRecords(records);
       setCalculatedAmount(initialAmount);
-      setOriginalAmount(parseFloat(invoice.amount)); // Store original for comparison
+      setOriginalAmount(parseFloat(invoice.amount));
       setIsInitialized(true);
 
-      console.log(`🧮 SHERLOCK v24.1: Initialized invoice edit - Original: ${invoice.amount}, Calculated: ${initialAmount}`);
+      console.log(`🧮 SHERLOCK v1.0: Initialized invoice edit - Original: ${invoice.amount}, Calculated: ${initialAmount}`);
     }
   }, [usageDetails, isInitialized, editMode, invoice.amount]);
 
@@ -254,48 +268,88 @@ export default function InvoiceEditDialog({
       setEditMode(false);
       setEditReason("");
       setActiveTab("edit");
-      setSessionHealthy(true); // Reset session health on close
+      setSessionHealthy(true);
       if (sessionCheckInterval) {
         clearInterval(sessionCheckInterval);
         setSessionCheckInterval(null);
       }
     }
-  }, [isOpen]);
+  }, [isOpen, sessionCheckInterval]);
 
-  // Calculate total amount
-  const calculateTotalAmount = (records: EditableUsageRecord[]) => {
-    return records
-      .filter(record => !record.isDeleted)
-      .reduce((total, record) => total + (record.amount || 0), 0);
+  // Add new record
+  const addNewRecord = () => {
+    const newRecord: EditableUsageRecord = {
+      id: generateId(),
+      admin_username: currentUsername,
+      event_timestamp: new Date().toISOString(),
+      event_type: 'CREATE',
+      description: '',
+      amount: 0,
+      isNew: true,
+      isModified: false,
+      isDeleted: false
+    };
+
+    setEditableRecords(prev => [...prev, newRecord]);
+  };
+
+  // Update record
+  const updateRecord = (id: string, field: keyof EditableUsageRecord, value: any) => {
+    setEditableRecords(prev => prev.map(record => {
+      if (record.id === id) {
+        const updated = { ...record, [field]: value, isModified: !record.isNew };
+        return updated;
+      }
+      return record;
+    }));
+  };
+
+  // Delete record
+  const deleteRecord = (id: string) => {
+    setEditableRecords(prev => prev.map(record => {
+      if (record.id === id) {
+        return { ...record, isDeleted: true };
+      }
+      return record;
+    }));
+  };
+
+  // Restore deleted record
+  const restoreRecord = (id: string) => {
+    setEditableRecords(prev => prev.map(record => {
+      if (record.id === id) {
+        return { ...record, isDeleted: false };
+      }
+      return record;
+    }));
   };
 
   // Update calculated amount when records change
   useEffect(() => {
-    if (editMode) {
-      const newAmount = calculateTotalAmount(editableRecords);
-      setCalculatedAmount(newAmount);
+    const newAmount = calculateTotalAmount(editableRecords);
+    setCalculatedAmount(newAmount);
+  }, [editableRecords]);
+
+  // Start editing
+  const startEditing = () => {
+    if (!sessionHealthy) {
+      toast({
+        title: "خطای جلسه",
+        description: "جلسه نامعتبر است. لطفاً صفحه را بازخوانی کنید.",
+        variant: "destructive"
+      });
+      return;
     }
-  }, [editableRecords, editMode]);
-
-  const startEdit = () => {
     setEditMode(true);
-    setEditReason("");
-    setSessionHealthy(true); // Assume healthy at start of edit
-
-    // Start session monitoring every 30 seconds during edit
-    const interval = setInterval(checkSessionHealth, 30000);
-    setSessionCheckInterval(interval);
-
-    // Initial session check
-    checkSessionHealth();
   };
 
-  const cancelEdit = () => {
+  // Cancel editing
+  const cancelEditing = () => {
     setEditMode(false);
     setEditReason("");
-    // Reset records to original state from fresh data
-    if ((usageDetails as any)?.records && Array.isArray((usageDetails as any).records)) {
-      const originalRecords = ((usageDetails as any).records as any[]).map((record: any) => ({
+    // Reset records to original state
+    if ((usageDetails as any)?.records) {
+      const records = ((usageDetails as any).records as any[]).map((record: any) => ({
         id: generateId(),
         admin_username: record.admin_username || '',
         event_timestamp: record.event_timestamp || '',
@@ -306,115 +360,66 @@ export default function InvoiceEditDialog({
         isModified: false,
         isDeleted: false
       }));
-      setEditableRecords(originalRecords);
-      setCalculatedAmount(calculateTotalAmount(originalRecords));
+      setEditableRecords(records);
     }
-
-    if (sessionCheckInterval) {
-      clearInterval(sessionCheckInterval);
-      setSessionCheckInterval(null);
-    }
-    setSessionHealthy(true); // Reset session health on cancel
   };
 
-  const addNewRecord = () => {
-    const newRecord: EditableUsageRecord = {
-      id: generateId(),
-      admin_username: representativeCode || '',
-      event_timestamp: getCurrentPersianDate(),
-      event_type: 'CREATE',
-      description: '',
-      amount: 0,
-      isNew: true,
-      isModified: false,
-      isDeleted: false
-    };
-    setEditableRecords([...editableRecords, newRecord]);
-  };
-
-  const updateRecord = (id: string, field: keyof EditableUsageRecord, value: any) => {
-    setEditableRecords(records =>
-      records.map(record =>
-        record.id === id
-          ? { 
-              ...record, 
-              [field]: value, 
-              isModified: !record.isNew ? true : record.isModified 
-            }
-          : record
-      )
-    );
-  };
-
-  const deleteRecord = (id: string) => {
-    setEditableRecords(records =>
-      records.map(record =>
-        record.id === id
-          ? { ...record, isDeleted: true }
-          : record
-      )
-    );
-  };
-
-  const restoreRecord = (id: string) => {
-    setEditableRecords(records =>
-      records.map(record =>
-        record.id === id
-          ? { ...record, isDeleted: false }
-          : record
-      )
-    );
-  };
-
-  const removeNewRecord = (id: string) => {
-    setEditableRecords(records => records.filter(record => record.id !== id));
-  };
-
-  const validateAndSave = () => {
-    const errors: string[] = [];
-    const activeRecords = editableRecords.filter(r => !r.isDeleted);
-
-    if (activeRecords.length === 0) {
-      errors.push("حداقل یک رکورد فعال باید وجود داشته باشد");
-    }
-
-    activeRecords.forEach((record, index) => {
-      if (!record.admin_username) {
-        errors.push(`رکورد ${index + 1}: نام ادمین الزامی است`);
-      }
-      if (!record.amount || record.amount <= 0) {
-        errors.push(`رکورد ${index + 1}: مبلغ باید بزرگتر از صفر باشد`);
-      }
-      if (!record.event_timestamp) {
-        errors.push(`رکورد ${index + 1}: زمان رویداد الزامی است`);
-      }
-    });
-
+  // Save changes
+  const saveChanges = () => {
     if (!editReason.trim()) {
-      errors.push("دلیل ویرایش الزامی است");
-    }
-
-    if (errors.length > 0) {
       toast({
-        title: "خطا در اعتبارسنجی",
-        description: errors.join('\n'),
-        variant: "destructive",
+        title: "خطای اعتبارسنجی",
+        description: "لطفاً دلیل ویرایش را وارد کنید",
+        variant: "destructive"
       });
       return;
     }
 
-    // Prepare edit data
+    if (!sessionHealthy) {
+      toast({
+        title: "خطای جلسه",
+        description: "جلسه منقضی شده است. لطفاً صفحه را بازخوانی کنید.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const activeRecords = editableRecords.filter(record => !record.isDeleted);
+    
+    if (activeRecords.length === 0) {
+      toast({
+        title: "خطای اعتبارسنجی",
+        description: "حداقل یک رکورد باید وجود داشته باشد",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const invalidRecords = activeRecords.filter(record => 
+      !record.description.trim() || record.amount <= 0
+    );
+
+    if (invalidRecords.length > 0) {
+      toast({
+        title: "خطای اعتبارسنجی",
+        description: "همه رکوردها باید توضیحات و مبلغ معتبر داشته باشند",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const editData = {
       invoiceId: invoice.id,
       originalUsageData: (usageDetails as any)?.usageData || {},
       editedUsageData: {
-        ...((usageDetails as any)?.usageData || {}),
-        records: activeRecords.map(r => ({
-          admin_username: r.admin_username,
-          event_timestamp: r.event_timestamp,
-          event_type: r.event_type,
-          description: r.description,
-          amount: r.amount
+        type: 'edited',
+        description: `فاکتور ویرایش شده - ${editReason}`,
+        records: activeRecords.map(record => ({
+          admin_username: record.admin_username,
+          event_timestamp: record.event_timestamp,
+          event_type: record.event_type,
+          description: record.description,
+          amount: record.amount.toString()
         })),
         totalRecords: activeRecords.length,
         usage_amount: calculatedAmount
@@ -423,122 +428,25 @@ export default function InvoiceEditDialog({
       editReason: editReason,
       originalAmount: parseFloat(invoice.amount),
       editedAmount: calculatedAmount,
-      editedBy: user.username // Use username from auth context
+      editedBy: currentUsername
     };
 
     editMutation.mutate(editData);
   };
 
-  // Session health monitoring - using the same auth system as invoice edit
-  const checkSessionHealth = async () => {
-    try {
-      // Use the same apiRequest method as the edit mutation to ensure consistency
-      const response = await apiRequest('/api/unified-financial/session-health', { 
-        method: 'GET' 
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setSessionHealthy(result.healthy);
-        if (!result.healthy) {
-          toast({
-            title: "جلسه منقضی شده",
-            description: "جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی کنید.",
-            variant: "destructive",
-          });
-          // Clear the interval and prevent further saves
-          if (sessionCheckInterval) {
-            clearInterval(sessionCheckInterval);
-            setSessionCheckInterval(null);
-          }
-        }
-      } else {
-        setSessionHealthy(false);
-        toast({
-          title: "خطای اتصال",
-          description: "اتصال به سرور قطع شده است.",
-          variant: "destructive",
-        });
-        if (sessionCheckInterval) {
-          clearInterval(sessionCheckInterval);
-          setSessionCheckInterval(null);
-        }
-      }
-    } catch (error) {
-      console.error('Session health check failed:', error);
-      setSessionHealthy(false);
-      toast({
-        title: "خطای بررسی جلسه",
-        description: "خطا در بررسی وضعیت جلسه",
-        variant: "destructive",
-      });
-      if (sessionCheckInterval) {
-        clearInterval(sessionCheckInterval);
-        setSessionCheckInterval(null);
-      }
-    }
+  const getRecordBadgeColor = (record: EditableUsageRecord) => {
+    if (record.isDeleted) return "destructive";
+    if (record.isNew) return "default";
+    if (record.isModified) return "secondary";
+    return "outline";
   };
 
-  // Simplified session health check - only on critical operations
-  useEffect(() => {
-    if (isOpen && editMode) {
-      // Only check session health when starting edit mode
-      checkSessionHealth();
-    }
-  }, [isOpen, editMode]);
-
-  const getRecordRowClass = (record: EditableUsageRecord) => {
-    if (record.isDeleted) return "bg-red-50 dark:bg-red-900/20 opacity-60";
-    if (record.isNew) return "bg-green-50 dark:bg-green-900/20";
-    if (record.isModified) return "bg-yellow-50 dark:bg-yellow-900/20";
-    return "";
+  const getRecordBadgeText = (record: EditableUsageRecord) => {
+    if (record.isDeleted) return "حذف شده";
+    if (record.isNew) return "جدید";
+    if (record.isModified) return "ویرایش شده";
+    return "اصلی";
   };
-
-  const getRecordBadge = (record: EditableUsageRecord) => {
-    if (record.isDeleted) return <Badge variant="destructive">حذف شده</Badge>;
-    if (record.isNew) return <Badge variant="default">جدید</Badge>;
-    if (record.isModified) return <Badge variant="secondary">ویرایش شده</Badge>;
-    return null;
-  };
-
-  const handleSave = async () => {
-    if (!invoice) return;
-
-    // Check session health before save using the same authentication method
-    await checkSessionHealth();
-    if (!sessionHealthy) {
-      toast({
-        title: "جلسه منقضی شده",
-        description: "جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی و مجدداً وارد شوید.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!editMode) { // If not in edit mode, just open the dialog
-      setIsOpen(true);
-      return;
-    }
-
-    // Proceed with validation and saving if in edit mode
-    validateAndSave();
-  };
-
-  if (isLoading) {
-    return (
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
-            <Edit3 className="w-4 h-4 mr-2" />
-            ویرایش ریز جزئیات
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto rtl">
-          <div className="p-8 text-center">در حال بارگذاری...</div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -548,303 +456,286 @@ export default function InvoiceEditDialog({
           ویرایش ریز جزئیات
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto rtl">
+      
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-right flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {sessionHealthy ? (
-                <Wifi className="h-4 w-4 text-green-500" />
-              ) : (
-                <WifiOff className="h-4 w-4 text-red-500" />
-              )}
-              <span className={sessionHealthy ? "text-green-600" : "text-red-600"}>
-                {sessionHealthy ? "متصل" : "قطع شده"}
-              </span>
-            </div>
-            ویرایش فاکتور {invoice?.invoiceNumber || invoice?.id}
+          <DialogTitle className="flex items-center gap-2">
+            <Edit3 className="w-5 h-5" />
+            ویرایش جزئیات فاکتور {invoice.invoiceNumber}
+            {!sessionHealthy && (
+              <Badge variant="destructive" className="ml-2">
+                جلسه نامعتبر
+              </Badge>
+            )}
           </DialogTitle>
-          <DialogDescription>
-            نماینده: {representativeCode} | مبلغ فعلی: {formatCurrency(invoice.amount)} تومان
-          </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="edit">ویرایش جزئیات</TabsTrigger>
-            <TabsTrigger value="history">تاریخچه تغییرات</TabsTrigger>
-            <TabsTrigger value="transactions">تراکنش‌های مالی</TabsTrigger>
+            <TabsTrigger value="history">تاریخچه ویرایش</TabsTrigger>
+            <TabsTrigger value="transactions">تراکنش‌ها</TabsTrigger>
           </TabsList>
 
           <TabsContent value="edit" className="space-y-4">
-            {/* Summary Card */}
+            {/* Session Status Alert */}
+            {!sessionHealthy && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی کنید و مجدداً وارد شوید.
+                  <Button variant="outline" size="sm" className="ml-2" onClick={() => window.location.reload()}>
+                    رفرش صفحه
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Invoice Summary */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>خلاصه فاکتور</span>
-                  <div className="flex items-center space-x-2 space-x-reverse">
-                    {!editMode ? (
-                      <Button onClick={startEdit} disabled={!sessionHealthy}>
-                        <Edit3 className="w-4 h-4 mr-2" />
-                        شروع ویرایش
-                      </Button>
-                    ) : (
-                      <>
-                        <Button variant="outline" onClick={cancelEdit}>
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          انصراف
-                        </Button>
-                        <Button 
-                          onClick={handleSave} 
-                          disabled={editMutation.isPending || isProcessing || editableRecords.filter(r => !r.isDeleted).length === 0 || !sessionHealthy}
-                          className={Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01 ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          {editMutation.isPending || isProcessing 
-                            ? "در حال ذخیره و همگام‌سازی..." 
-                            : Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01
-                            ? `ذخیره تغییرات (${calculatedAmount > parseFloat(invoice.amount) ? '+' : ''}${formatCurrency((calculatedAmount - parseFloat(invoice.amount)).toString())})`
-                            : "ذخیره تغییرات"
-                          }
-                        </Button>
-                      </>
-                    )}
+                  اطلاعات فاکتور
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">کد نماینده: {representativeCode}</Badge>
+                    <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
+                      {invoice.status === 'paid' ? 'پرداخت شده' : 
+                       invoice.status === 'partial' ? 'پرداخت جزئی' : 'پرداخت نشده'}
+                    </Badge>
                   </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">مبلغ اصلی فاکتور</p>
-                    <p className="text-xl font-bold">{formatCurrency(invoice.amount)} تومان</p>
+                    <Label className="text-sm text-gray-500">مبلغ اصلی</Label>
+                    <p className="font-semibold">{originalAmount.toLocaleString()} تومان</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {editMode ? 'مبلغ محاسبه شده (زنده)' : 'مبلغ محاسبه شده'}
-                      {editMode && <span className="text-xs text-blue-500 mr-2">🔄 Real-time</span>}
-                    </p>
-                    <p className={`text-xl font-bold transition-colors duration-300 ${
-                      Math.abs(calculatedAmount - parseFloat(invoice.amount)) < 0.01
-                        ? 'text-green-600 dark:text-green-400' 
-                        : editMode
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : 'text-orange-600 dark:text-orange-400'
-                    }`}>
-                      {formatCurrency(calculatedAmount.toString())} تومان
-                    </p>
-                    {editMode && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        تعداد آیتم‌های فعال: {toPersianDigits(editableRecords.filter(r => !r.isDeleted).length.toString())}
-                      </p>
-                    )}
+                    <Label className="text-sm text-gray-500">مبلغ محاسبه شده</Label>
+                    <p className="font-semibold text-blue-600">{calculatedAmount.toLocaleString()} تومان</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">تفاوت مبلغ</p>
-                    <p className={`text-xl font-bold transition-colors duration-300 ${
-                      Math.abs(calculatedAmount - parseFloat(invoice.amount)) < 0.01
-                        ? 'text-gray-600 dark:text-gray-400'
-                        : calculatedAmount - parseFloat(invoice.amount) > 0
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {calculatedAmount - parseFloat(invoice.amount) > 0 ? '+' : ''}
-                      {formatCurrency((calculatedAmount - parseFloat(invoice.amount)).toString())} تومان
+                    <Label className="text-sm text-gray-500">تاریخ صدور</Label>
+                    <p className="font-semibold">{invoice.issueDate}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-500">تفاوت</Label>
+                    <p className={`font-semibold ${calculatedAmount !== originalAmount ? 'text-orange-600' : 'text-green-600'}`}>
+                      {(calculatedAmount - originalAmount).toLocaleString()} تومان
                     </p>
-                    {editMode && Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01 && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {calculatedAmount > parseFloat(invoice.amount) ? '↗️ افزایش' : '↘️ کاهش'} مبلغ فاکتور
-                      </p>
-                    )}
                   </div>
                 </div>
-
-                {editMode && (
-                  <div className="mt-4 space-y-2">
-                    <label className="text-sm font-medium">دلیل ویرایش (الزامی)</label>
-                    <Textarea
-                      value={editReason}
-                      onChange={(e) => setEditReason(e.target.value)}
-                      placeholder="دلیل ویرایش این فاکتور را وارد کنید..."
-                      className="w-full"
-                    />
-                  </div>
-                )}
               </CardContent>
             </Card>
 
             {/* Edit Controls */}
-            {editMode && (
-              <div className="flex items-center space-x-2 space-x-reverse">
-                <Button onClick={addNewRecord} variant="outline" disabled={!sessionHealthy}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  افزودن رکورد جدید
+            {!editMode ? (
+              <div className="flex justify-between items-center">
+                <Button onClick={startEditing} disabled={!sessionHealthy}>
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  شروع ویرایش
                 </Button>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  تعداد رکوردهای فعال: {toPersianDigits(editableRecords.filter(r => !r.isDeleted).length.toString())}
+                <div className="text-sm text-gray-500">
+                  کاربر فعال: {currentUsername}
                 </div>
+              </div>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>دلیل ویرایش</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="لطفاً دلیل ویرایش این فاکتور را شرح دهید..."
+                    value={editReason}
+                    onChange={(e) => setEditReason(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Records List */}
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-gray-500">در حال بارگذاری جزئیات...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {editableRecords.map((record, index) => (
+                  <Card key={record.id} className={`${record.isDeleted ? 'opacity-50 bg-gray-50' : ''}`}>
+                    <CardContent className="pt-4">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={getRecordBadgeColor(record)}>
+                            {getRecordBadgeText(record)}
+                          </Badge>
+                          <span className="text-sm text-gray-500">رکورد #{index + 1}</span>
+                        </div>
+                        
+                        {editMode && (
+                          <div className="flex gap-2">
+                            {record.isDeleted ? (
+                              <Button size="sm" variant="outline" onClick={() => restoreRecord(record.id)}>
+                                بازیابی
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="destructive" onClick={() => deleteRecord(record.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                          <Label htmlFor={`username-${record.id}`}>کاربر</Label>
+                          <Input
+                            id={`username-${record.id}`}
+                            value={record.admin_username}
+                            onChange={(e) => updateRecord(record.id, 'admin_username', e.target.value)}
+                            disabled={!editMode || record.isDeleted}
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor={`timestamp-${record.id}`}>زمان</Label>
+                          <Input
+                            id={`timestamp-${record.id}`}
+                            type="datetime-local"
+                            value={record.event_timestamp ? new Date(record.event_timestamp).toISOString().slice(0, 16) : ''}
+                            onChange={(e) => updateRecord(record.id, 'event_timestamp', new Date(e.target.value).toISOString())}
+                            disabled={!editMode || record.isDeleted}
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor={`type-${record.id}`}>نوع رویداد</Label>
+                          <Select
+                            value={record.event_type}
+                            onValueChange={(value) => updateRecord(record.id, 'event_type', value)}
+                            disabled={!editMode || record.isDeleted}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CREATE">ایجاد</SelectItem>
+                              <SelectItem value="RENEWAL">تمدید</SelectItem>
+                              <SelectItem value="DELETE">حذف</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor={`amount-${record.id}`}>مبلغ (تومان)</Label>
+                          <Input
+                            id={`amount-${record.id}`}
+                            type="number"
+                            step="1000"
+                            min="0"
+                            value={record.amount}
+                            onChange={(e) => updateRecord(record.id, 'amount', parseFloat(e.target.value) || 0)}
+                            disabled={!editMode || record.isDeleted}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4">
+                        <Label htmlFor={`description-${record.id}`}>توضیحات</Label>
+                        <Textarea
+                          id={`description-${record.id}`}
+                          value={record.description}
+                          onChange={(e) => updateRecord(record.id, 'description', e.target.value)}
+                          disabled={!editMode || record.isDeleted}
+                          className="mt-1"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {editMode && (
+                  <Button onClick={addNewRecord} variant="outline" className="w-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    افزودن رکورد جدید
+                  </Button>
+                )}
               </div>
             )}
 
-            {/* Records Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>ریز جزئیات مصرف</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>وضعیت</TableHead>
-                      <TableHead>نام کاربری ادمین</TableHead>
-                      <TableHead>زمان رویداد</TableHead>
-                      <TableHead>نوع رویداد</TableHead>
-                      <TableHead>توضیحات</TableHead>
-                      <TableHead>مبلغ (تومان)</TableHead>
-                      {editMode && <TableHead>عملیات</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {editableRecords.map((record) => (
-                      <TableRow key={record.id} className={getRecordRowClass(record)}>
-                        <TableCell>
-                          {getRecordBadge(record)}
-                        </TableCell>
-                        <TableCell>
-                          {editMode && !record.isDeleted ? (
-                            <Input
-                              value={record.admin_username}
-                              onChange={(e) => updateRecord(record.id, 'admin_username', e.target.value)}
-                              className="min-w-[120px]"
-                            />
-                          ) : (
-                            record.admin_username
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editMode && !record.isDeleted ? (
-                            <Input
-                              value={record.event_timestamp}
-                              onChange={(e) => updateRecord(record.id, 'event_timestamp', e.target.value)}
-                              placeholder="1404/5/15 14:30:00"
-                              className="min-w-[150px]"
-                            />
-                          ) : (
-                            record.event_timestamp
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editMode && !record.isDeleted ? (
-                            <Select
-                              value={record.event_type}
-                              onValueChange={(value) => updateRecord(record.id, 'event_type', value)}
-                            >
-                              <SelectTrigger className="min-w-[100px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="CREATE">CREATE</SelectItem>
-                                <SelectItem value="RENEWAL">RENEWAL</SelectItem>
-                                <SelectItem value="DELETE">DELETE</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Badge variant="outline">{record.event_type}</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editMode && !record.isDeleted ? (
-                            <Textarea
-                              value={record.description}
-                              onChange={(e) => updateRecord(record.id, 'description', e.target.value)}
-                              className="min-w-[200px] min-h-[60px]"
-                              placeholder="توضیحات رویداد..."
-                            />
-                          ) : (
-                            <div className="max-w-[200px] text-sm">{record.description}</div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editMode && !record.isDeleted ? (
-                            <Input
-                              type="number"
-                              value={record.amount}
-                              onChange={(e) => updateRecord(record.id, 'amount', parseFloat(e.target.value) || 0)}
-                              className="min-w-[120px]"
-                            />
-                          ) : (
-                            <span className="font-medium">
-                              {formatCurrency(record.amount.toString())}
-                            </span>
-                          )}
-                        </TableCell>
-                        {editMode && (
-                          <TableCell>
-                            <div className="flex items-center space-x-1 space-x-reverse">
-                              {record.isDeleted ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => restoreRecord(record.id)}
-                                >
-                                  <RotateCcw className="w-3 h-3" />
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => record.isNew ? removeNewRecord(record.id) : deleteRecord(record.id)}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            {/* Action Buttons */}
+            {editMode && (
+              <div className="flex justify-between pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button onClick={cancelEditing} variant="outline">
+                    انصراف
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <div className="text-sm text-gray-600 flex items-center">
+                    مجموع: {calculatedAmount.toLocaleString()} تومان
+                  </div>
+                  <Button 
+                    onClick={saveChanges} 
+                    disabled={isProcessing || !sessionHealthy}
+                    className="min-w-[120px]"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        در حال ذخیره...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        ذخیره تغییرات
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="history" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2 space-x-reverse">
+                <CardTitle className="flex items-center gap-2">
                   <History className="w-5 h-5" />
-                  <span>تاریخچه ویرایش‌ها</span>
+                  تاریخچه ویرایش فاکتور
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {editHistory && Array.isArray(editHistory) && editHistory.length > 0 ? (
+                {editHistory && editHistory.length > 0 ? (
                   <div className="space-y-4">
-                    {editHistory.map((edit: any) => (
-                      <div key={edit.id} className="border-r-4 border-blue-500 pr-4 py-3 bg-gray-50 dark:bg-gray-800 rounded">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium">ویرایش توسط: {edit.editedBy}</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              نوع ویرایش: {edit.editType}
-                            </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              مبلغ از {formatCurrency(edit.originalAmount)} به {formatCurrency(edit.editedAmount)} تغییر یافت
-                            </div>
-                            {edit.editReason && (
-                              <div className="text-sm text-gray-500 mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                                <strong>دلیل:</strong> {edit.editReason}
-                              </div>
-                            )}
+                    {editHistory.map((edit: any, index: number) => (
+                      <div key={edit.id} className="border-l-4 border-blue-200 pl-4 py-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">#{index + 1}</Badge>
+                            <span className="font-medium">{edit.editedBy}</span>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(edit.createdAt).toLocaleString('fa-IR')}
-                          </div>
+                          <span className="text-sm text-gray-500">
+                            {new Date(edit.timestamp).toLocaleString('fa-IR')}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 mb-2">{edit.editReason}</p>
+                        <div className="text-sm text-gray-600">
+                          <span>مبلغ: {edit.originalAmount} ← {edit.editedAmount} تومان</span>
+                          <span className="mx-2">|</span>
+                          <span>نوع: {edit.editType}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
-                    هیچ ویرایشی برای این فاکتور ثبت نشده است
+                    <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>هیچ تاریخچه ویرایشی یافت نشد</p>
                   </div>
                 )}
               </CardContent>
@@ -854,46 +745,35 @@ export default function InvoiceEditDialog({
           <TabsContent value="transactions" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2 space-x-reverse">
-                  <Calculator className="w-5 h-5" />
-                  <span>تراکنش‌های مالی اتمیک</span>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  تراکنش‌های مالی مرتبط
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {financialTransactions && Array.isArray(financialTransactions) && financialTransactions.length > 0 ? (
+                {financialTransactions && financialTransactions.length > 0 ? (
                   <div className="space-y-4">
-                    {financialTransactions
-                      .filter((tx: any) => tx.relatedEntityId === invoice.id && tx.relatedEntityType === 'invoice')
-                      .map((transaction: any) => (
-                      <div key={transaction.id} className="border-r-4 border-green-500 pr-4 py-3 bg-green-50 dark:bg-green-900/20 rounded">
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-2">
-                            <div className="font-medium">
-                              شناسه تراکنش: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm">{transaction.transactionId}</code>
-                            </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              نوع: <Badge variant="outline">{transaction.type}</Badge>
-                              وضعیت: <Badge variant={transaction.status === 'COMPLETED' ? 'default' : 'secondary'}>{transaction.status}</Badge>
-                            </div>
-                            {transaction.financialImpact && (
-                              <div className="text-sm">
-                                تأثیر مالی: {transaction.financialImpact.debtChange > 0 ? '+' : ''}{formatCurrency(transaction.financialImpact.debtChange?.toString() || '0')} تومان
-                              </div>
-                            )}
-                            <div className="text-xs text-gray-500 mt-2">
-                              ایجاد شده توسط: {transaction.initiatedBy}
-                            </div>
-                          </div>
+                    {financialTransactions.slice(0, 10).map((transaction: any) => (
+                      <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <div className="font-medium">{transaction.description}</div>
                           <div className="text-sm text-gray-500">
-                            {transaction.completedAt ? new Date(transaction.completedAt).toLocaleString('fa-IR') : 'در حال پردازش'}
+                            تاریخ: {new Date(transaction.timestamp).toLocaleString('fa-IR')}
                           </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{transaction.amount?.toLocaleString()} تومان</div>
+                          <Badge variant={transaction.status === 'COMPLETED' ? 'default' : 'secondary'}>
+                            {transaction.status}
+                          </Badge>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
-                    هیچ تراکنش مالی برای این فاکتور ثبت نشده است
+                    <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>هیچ تراکنش مالی یافت نشد</p>
                   </div>
                 )}
               </CardContent>

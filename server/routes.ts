@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, or, like, gte, lte, asc, count, desc } from "drizzle-orm";
 import { invoices, representatives, payments, activityLogs } from "@shared/schema";
+import { unifiedAuthMiddleware, enhancedUnifiedAuthMiddleware } from "./middleware/unified-auth";
 // CRM routes are imported in registerCrmRoutes function
 
 import multer from "multer";
@@ -84,164 +85,10 @@ const upload = multer({
   }
 });
 
-// SHERLOCK v25.0: Enhanced Authentication Middleware with Session Persistence for Invoice Editing
-  const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
-    const path = req.path;
-    const method = req.method;
-    const sessionId = req.sessionID;
-
-    console.log('🔐 SHERLOCK v25.0: Authentication check:', {
-      sessionId,
-      path,
-      method,
-      hasSession: !!req.session,
-      timestamp: new Date().toISOString()
-    });
-
-    // Simplified and robust authentication check
-    let isAuthenticated = false;
-    let userType = null;
-
-    if (req.session) {
-      // Check admin authentication
-      if (req.session.authenticated === true ||
-          (req.session.user && ['admin', 'ADMIN', 'SUPER_ADMIN'].includes(req.session.user.role))) {
-        isAuthenticated = true;
-        userType = 'ADMIN';
-      }
-
-      // Check CRM authentication
-      if (req.session.crmAuthenticated === true || req.session.crmUser) {
-        isAuthenticated = true;
-        userType = 'CRM';
-      }
-    }
-
-    if (isAuthenticated) {
-      // ✅ SHERLOCK v25.0: Enhanced session extension for invoice editing
-      try {
-        req.session.touch();
-
-        // Extended session timeout for edit operations (12 hours) - critical for invoice editing
-        const extendedTimeout = 12 * 60 * 60 * 1000; // 12 hours
-        req.session.cookie.maxAge = extendedTimeout;
-
-        // Update last activity with safe property access
-        const now = new Date().toISOString();
-        if (req.session.user) {
-          (req.session.user as any).lastActivity = now;
-        }
-        if (req.session.crmUser) {
-          (req.session.crmUser as any).lastActivity = now;
-        }
-
-        console.log('✅ SHERLOCK v25.0: Auth Success & Session Extended:', {
-          sessionId,
-          userType,
-          path,
-          extendedTimeout: '12 hours',
-          timestamp: now
-        });
-
-        // ✅ SHERLOCK v25.0: Force session save to prevent expiration during invoice edits
-        req.session.save((err: any) => {
-          if (err) {
-            console.error('⚠️ SHERLOCK v25.0: Session save error during auth:', err);
-            // Continue request even if session save fails to avoid blocking operations
-          } else {
-            console.log('✅ SHERLOCK v25.0: Session saved successfully for invoice edit operation');
-          }
-          next();
-        });
-
-      } catch (sessionError) {
-        console.error('⚠️ SHERLOCK v25.0: Session extension error:', sessionError);
-        next(); // Continue even if session extension fails
-      }
-    } else {
-      console.log('❌ SHERLOCK v25.0: Authentication Failed:', {
-        sessionId,
-        path,
-        method,
-        hasSession: !!req.session,
-        adminAuth: req.session?.authenticated,
-        crmAuth: req.session?.crmAuthenticated,
-        timestamp: new Date().toISOString()
-      });
-
-      // Enhanced error response with recovery instructions
-      res.status(401).json({
-        error: "جلسه منقضی شده است",
-        errorCode: "SESSION_EXPIRED",
-        message: "لطفاً صفحه را رفرش کرده و مجدداً وارد شوید",
-        path: req.path,
-        timestamp: new Date().toISOString(),
-        sessionId: req.sessionID,
-        recoveryAction: "REFRESH_AND_LOGIN"
-      });
-    }
-  };
-
-// SHERLOCK v25.0: Enhanced Authentication with Session Extension
-  const enhancedAuthMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.session?.authenticated && !req.session?.crmAuthenticated) {
-      console.log('🚫 SHERLOCK v25.0: Authentication failed:', {
-        sessionId: req.sessionID,
-        path: req.path,
-        method: req.method,
-        hasSession: !!req.session,
-        timestamp: new Date().toISOString()
-      });
-      return res.status(401).json({
-        success: false,
-        error: "Authentication required",
-        code: "AUTH_REQUIRED",
-        sessionId: req.sessionID,
-        recoveryAction: "REFRESH_AND_LOGIN"
-      });
-    }
-
-    // Log successful authentication
-    console.log('🔐 SHERLOCK v25.0: Authentication check:', {
-      sessionId: req.sessionID,
-      path: req.path,
-      method: req.method,
-      hasSession: !!req.session,
-      timestamp: new Date().toISOString()
-    });
-
-    // Extend session timeout for extended operations (8 hours)
-    if (req.session) {
-      req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
-
-      console.log('✅ SHERLOCK v25.0: Auth Success & Session Extended:', {
-        sessionId: req.sessionID,
-        userType: req.session.authenticated ? 'ADMIN' : 'CRM',
-        path: req.path,
-        extendedTimeout: '8 hours',
-        timestamp: new Date().toISOString()
-      });
-
-      // SHERLOCK v25.2: Synchronized session persistence for all operations
-      return new Promise<void>((resolve, reject) => {
-        req.session!.save((err) => {
-          if (err) {
-            console.error('❌ SHERLOCK v25.2: Session save failed:', err);
-            reject(err);
-          } else {
-            console.log('✅ SHERLOCK v25.2: Session saved successfully for operation:', {
-              method: req.method,
-              path: req.path,
-              timestamp: new Date().toISOString()
-            });
-            resolve();
-          }
-        });
-      }).then(() => next()).catch(next);
-    }
-
-    next();
-  };
+// SHERLOCK v1.0: UNIFIED AUTHENTICATION SYSTEM
+  // Using imported unified middleware instead of duplicate implementations
+  const authMiddleware = unifiedAuthMiddleware;
+  const enhancedAuthMiddleware = enhancedUnifiedAuthMiddleware;
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -291,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Register essential CRM routes (core functionality only)
-  registerCrmRoutes(app, authMiddleware); // Pass authMiddleware here
+  registerCrmRoutes(app, unifiedAuthMiddleware, storage); // Pass unified authMiddleware
 
   // Register Settings routes (core system settings)
   registerSettingsRoutes(app);
@@ -1217,7 +1064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // فاز ۲: Invoice editing API - ویرایش فاکتور
-  app.put("/api/invoices/:id", enhancedAuthMiddleware, async (req, res) => {
+  app.put("/api/invoices/:id", enhancedUnifiedAuthMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
 

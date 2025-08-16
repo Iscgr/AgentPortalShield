@@ -5,8 +5,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/contexts/auth-context";
-import { CrmAuthProvider, useCrmAuth } from "./hooks/use-crm-auth";
+import { UnifiedAuthProvider, useUnifiedAuth } from "@/contexts/unified-auth-context";
 
 // Layout components
 import Sidebar from "@/components/layout/sidebar";
@@ -38,7 +37,7 @@ const ModernCrmDashboard = lazy(() =>
 
 // CRM Protected Routes Component
 function CrmProtectedRoutes() {
-  const { user, isLoading } = useCrmAuth();
+  const { user, isLoading } = useUnifiedAuth(); // Use unified auth hook
   const [, setLocation] = useLocation();
 
   // Check authentication but don't create infinite loops
@@ -89,7 +88,7 @@ function CrmProtectedRoutes() {
 
 
 function AuthenticatedRouter() {
-  const { isAuthenticated: adminAuthenticated, isLoading: adminIsLoading } = useAuth();
+  const { isAuthenticated: adminAuthenticated, isLoading: adminIsLoading, user: adminUser } = useUnifiedAuth(); // Use unified auth hook
   const [location] = useLocation();
 
   // Check if this is a public portal route
@@ -136,11 +135,8 @@ function AuthenticatedRouter() {
 
   // SHERLOCK v3.0 FIX: Always require login for CRM routes
   if (isCrmRoute) {
-    return (
-      <CrmAuthProvider>
-        <CrmProtectedRoutes />
-      </CrmAuthProvider>
-    );
+    // 🔒 SECURITY: CRM routes are protected by unified auth
+    return <CrmProtectedRoutes />;
   }
 
   // Show loading state while checking authentication
@@ -157,11 +153,7 @@ function AuthenticatedRouter() {
 
   // SHERLOCK v3.0 FIX: Show unified auth for non-authenticated users  
   if (!adminAuthenticated) {
-    return (
-      <CrmAuthProvider>
-        <UnifiedAuth />
-      </CrmAuthProvider>
-    );
+    return <UnifiedAuth />;
   }
 
   // Show admin panel if authenticated
@@ -204,12 +196,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
+        <UnifiedAuthProvider>
           <div className="rtl">
             <Toaster />
             <AuthenticatedRouter />
           </div>
-        </AuthProvider>
+        </UnifiedAuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

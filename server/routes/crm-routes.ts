@@ -18,7 +18,7 @@ export function invalidateCrmCache() {
   }
 }
 
-export function registerCrmRoutes(app: Express, storage: IStorage) {
+export function registerCrmRoutes(app: Express, authMiddleware: any, storage: IStorage) {
   // Initialize only essential services for clean CRM
   const xaiGrokEngine = new XAIGrokEngine(storage);
 
@@ -35,55 +35,8 @@ export function registerCrmRoutes(app: Express, storage: IStorage) {
     }
   });
 
-  // CRM Authentication Middleware - Enhanced Cross-Panel Support with Session Recovery
-  const crmAuthMiddleware = (req: any, res: any, next: any) => {
-    // SHERLOCK v23.1: Enhanced CRM authentication with proper Admin cross-panel support
-    const isCrmAuthenticated = req.session?.crmAuthenticated === true;
-    const hasValidCrmUser = req.session?.crmUser && req.session.crmUser.id;
-
-    // Enhanced Admin authentication check
-    const isAdminAuthenticated = req.session?.authenticated === true;
-    const hasValidAdminUser = req.session?.user && (
-      req.session.user.role === 'admin' || 
-      req.session.user.role === 'ADMIN' || 
-      req.session.user.role === 'SUPER_ADMIN'
-    );
-
-    // Combined authentication validation
-    const isAuthenticated = isCrmAuthenticated || hasValidCrmUser || isAdminAuthenticated || hasValidAdminUser;
-
-    // Enhanced debug logging for production monitoring
-    if (!isAuthenticated) {
-      console.log('🔒 SHERLOCK v23.1 CRM Auth Failed:', {
-        sessionId: req.sessionID,
-        hasSession: !!req.session,
-        crmAuth: isCrmAuthenticated,
-        adminAuth: isAdminAuthenticated,
-        hasValidCrmUser,
-        hasValidAdminUser,
-        userRole: req.session?.user?.role,
-        path: req.path,
-        method: req.method,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    if (isAuthenticated) {
-      // Touch session to extend expiry
-      req.session.touch();
-      console.log(`✅ SHERLOCK v23.1 CRM Auth Success: ${req.method} ${req.path} (Admin: ${hasValidAdminUser}, CRM: ${hasValidCrmUser})`);
-      next();
-    } else {
-      console.log(`❌ SHERLOCK v23.1 CRM Auth Denied: ${req.method} ${req.path}`);
-      res.status(401).json({ 
-        error: 'احراز هویت نشده - دسترسی غیرمجاز',
-        path: req.path,
-        method: req.method,
-        timestamp: new Date().toISOString(),
-        sessionId: req.sessionID 
-      });
-    }
-  };
+  // SHERLOCK v1.0: Use unified authentication middleware passed from main routes
+  const crmAuthMiddleware = authMiddleware;
 
   // ==================== OPTIMIZED ADMIN-CRM DATA SYNCHRONIZATION SERVICE ====================
 
