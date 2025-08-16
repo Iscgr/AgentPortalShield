@@ -69,7 +69,7 @@ const sessionMiddleware = session({
   cookie: {
     secure: false, // Set to true in production with HTTPS
     httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days for admin panel, CRM uses 48h with 2h refresh cycles
+    maxAge: 4 * 60 * 60 * 1000, // 4 hours base session, extended dynamically for long operations
     sameSite: 'lax' // Better cross-origin handling
   },
   name: 'marfanet.sid', // Custom session name for identification

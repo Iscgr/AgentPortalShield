@@ -9,7 +9,9 @@ import {
   AlertTriangle, 
   History,
   Calculator,
-  RotateCcw
+  RotateCcw,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import {
   Dialog,
@@ -89,7 +91,11 @@ export default function InvoiceEditDialog({
   const [isInitialized, setIsInitialized] = useState(false);
   const [originalAmount, setOriginalAmount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
+  // State for session monitoring
+  const [sessionHealthy, setSessionHealthy] = useState(true);
+  const [sessionCheckInterval, setSessionCheckInterval] = useState<NodeJS.Timeout | null>(null);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -137,17 +143,17 @@ export default function InvoiceEditDialog({
       const transactionId = data.transactionId;
       const editId = data.editId;
       const amountDifference = calculatedAmount - originalAmount;
-      
+
       toast({
         title: "فاکتور ویرایش شد",
         description: `تغییرات با موفقیت ذخیره شد | تراکنش: ${transactionId?.slice(-8) || 'نامشخص'} | تفاوت: ${formatCurrency(amountDifference.toString())} تومان`,
       });
-      
+
       // ✅ SHERLOCK v24.1: Force financial synchronization
       try {
         if (Math.abs(amountDifference) > 0) {
           console.log(`🔄 SHERLOCK v24.1: Synchronizing financial data for representative ${representativeCode}, amount difference: ${amountDifference}`);
-          
+
           // Force sync representative debt immediately
           await apiRequest(`/api/unified-financial/sync-representative/${representativeCode}`, {
             method: 'POST',
@@ -164,13 +170,13 @@ export default function InvoiceEditDialog({
           queryClient.invalidateQueries({ queryKey: ['/api/unified-financial'] });
           queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
           queryClient.invalidateQueries({ queryKey: [`/api/unified-financial/representative`] });
-          
+
           console.log(`✅ SHERLOCK v24.1: Financial synchronization completed for representative ${representativeCode}`);
         }
       } catch (syncError) {
         console.warn('⚠️ Financial sync warning (non-critical):', syncError);
       }
-      
+
       // Mark all records as saved (remove modified/new flags)
       setEditableRecords(prevRecords => 
         prevRecords
@@ -181,16 +187,16 @@ export default function InvoiceEditDialog({
             isModified: false
           }))
       );
-      
+
       setEditMode(false);
       setEditReason("");
       setIsProcessing(false);
-      
+
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: [`/api/representatives/${representativeCode}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
       queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] });
-      
+
       onEditComplete?.();
     },
     onError: (error: any) => {
@@ -217,13 +223,13 @@ export default function InvoiceEditDialog({
         isModified: false,
         isDeleted: false
       }));
-      
+
       const initialAmount = calculateTotalAmount(records);
       setEditableRecords(records);
       setCalculatedAmount(initialAmount);
       setOriginalAmount(parseFloat(invoice.amount)); // Store original for comparison
       setIsInitialized(true);
-      
+
       console.log(`🧮 SHERLOCK v24.1: Initialized invoice edit - Original: ${invoice.amount}, Calculated: ${initialAmount}`);
     }
   }, [usageDetails, isInitialized, editMode, invoice.amount]);
@@ -235,6 +241,11 @@ export default function InvoiceEditDialog({
       setEditMode(false);
       setEditReason("");
       setActiveTab("edit");
+      setSessionHealthy(true); // Reset session health on close
+      if (sessionCheckInterval) {
+        clearInterval(sessionCheckInterval);
+        setSessionCheckInterval(null);
+      }
     }
   }, [isOpen]);
 
@@ -256,6 +267,14 @@ export default function InvoiceEditDialog({
   const startEdit = () => {
     setEditMode(true);
     setEditReason("");
+    setSessionHealthy(true); // Assume healthy at start of edit
+
+    // Start session monitoring every 30 seconds during edit
+    const interval = setInterval(checkSessionHealth, 30000);
+    setSessionCheckInterval(interval);
+
+    // Initial session check
+    checkSessionHealth();
   };
 
   const cancelEdit = () => {
@@ -277,6 +296,12 @@ export default function InvoiceEditDialog({
       setEditableRecords(originalRecords);
       setCalculatedAmount(calculateTotalAmount(originalRecords));
     }
+    
+    if (sessionCheckInterval) {
+      clearInterval(sessionCheckInterval);
+      setSessionCheckInterval(null);
+    }
+    setSessionHealthy(true); // Reset session health on cancel
   };
 
   const addNewRecord = () => {
@@ -385,11 +410,73 @@ export default function InvoiceEditDialog({
       editReason: editReason,
       originalAmount: parseFloat(invoice.amount),
       editedAmount: calculatedAmount,
-      editedBy: 'mgr' // This should come from auth context
+      editedBy: user.username // Use username from auth context
     };
 
     editMutation.mutate(editData);
   };
+
+  // Session health monitoring
+  const checkSessionHealth = async () => {
+    try {
+      const response = await fetch('/api/unified-financial/session-health', {
+        method: 'GET',
+        credentials: 'include' // Important for sending cookies
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSessionHealthy(result.healthy);
+        if (!result.healthy) {
+          setError("جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی کنید.");
+          // Optionally, clear the interval and prevent further saves
+          if (sessionCheckInterval) {
+            clearInterval(sessionCheckInterval);
+            setSessionCheckInterval(null);
+          }
+        }
+      } else {
+        setSessionHealthy(false);
+        setError("اتصال به سرور قطع شده است.");
+        if (sessionCheckInterval) {
+          clearInterval(sessionCheckInterval);
+          setSessionCheckInterval(null);
+        }
+      }
+    } catch (error) {
+      console.error('Session health check failed:', error);
+      setSessionHealthy(false);
+      setError("خطا در بررسی وضعیت جلسه");
+      if (sessionCheckInterval) {
+        clearInterval(sessionCheckInterval);
+        setSessionCheckInterval(null);
+      }
+    }
+  };
+
+  // Effect to handle the interval and initial check when dialog opens
+  useEffect(() => {
+    if (isOpen && !editMode) { // Only start monitoring if dialog is open and not in edit mode yet
+      const interval = setInterval(checkSessionHealth, 30000); // Check every 30 seconds
+      setSessionCheckInterval(interval);
+      checkSessionHealth(); // Perform an initial check
+
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    }
+  }, [isOpen, editMode]); // Depend on isOpen and editMode
+
+  // Cleanup interval when component unmounts
+  useEffect(() => {
+    return () => {
+      if (sessionCheckInterval) {
+        clearInterval(sessionCheckInterval);
+      }
+    };
+  }, [sessionCheckInterval]);
 
   const getRecordRowClass = (record: EditableUsageRecord) => {
     if (record.isDeleted) return "bg-red-50 dark:bg-red-900/20 opacity-60";
@@ -403,6 +490,25 @@ export default function InvoiceEditDialog({
     if (record.isNew) return <Badge variant="default">جدید</Badge>;
     if (record.isModified) return <Badge variant="secondary">ویرایش شده</Badge>;
     return null;
+  };
+
+  const handleSave = async () => {
+    if (!invoice) return;
+
+    // Check session health before save
+    await checkSessionHealth();
+    if (!sessionHealthy) {
+      setError("جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی و مجدداً وارد شوید.");
+      return;
+    }
+
+    if (!editMode) { // If not in edit mode, just open the dialog
+      setIsOpen(true);
+      return;
+    }
+
+    // Proceed with validation and saving if in edit mode
+    validateAndSave();
   };
 
   if (isLoading) {
@@ -431,9 +537,18 @@ export default function InvoiceEditDialog({
       </DialogTrigger>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto rtl">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2 space-x-reverse">
-            <Edit3 className="w-5 h-5" />
-            <span>ویرایش ریز جزئیات فاکتور {invoice.invoiceNumber}</span>
+          <DialogTitle className="text-right flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {sessionHealthy ? (
+                <Wifi className="h-4 w-4 text-green-500" title="جلسه فعال" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-red-500" title="جلسه منقضی شده" />
+              )}
+              <span className={sessionHealthy ? "text-green-600" : "text-red-600"}>
+                {sessionHealthy ? "متصل" : "قطع شده"}
+              </span>
+            </div>
+            ویرایش فاکتور {invoice?.invoiceNumber || invoice?.id}
           </DialogTitle>
           <DialogDescription>
             نماینده: {representativeCode} | مبلغ فعلی: {formatCurrency(invoice.amount)} تومان
@@ -455,7 +570,7 @@ export default function InvoiceEditDialog({
                   <span>خلاصه فاکتور</span>
                   <div className="flex items-center space-x-2 space-x-reverse">
                     {!editMode ? (
-                      <Button onClick={startEdit}>
+                      <Button onClick={startEdit} disabled={!sessionHealthy}>
                         <Edit3 className="w-4 h-4 mr-2" />
                         شروع ویرایش
                       </Button>
@@ -466,8 +581,8 @@ export default function InvoiceEditDialog({
                           انصراف
                         </Button>
                         <Button 
-                          onClick={validateAndSave} 
-                          disabled={editMutation.isPending || isProcessing || editableRecords.filter(r => !r.isDeleted).length === 0}
+                          onClick={handleSave} 
+                          disabled={editMutation.isPending || isProcessing || editableRecords.filter(r => !r.isDeleted).length === 0 || !sessionHealthy}
                           className={Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01 ? 'bg-blue-600 hover:bg-blue-700' : ''}
                         >
                           <Save className="w-4 h-4 mr-2" />
@@ -546,7 +661,7 @@ export default function InvoiceEditDialog({
             {/* Edit Controls */}
             {editMode && (
               <div className="flex items-center space-x-2 space-x-reverse">
-                <Button onClick={addNewRecord} variant="outline">
+                <Button onClick={addNewRecord} variant="outline" disabled={!sessionHealthy}>
                   <Plus className="w-4 h-4 mr-2" />
                   افزودن رکورد جدید
                 </Button>

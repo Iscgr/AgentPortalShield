@@ -20,15 +20,67 @@ const router = Router();
 // Import authentication middleware from main routes
 import type { Request, Response, NextFunction } from 'express';
 
-// Authentication middleware consistent with main system
+// Enhanced Authentication middleware with session extension and proper error handling
 const requireAuth = (req: any, res: any, next: any) => {
-  const isAdminAuthenticated = req.session?.authenticated === true;
-  const isCrmAuthenticated = req.session?.crmAuthenticated === true;
+  console.log('🔐 SHERLOCK v24.3: Authentication check:', {
+    sessionId: req.sessionID,
+    adminAuth: req.session?.authenticated,
+    crmAuth: req.session?.crmAuthenticated,
+    adminUser: !!req.session?.user,
+    crmUser: !!req.session?.crmUser,
+    path: req.path,
+    method: req.method,
+    userAgent: req.get('User-Agent')?.slice(0, 50),
+    timestamp: new Date().toISOString()
+  });
 
-  if (isAdminAuthenticated || isCrmAuthenticated) {
+  // Multiple authentication checks with fallbacks
+  const isAdminAuthenticated = req.session?.authenticated === true ||
+                              (req.session?.user && (req.session.user.role === 'admin' || req.session.user.role === 'ADMIN' || req.session.user.role === 'SUPER_ADMIN'));
+  const isCrmAuthenticated = req.session?.crmAuthenticated === true || req.session?.crmUser;
+
+  // Additional session recovery check
+  const hasValidSession = req.session && (req.session.authenticated || req.session.crmAuthenticated);
+  
+  const isAuthenticated = isAdminAuthenticated || isCrmAuthenticated || hasValidSession;
+
+  if (isAuthenticated) {
+    // Extend session activity - critical for long edit operations
+    try {
+      req.session.touch();
+      if (req.session.crmUser) {
+        req.session.crmUser.lastActivity = new Date().toISOString();
+        // Extend session timeout for edit operations
+        req.session.cookie.maxAge = 4 * 60 * 60 * 1000; // 4 hours for edit operations
+      }
+      if (req.session.user) {
+        req.session.user.lastActivity = new Date().toISOString();
+      }
+      console.log('✅ SHERLOCK v24.3: Auth Success & Session Extended:', {
+        sessionId: req.sessionID,
+        path: req.path,
+        extendedMaxAge: req.session.cookie.maxAge
+      });
+    } catch (sessionError) {
+      console.error('⚠️ Session extension error (non-critical):', sessionError);
+    }
     next();
   } else {
-    res.status(401).json({ error: "احراز هویت نشده" });
+    console.log('❌ SHERLOCK v24.3: Auth Failed - Session Expired:', {
+      sessionId: req.sessionID,
+      path: req.path,
+      hasSession: !!req.session,
+      adminAuth: req.session?.authenticated,
+      crmAuth: req.session?.crmAuthenticated,
+      timestamp: new Date().toISOString()
+    });
+    res.status(401).json({ 
+      error: "انقضای جلسه - لطفاً مجدداً وارد شوید",
+      errorCode: "SESSION_EXPIRED",
+      path: req.path,
+      timestamp: new Date().toISOString(),
+      sessionId: req.sessionID
+    });
   }
 };
 
@@ -462,7 +514,7 @@ router.get('/summary', requireAuth, async (req, res) => {
 });
 
 /**
- * تست authentication
+ * تست authentication و بررسی سلامت جلسه
  */
 router.get('/auth-test', requireAuth, async (req, res) => {
   try {
@@ -472,6 +524,11 @@ router.get('/auth-test', requireAuth, async (req, res) => {
       user: {
         authenticated: true,
         session: !!req.session,
+        sessionId: req.sessionID,
+        adminAuth: req.session?.authenticated,
+        crmAuth: req.session?.crmAuthenticated,
+        sessionMaxAge: req.session?.cookie?.maxAge,
+        lastActivity: req.session?.user?.lastActivity || req.session?.crmUser?.lastActivity,
         timestamp: new Date().toISOString()
       }
     });
@@ -480,6 +537,59 @@ router.get('/auth-test', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: "خطا در تست احراز هویت"
+    });
+  }
+});
+
+/**
+ * ✅ SHERLOCK v24.3: Session health check برای عملیات‌های طولانی مدت (ویرایش فاکتور)
+ * GET /api/unified-financial/session-health
+ */
+router.get('/session-health', (req, res) => {
+  try {
+    const sessionValid = req.session && (req.session.authenticated || req.session.crmAuthenticated);
+    
+    if (sessionValid) {
+      // Extend session for edit operations
+      req.session.touch();
+      if (req.session.cookie) {
+        req.session.cookie.maxAge = 4 * 60 * 60 * 1000; // 4 hours
+      }
+      
+      console.log('💚 SHERLOCK v24.3: Session Health Check - HEALTHY & EXTENDED:', {
+        sessionId: req.sessionID,
+        extendedMaxAge: req.session.cookie?.maxAge,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.json({
+        success: true,
+        healthy: true,
+        sessionId: req.sessionID,
+        extendedUntil: new Date(Date.now() + (req.session.cookie?.maxAge || 0)).toISOString(),
+        message: "جلسه سالم و تمدید شد"
+      });
+    } else {
+      console.log('💔 SHERLOCK v24.3: Session Health Check - EXPIRED:', {
+        sessionId: req.sessionID,
+        hasSession: !!req.session,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.status(401).json({
+        success: false,
+        healthy: false,
+        error: "جلسه منقضی شده است",
+        errorCode: "SESSION_EXPIRED",
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Session health check error:', error);
+    res.status(500).json({
+      success: false,
+      healthy: false,
+      error: "خطا در بررسی سلامت جلسه"
     });
   }
 });
