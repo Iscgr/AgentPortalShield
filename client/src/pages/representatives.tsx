@@ -55,11 +55,27 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { FinancialIntegrityCard } from "@/components/financial-integrity-card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 
 // ✅ SHERLOCK v24.0: کامپوننت Real-time نمایش بدهی با بهینه‌سازی
 function RealTimeDebtCell({ representativeId }: { representativeId: number }) {
   const queryClient = useQueryClient();
-  
+
   const { data: financialData, isLoading, error } = useQuery({
     queryKey: [`unified-financial-representative-${representativeId}`],
     queryFn: () => apiRequest(`/api/unified-financial/representative/${representativeId}`),
@@ -78,10 +94,10 @@ function RealTimeDebtCell({ representativeId }: { representativeId: number }) {
         queryKey: [`unified-financial-representative-${representativeId}`] 
       });
     };
-    
+
     // Listen for custom payment update events
     window.addEventListener(`payment-updated-${representativeId}`, handlePaymentUpdate);
-    
+
     return () => {
       window.removeEventListener(`payment-updated-${representativeId}`, handlePaymentUpdate);
     };
@@ -107,21 +123,6 @@ function RealTimeDebtCell({ representativeId }: { representativeId: number }) {
     </span>
   );
 }
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 
 // SHERLOCK v11.0: Updated interface with standardized terminology
 interface Representative {
@@ -1958,7 +1959,7 @@ function EditInvoiceDialog({
     const newData = { ...parsedUsageData, [field]: value };
     setParsedUsageData(newData);
     setUsageData(JSON.stringify(newData, null, 2));
-    
+
     // ✅ SHERLOCK v24.2: Touch session during long edit operations - 2 hour intervals
     if (Math.random() < 0.05) { // 5% chance to refresh session (reduced frequency due to longer intervals)
       apiRequest('/api/crm/auth/user', { method: 'GET' }).catch(() => {
@@ -2073,19 +2074,17 @@ function EditInvoiceDialog({
   };
 
   const handleSave = async () => {
-    try {
-      setIsLoadingEditInvoice(true);
+    if (!editingUsage || !selectedRep) return;
 
-      // ✅ SHERLOCK v24.1: Session refresh before long operations
-      try {
-        await apiRequest('/api/crm/auth/user', { method: 'GET' });
-      } catch (authError) {
+    try {
+      // Check unified authentication
+      const authCheck = await apiRequest('/api/auth/check');
+      if (!authCheck.authenticated) {
         toast({
-          title: "انقضای جلسه",
+          title: "خطا در احراز هویت",
           description: "لطفاً مجدداً وارد شوید",
-          variant: "destructive"
+          variant: "destructive",
         });
-        window.location.reload();
         return;
       }
 
@@ -2093,7 +2092,7 @@ function EditInvoiceDialog({
         toast({
           title: "خطا",
           description: "مبلغ و تاریخ صدور الزامی است",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -2219,7 +2218,7 @@ function EditInvoiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] admin-glass-card border-white/20 shadow-2xl backdrop-blur-xl overflow-y-auto" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+      <DialogContent className="max-w-4xl max-h-[90vh] admin-glass-card border-white/20 shadow-2xl backdrop-blur-xl" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
         <DialogHeader>
           <DialogTitle className="text-white text-xl flex items-center gap-2">
             <Edit className="w-5 h-5 text-blue-400" />
@@ -2503,7 +2502,7 @@ function CreatePaymentDialog({
   // ✅ SHERLOCK v24.2: Extended auto session refresh for EditInvoiceDialog - 2 hours
   React.useEffect(() => {
     if (!open) return;
-    
+
     const interval = setInterval(() => {
       // Touch session every 2 hours during edit
       apiRequest('/api/crm/auth/user?touch=true', { method: 'GET' })
@@ -2560,12 +2559,12 @@ function CreatePaymentDialog({
 
       // ✅ SHERLOCK v24.0: Immediate UI refresh with custom events
       window.dispatchEvent(new CustomEvent(`payment-updated-${representative.id}`));
-      
+
       // Force refresh all related data immediately
       queryClient.invalidateQueries({ queryKey: ["representatives"] });
       queryClient.invalidateQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/unified-financial/debtors"] });
-      
+
       // Trigger immediate re-fetch
       await queryClient.refetchQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
 
