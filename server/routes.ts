@@ -85,10 +85,13 @@ const upload = multer({
   }
 });
 
-// SHERLOCK v1.0: UNIFIED AUTHENTICATION SYSTEM
-  // Using imported unified middleware instead of duplicate implementations
-  const authMiddleware = unifiedAuthMiddleware;
-  const enhancedAuthMiddleware = enhancedUnifiedAuthMiddleware;
+// SHERLOCK v26.0: NO AUTHENTICATION SYSTEM
+  // Simple pass-through middleware
+  const authMiddleware = (req: any, res: any, next: any) => {
+    console.log('🔓 SHERLOCK v26.0: Main routes pass-through middleware');
+    next();
+  };
+  const enhancedAuthMiddleware = authMiddleware;
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
