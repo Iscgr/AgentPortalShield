@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -50,6 +50,26 @@ import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-route
 // Import database optimization routes registration
 import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
 
+// --- Interfaces for Authentication Middleware ---
+interface AuthSession extends Express.Session {
+  authenticated?: boolean;
+  userId?: number;
+  username?: string;
+  role?: string;
+  permissions?: string[];
+  crmAuthenticated?: boolean;
+  crmUserId?: number;
+  crmUsername?: string;
+  crmRole?: string;
+  crmPermissions?: string[];
+  user?: any;
+  crmUser?: any;
+}
+
+interface AuthRequest extends Request {
+  session?: AuthSession;
+}
+
 
 // Configure multer for file uploads with broader JSON acceptance
 const upload = multer({
@@ -64,13 +84,13 @@ const upload = multer({
   }
 });
 
-// 🔐 SHERLOCK v26.0: Enhanced Authentication Middleware with Session Persistence for Invoice Editing
-  const authMiddleware = (req: any, res: any, next: any) => {
+// SHERLOCK v25.0: Enhanced Authentication Middleware with Session Persistence for Invoice Editing
+  const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
     const path = req.path;
     const method = req.method;
     const sessionId = req.sessionID;
-    
-    console.log('🔐 SHERLOCK v26.0: Authentication check:', {
+
+    console.log('🔐 SHERLOCK v25.0: Authentication check:', {
       sessionId,
       path,
       method,
@@ -84,12 +104,12 @@ const upload = multer({
 
     if (req.session) {
       // Check admin authentication
-      if (req.session.authenticated === true || 
+      if (req.session.authenticated === true ||
           (req.session.user && ['admin', 'ADMIN', 'SUPER_ADMIN'].includes(req.session.user.role))) {
         isAuthenticated = true;
         userType = 'ADMIN';
       }
-      
+
       // Check CRM authentication
       if (req.session.crmAuthenticated === true || req.session.crmUser) {
         isAuthenticated = true;
@@ -98,14 +118,14 @@ const upload = multer({
     }
 
     if (isAuthenticated) {
-      // ✅ SHERLOCK v26.0: Enhanced session extension for invoice editing
+      // ✅ SHERLOCK v25.0: Enhanced session extension for invoice editing
       try {
         req.session.touch();
-        
+
         // Extended session timeout for edit operations (12 hours) - critical for invoice editing
         const extendedTimeout = 12 * 60 * 60 * 1000; // 12 hours
         req.session.cookie.maxAge = extendedTimeout;
-        
+
         // Update last activity with safe property access
         const now = new Date().toISOString();
         if (req.session.user) {
@@ -114,32 +134,32 @@ const upload = multer({
         if (req.session.crmUser) {
           (req.session.crmUser as any).lastActivity = now;
         }
-        
-        console.log('✅ SHERLOCK v26.0: Auth Success & Session Extended:', {
+
+        console.log('✅ SHERLOCK v25.0: Auth Success & Session Extended:', {
           sessionId,
           userType,
           path,
           extendedTimeout: '12 hours',
           timestamp: now
         });
-        
-        // ✅ SHERLOCK v26.0: Force session save to prevent expiration during invoice edits
+
+        // ✅ SHERLOCK v25.0: Force session save to prevent expiration during invoice edits
         req.session.save((err: any) => {
           if (err) {
-            console.error('⚠️ SHERLOCK v26.0: Session save error during auth:', err);
+            console.error('⚠️ SHERLOCK v25.0: Session save error during auth:', err);
             // Continue request even if session save fails to avoid blocking operations
           } else {
-            console.log('✅ SHERLOCK v26.0: Session saved successfully for invoice edit operation');
+            console.log('✅ SHERLOCK v25.0: Session saved successfully for invoice edit operation');
           }
           next();
         });
-        
+
       } catch (sessionError) {
-        console.error('⚠️ SHERLOCK v26.0: Session extension error:', sessionError);
+        console.error('⚠️ SHERLOCK v25.0: Session extension error:', sessionError);
         next(); // Continue even if session extension fails
       }
     } else {
-      console.log('❌ SHERLOCK v26.0: Authentication Failed:', {
+      console.log('❌ SHERLOCK v25.0: Authentication Failed:', {
         sessionId,
         path,
         method,
@@ -148,9 +168,9 @@ const upload = multer({
         crmAuth: req.session?.crmAuthenticated,
         timestamp: new Date().toISOString()
       });
-      
+
       // Enhanced error response with recovery instructions
-      res.status(401).json({ 
+      res.status(401).json({
         error: "جلسه منقضی شده است",
         errorCode: "SESSION_EXPIRED",
         message: "لطفاً صفحه را رفرش کرده و مجدداً وارد شوید",
@@ -161,6 +181,68 @@ const upload = multer({
       });
     }
   };
+
+// SHERLOCK v25.0: Enhanced Authentication with Session Extension
+  const enhancedAuthMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.session?.authenticated && !req.session?.crmAuthenticated) {
+      console.log('🚫 SHERLOCK v25.0: Authentication failed:', {
+        sessionId: req.sessionID,
+        path: req.path,
+        method: req.method,
+        hasSession: !!req.session,
+        timestamp: new Date().toISOString()
+      });
+      return res.status(401).json({
+        success: false,
+        error: "Authentication required",
+        code: "AUTH_REQUIRED",
+        sessionId: req.sessionID,
+        recoveryAction: "REFRESH_AND_LOGIN"
+      });
+    }
+
+    // Log successful authentication
+    console.log('🔐 SHERLOCK v25.0: Authentication check:', {
+      sessionId: req.sessionID,
+      path: req.path,
+      method: req.method,
+      hasSession: !!req.session,
+      timestamp: new Date().toISOString()
+    });
+
+    // Extend session timeout for extended operations (8 hours)
+    if (req.session) {
+      req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
+
+      console.log('✅ SHERLOCK v25.0: Auth Success & Session Extended:', {
+        sessionId: req.sessionID,
+        userType: req.session.authenticated ? 'ADMIN' : 'CRM',
+        path: req.path,
+        extendedTimeout: '8 hours',
+        timestamp: new Date().toISOString()
+      });
+
+      // SHERLOCK v25.2: Synchronized session persistence for all operations
+      return new Promise<void>((resolve, reject) => {
+        req.session!.save((err) => {
+          if (err) {
+            console.error('❌ SHERLOCK v25.2: Session save failed:', err);
+            reject(err);
+          } else {
+            console.log('✅ SHERLOCK v25.2: Session saved successfully for operation:', {
+              method: req.method,
+              path: req.path,
+              timestamp: new Date().toISOString()
+            });
+            resolve();
+          }
+        });
+      }).then(() => next()).catch(next);
+    }
+
+    next();
+  };
+
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -345,17 +427,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).username = adminUser.username;
       (req.session as any).role = adminUser.role || 'ADMIN';
       (req.session as any).permissions = adminUser.permissions || [];
+      (req.session as any).user = adminUser; // Store full user object for easier access
 
-      res.json({
-        success: true,
-        message: "ورود موفقیت‌آمیز",
-        user: {
-          id: adminUser.id,
-          username: adminUser.username,
-          role: adminUser.role || 'ADMIN',
-          permissions: adminUser.permissions || [],
-          hasFullAccess: adminUser.role === 'SUPER_ADMIN' || (Array.isArray(adminUser.permissions) && adminUser.permissions.includes('FULL_ACCESS'))
+      // Save session immediately after login
+      req.session.save((err) => {
+        if (err) {
+          console.error('❌ Error saving session after login:', err);
+          // Continue, but log the error
         }
+        res.json({
+          success: true,
+          message: "ورود موفقیت‌آمیز",
+          user: {
+            id: adminUser.id,
+            username: adminUser.username,
+            role: adminUser.role || 'ADMIN',
+            permissions: adminUser.permissions || [],
+            hasFullAccess: adminUser.role === 'SUPER_ADMIN' || (Array.isArray(adminUser.permissions) && adminUser.permissions.includes('FULL_ACCESS'))
+          }
+        });
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -732,9 +822,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getSalesPartnersStatistics();
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ 
+      res.status(500).json({
         totalPartners: "0",
-        activePartners: "0", 
+        activePartners: "0",
         totalCommission: "0",
         averageCommissionRate: "0"
       });
@@ -1127,31 +1217,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // فاز ۲: Invoice editing API - ویرایش فاکتور
-  app.put("/api/invoices/:id", authMiddleware, async (req, res) => {
+  app.put("/api/invoices/:id", enhancedAuthMiddleware, async (req, res) => {
     try {
-      console.log('🔧 فاز ۲: ویرایش فاکتور');
-      const invoiceId = parseInt(req.params.id);
-      const updateData = req.body;
+      const id = parseInt(req.params.id);
 
-      // Get original invoice for audit trail
-      const originalInvoice = await storage.getInvoice(invoiceId);
+      // SHERLOCK v25.2: Extra session verification for critical operations
+      if (!req.session?.authenticated && !req.session?.crmAuthenticated) {
+        return res.status(401).json({
+          success: false,
+          error: "جلسه منقضی شده است",
+          code: "SESSION_EXPIRED",
+          redirect: "/admin-login"
+        });
+      }
+
+      // Get original invoice for audit trail before update
+      const originalInvoice = await storage.getInvoice(id);
       if (!originalInvoice) {
         return res.status(404).json({ error: "فاکتور یافت نشد" });
       }
 
-      // Update invoice
-      const updatedInvoice = await storage.updateInvoice(invoiceId, updateData);
+      const updateData = req.body;
+      const editedAmount = parseFloat(updateData.amount);
+      const originalAmount = parseFloat(originalInvoice.amount);
 
-      // Update representative financial data if amount changed
-      if (updateData.amount && parseFloat(updateData.amount) !== parseFloat(originalInvoice.amount)) {
-        await storage.updateRepresentativeFinancials(originalInvoice.representativeId);
+      // Update invoice
+      const invoice = await storage.updateInvoice(id, updateData);
+
+      // Update representative financial data if amount changed significantly
+      if (invoice && Math.abs(editedAmount - originalAmount) > 0.01) {
+        await storage.updateRepresentativeFinancials(invoice.representativeId);
       }
 
       // Log the edit
       await storage.createActivityLog({
         type: "invoice_edited",
         description: `فاکتور ${originalInvoice.invoiceNumber} ویرایش شد`,
-        relatedId: invoiceId,
+        relatedId: id,
         metadata: {
           originalAmount: originalInvoice.amount,
           newAmount: updateData.amount,
@@ -1162,13 +1264,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      res.json({
-        success: true,
-        invoice: updatedInvoice
-      });
+      res.json(invoice);
     } catch (error) {
-      console.error('Error updating invoice:', error);
-      res.status(500).json({ error: "خطا در ویرایش فاکتور" });
+      console.error("Error updating invoice:", error);
+      res.status(500).json({ error: "Failed to update invoice" });
     }
   });
 
@@ -2529,13 +2628,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/emergency/reset-users", async (req, res) => {
     try {
       console.log('🚨 Emergency user reset requested');
-      
+
       // Force recreate admin user
       await storage.initializeDefaultAdminUser("mgr", "8679");
-      
-      // Force recreate CRM user  
+
+      // Force recreate CRM user
       await storage.initializeDefaultCrmUser("crm", "8679");
-      
+
       res.json({
         success: true,
         message: "کاربران با موفقیت بازنشانی شدند",
@@ -2543,7 +2642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error in emergency user reset:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "خطا در بازنشانی کاربران",
         details: error instanceof Error ? error.message : 'Unknown error'
       });
