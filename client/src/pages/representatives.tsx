@@ -2074,7 +2074,9 @@ function EditInvoiceDialog({
   };
 
   const handleSave = async () => {
-    if (!editingUsage || !selectedRep) return;
+    if (!representative || !selectedInvoice) return; // Ensure representative and selectedInvoice are available
+
+    setIsLoadingEditInvoice(true);
 
     try {
       // Check unified authentication
@@ -2108,7 +2110,7 @@ function EditInvoiceDialog({
         issueDate,
         status,
         usageData: finalUsageData,
-        representativeId: representative?.id // Pass representativeId for sync
+        representativeId: representative.id // Pass representativeId for sync
       };
 
       await apiRequest(`/api/invoices/${invoice.id}`, {
@@ -2324,8 +2326,6 @@ function EditInvoiceDialog({
           </div>
         </div>
 
-        </div>
-        
         <div className="flex-shrink-0 flex justify-end space-x-2 pt-4 border-t border-white/10 mt-6 px-1">
           <Button
             variant="outline"
