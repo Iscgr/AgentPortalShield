@@ -610,55 +610,42 @@ router.post("/sync-debt", requireAuth, async (req, res) => {
 });
 
 // ========== REPRESENTATIVE FINANCIAL SYNC (INVOICE EDIT) ==========
-router.post("/sync-representative/:representativeCode", requireAuth, async (req, res) => {
+// Representative financial synchronization endpoint
+router.post("/representative/:code/sync", requireAuth, async (req, res) => {
   try {
-    const { representativeCode } = req.params;
-    const { amountDifference, newTotalAmount, oldTotalAmount, invoiceId, reason } = req.body;
+    const { code } = req.params;
+    const { reason, invoiceId, amountChange, timestamp } = req.body;
 
-    console.log(`🔄 SHERLOCK v24.1: Individual representative financial sync requested for ${representativeCode}`);
-    console.log(`💰 Amount change: ${oldTotalAmount} → ${newTotalAmount} (Δ: ${amountDifference})`);
+    console.log(`🔄 SHERLOCK v1.0: Financial sync requested for representative ${code}, reason: ${reason}`);
 
     // Find representative by code
-    const representative = await storage.getRepresentativeByCode(representativeCode);
+    const representative = await storage.getRepresentativeByCode(code);
     if (!representative) {
-      return res.status(404).json({
-        success: false,
-        error: `نماینده با کد ${representativeCode || 'نامشخص'} یافت نشد`
-      });
+      return res.status(404).json({ error: `Representative ${code} not found` });
     }
 
-    // Force immediate cache invalidation before sync
-    UnifiedFinancialEngine.forceInvalidateRepresentative(representative.id);
-
-    // Sync representative debt with new calculations
+    // Sync using unified financial engine
     await unifiedFinancialEngine.syncRepresentativeDebt(representative.id);
 
-    // Log the financial transaction for audit trail
-    console.log(`✅ SHERLOCK v24.1: Financial sync completed for representative ${representativeCode} (ID: ${representative.id})`);
-    console.log(`📊 Reason: ${reason || 'MANUAL_SYNC'}, Invoice ID: ${invoiceId || 'N/A'}`);
+    // Get updated financial data
+    const financialData = await unifiedFinancialEngine.calculateRepresentative(representative.id);
+
+    console.log(`✅ SHERLOCK v1.0: Financial sync completed for ${code} - New debt: ${financialData.actualDebt}`);
 
     res.json({
       success: true,
-      message: `همگام‌سازی مالی نماینده ${representativeCode} انجام شد`,
       data: {
-        representativeId: representative.id,
-        representativeCode,
-        amountDifference,
-        newTotalAmount,
-        oldTotalAmount,
-        syncTimestamp: new Date().toISOString()
+        representativeCode: code,
+        financialData,
+        syncReason: reason,
+        timestamp: new Date().toISOString()
       }
     });
-  } catch (error: any) {
-    console.error(`❌ Error in representative ${req.params.representativeCode} financial sync:`, error);
-    res.status(500).json({
-      success: false,
-      error: "خطا در همگام‌سازی مالی نماینده",
-      details: error.message
-    });
+  } catch (error) {
+    console.error('❌ Financial sync error:', error);
+    res.status(500).json({ error: 'خطا در همگام‌سازی مالی' });
   }
 });
-
 
 export default router;
 

@@ -1983,13 +1983,35 @@ export class DatabaseStorage implements IStorage {
           await db.update(invoices)
             .set({
               amount: editData.editedAmount.toString(),
-              usageData: editData.editedUsageData
+              usageData: editData.editedUsageData,
+              updatedAt: new Date()
             })
             .where(eq(invoices.id, editData.invoiceId));
 
-          // FIX: Update representative debt using correct calculation
-          // Instead of adding difference, recalculate total debt from all invoices
+          console.log(`💰 SHERLOCK v12.1: Invoice ${editData.invoiceId} amount updated from ${editData.originalAmount} to ${editData.editedAmount}`);
+
+          // ENHANCED: Complete financial synchronization
           await this.updateRepresentativeFinancials(invoice.representativeId);
+          
+          // SHERLOCK v1.0: Force unified financial engine synchronization
+          try {
+            const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine');
+            UnifiedFinancialEngine.forceInvalidateRepresentative(invoice.representativeId);
+            console.log(`🔄 SHERLOCK v12.1: Force invalidated financial cache for representative ${invoice.representativeId}`);
+          } catch (cacheError) {
+            console.warn('⚠️ Cache invalidation warning (non-critical):', cacheError);
+          }
+
+          // SHERLOCK v1.0: Update payment status based on new amount
+          try {
+            const updatedInvoiceStatus = await this.calculateInvoicePaymentStatus(editData.invoiceId);
+            await db.update(invoices)
+              .set({ status: updatedInvoiceStatus })
+              .where(eq(invoices.id, editData.invoiceId));
+            console.log(`📊 SHERLOCK v12.1: Invoice ${editData.invoiceId} status updated to: ${updatedInvoiceStatus}`);
+          } catch (statusError) {
+            console.warn('⚠️ Invoice status update warning (non-critical):', statusError);
+          }
 
           // Complete transaction (get updated debt after recalculation)
           const updatedRep = await this.getRepresentative(invoice.representativeId);

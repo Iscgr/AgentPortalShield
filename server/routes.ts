@@ -2111,15 +2111,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const debug = {
       info: (message: string, data?: any) => {
         const timestamp = new Date().toISOString();
-        console.log(`🔍 SHERLOCK v12.0 [INVOICE_EDIT] ${timestamp}: ${message}`, data || '');
+        console.log(`🔍 SHERLOCK v12.1 [INVOICE_EDIT_ENHANCED] ${timestamp}: ${message}`, data || '');
       },
       error: (message: string, error?: any) => {
         const timestamp = new Date().toISOString();
-        console.error(`❌ SHERLOCK v12.0 [INVOICE_EDIT] ${timestamp}: ${message}`, error || '');
+        console.error(`❌ SHERLOCK v12.1 [INVOICE_EDIT_ENHANCED] ${timestamp}: ${message}`, error || '');
       },
       success: (message: string, data?: any) => {
         const timestamp = new Date().toISOString();
-        console.log(`✅ SHERLOCK v12.0 [INVOICE_EDIT] ${timestamp}: ${message}`, data || '');
+        console.log(`✅ SHERLOCK v12.1 [INVOICE_EDIT_ENHANCED] ${timestamp}: ${message}`, data || '');
+      },
+      financial: (message: string, data?: any) => {
+        const timestamp = new Date().toISOString();
+        console.log(`💰 SHERLOCK v12.1 [FINANCIAL_SYNC] ${timestamp}: ${message}`, data || '');
       }
     };
 

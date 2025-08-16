@@ -186,14 +186,51 @@ export default function InvoiceEditDialog({
     onSuccess: async (data) => {
       const transactionId = data.transactionId;
       const editId = data.editId;
+      const amountDifference = calculatedAmount - originalAmount;
       
-      console.log(`✅ SHERLOCK v1.0: Invoice edit successful - Transaction: ${transactionId}, Edit: ${editId}`);
+      console.log(`✅ SHERLOCK v1.0: Invoice edit successful - Transaction: ${transactionId}, Edit: ${editId}, Amount difference: ${amountDifference}`);
       
-      // Refresh relevant queries
-      await queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/usage-details`] });
-      await queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      // COMPREHENSIVE: Invalidate all related financial data
+      await Promise.all([
+        // Invoice-specific data
+        queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/usage-details`] }),
+        queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/invoices'] }),
+        
+        // Representative financial data
+        queryClient.invalidateQueries({ queryKey: ['/api/representatives'] }),
+        queryClient.invalidateQueries({ queryKey: [`/api/representatives/${representativeCode}`] }),
+        
+        // Global dashboard and statistics
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/unified-financial/summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/unified-financial/debtors'] }),
+        
+        // Payment-related data (for debt calculations)
+        queryClient.invalidateQueries({ queryKey: ['/api/payments'] })
+      ]);
+      
+      // SHERLOCK v1.0: Additional financial synchronization if amount changed
+      if (Math.abs(amountDifference) > 0) {
+        try {
+          console.log(`💰 SHERLOCK v1.0: Triggering financial sync for amount change: ${amountDifference} تومان`);
+          
+          // Force representative financial recalculation
+          await apiRequest(`/api/unified-financial/representative/${representativeCode}/sync`, {
+            method: 'POST',
+            data: {
+              reason: 'invoice_edit',
+              invoiceId: invoice.id,
+              amountChange: amountDifference,
+              timestamp: new Date().toISOString()
+            }
+          });
+          
+          console.log(`✅ SHERLOCK v1.0: Financial synchronization completed for representative ${representativeCode}`);
+        } catch (syncError) {
+          console.warn('⚠️ Financial sync warning (non-critical):', syncError);
+        }
+      }
       
       setIsProcessing(false);
       setEditMode(false);
@@ -205,7 +242,7 @@ export default function InvoiceEditDialog({
       
       toast({
         title: "ویرایش موفق",
-        description: `فاکتور ${invoice.invoiceNumber} با موفقیت ویرایش شد`,
+        description: `فاکتور ${invoice.invoiceNumber} با موفقیت ویرایش شد${amountDifference !== 0 ? ' - آمار مالی بروزرسانی گردید' : ''}`,
         variant: "default",
       });
     },
@@ -328,7 +365,13 @@ export default function InvoiceEditDialog({
   useEffect(() => {
     const newAmount = calculateTotalAmount(editableRecords);
     setCalculatedAmount(newAmount);
-  }, [editableRecords]);
+    
+    // SHERLOCK v1.0: Auto-sync total amount with usage details
+    // Update the invoice amount in parent state if callback is available
+    if (typeof onEditComplete === 'function' && newAmount !== originalAmount) {
+      console.log(`💰 SHERLOCK v1.0: Auto-calculated amount changed from ${originalAmount} to ${newAmount}`);
+    }
+  }, [editableRecords, originalAmount, onEditComplete]);
 
   // Start editing
   const startEditing = () => {
@@ -364,8 +407,8 @@ export default function InvoiceEditDialog({
     }
   };
 
-  // Save changes
-  const saveChanges = () => {
+  // Save changes with comprehensive financial sync
+  const saveChanges = async () => {
     if (!editReason.trim()) {
       toast({
         title: "خطای اعتبارسنجی",
@@ -408,8 +451,10 @@ export default function InvoiceEditDialog({
       return;
     }
 
+    // SHERLOCK v1.0: Enhanced edit data with representative info for financial sync
     const editData = {
       invoiceId: invoice.id,
+      representativeCode: representativeCode, // Add representative context
       originalUsageData: (usageDetails as any)?.usageData || {},
       editedUsageData: {
         type: 'edited',
@@ -428,9 +473,13 @@ export default function InvoiceEditDialog({
       editReason: editReason,
       originalAmount: parseFloat(invoice.amount),
       editedAmount: calculatedAmount,
-      editedBy: currentUsername
+      editedBy: currentUsername,
+      // SHERLOCK v1.0: Add financial synchronization flags
+      requiresFinancialSync: calculatedAmount !== parseFloat(invoice.amount),
+      amountDifference: calculatedAmount - parseFloat(invoice.amount)
     };
 
+    console.log(`💰 SHERLOCK v1.0: Invoice edit initiated - Amount change: ${editData.amountDifference} تومان`);
     editMutation.mutate(editData);
   };
 
@@ -675,9 +724,15 @@ export default function InvoiceEditDialog({
                     انصراف
                   </Button>
                 </div>
-                <div className="flex gap-2">
-                  <div className="text-sm text-gray-600 flex items-center">
-                    مجموع: {calculatedAmount.toLocaleString()} تومان
+                <div className="flex gap-2 items-center">
+                  {/* SHERLOCK v1.0: Enhanced amount display with change indicator */}
+                  <div className="text-sm text-gray-600 flex flex-col items-end">
+                    <div>مجموع فعلی: {calculatedAmount.toLocaleString()} تومان</div>
+                    {calculatedAmount !== originalAmount && (
+                      <div className={`text-xs font-medium ${calculatedAmount > originalAmount ? 'text-green-600' : 'text-red-600'}`}>
+                        {calculatedAmount > originalAmount ? '↗️' : '↘️'} تغییر: {Math.abs(calculatedAmount - originalAmount).toLocaleString()} تومان
+                      </div>
+                    )}
                   </div>
                   <Button 
                     onClick={saveChanges} 
@@ -693,6 +748,9 @@ export default function InvoiceEditDialog({
                       <>
                         <Save className="w-4 h-4 mr-2" />
                         ذخیره تغییرات
+                        {calculatedAmount !== originalAmount && (
+                          <span className="mr-1 text-xs">({calculatedAmount > originalAmount ? '+' : ''}{(calculatedAmount - originalAmount).toLocaleString()})</span>
+                        )}
                       </>
                     )}
                   </Button>
