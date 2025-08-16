@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/auth-context";
-import { useCrmAuth } from "@/hooks/use-crm-auth";
+import { useUnifiedAuth, useCrmAuth } from "@/contexts/unified-auth-context";
 import { useLocation } from "wouter";
 
 const loginSchema = z.object({
@@ -26,25 +25,17 @@ export default function UnifiedAuth() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Admin auth
-  const { loginMutation: adminLoginMutation, isAuthenticated: isAdminAuth } = useAuth();
+  // Unified auth
+  const { 
+    adminLoginMutation, 
+    crmLoginMutation,
+    isAuthenticated: isAdminAuth,
+    userType,
+    user
+  } = useUnifiedAuth();
   
-  // CRM auth - handle safely in case provider is not available
-  let crmLoginMutation, isCrmAuth;
-  try {
-    const crmAuth = useCrmAuth();
-    crmLoginMutation = crmAuth.loginMutation;
-    isCrmAuth = crmAuth.user !== null;
-  } catch (error) {
-    // CRM auth context not available, create fallback
-    crmLoginMutation = {
-      mutate: () => {},
-      isPending: false,
-      isError: false,
-      error: null
-    };
-    isCrmAuth = false;
-  }
+  // Check CRM authentication
+  const isCrmAuth = userType === 'CRM' && isAdminAuth;
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),

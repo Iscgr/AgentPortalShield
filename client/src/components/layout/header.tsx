@@ -59,7 +59,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
             >
               <Menu className="w-5 h-5" />
             </Button>
-            
+
             <div>
               <h1 className="text-xl lg:text-2xl font-bold text-white">
                 داشبورد مدیریت مالی
@@ -69,13 +69,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2 lg:space-x-4 space-x-reverse">
             {/* Current Time */}
             <div className="text-sm text-blue-200 ltr hidden md:block bg-black/20 px-3 py-1 rounded-lg backdrop-blur-sm">
               {currentTime.toLocaleTimeString('fa-IR')}
             </div>
-            
+
             {/* Telegram Integration Status */}
             <Badge 
               variant={isTelegramConnected ? "default" : "destructive"}
@@ -93,7 +93,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 {isTelegramConnected ? "متصل" : "قطع"}
               </span>
             </Badge>
-            
+
             {/* AI Assistant Quick Access */}
             <Button 
               variant="outline"
@@ -104,12 +104,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
               <Bot className="w-4 h-4 mr-2" />
               دستیار هوشمند
             </Button>
-            
+
             {/* Logout Button */}
             <Button 
               variant="outline"
               size="sm"
-              className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/30 hover:text-white backdrop-blur-sm transition-all duration-200"
+              className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white backdrop-blur-sm transition-all duration-200"
               onClick={handleLogout}
             >
               <LogOut className="w-4 h-4 mr-2" />
