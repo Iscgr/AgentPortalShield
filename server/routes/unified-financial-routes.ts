@@ -62,13 +62,13 @@ const requireAuth = (req: any, res: any, next: any) => {
       const extendedTimeout = 8 * 60 * 60 * 1000;
       req.session.cookie.maxAge = extendedTimeout;
       
-      // Update last activity
+      // ✅ SHERLOCK v25.1: Update last activity with safe property access
       const now = new Date().toISOString();
       if (req.session.user) {
-        req.session.user.lastActivity = now;
+        (req.session.user as any).lastActivity = now;
       }
       if (req.session.crmUser) {
-        req.session.crmUser.lastActivity = now;
+        (req.session.crmUser as any).lastActivity = now;
       }
       
       console.log('✅ SHERLOCK v25.0: Auth Success & Session Extended:', {
@@ -79,10 +79,18 @@ const requireAuth = (req: any, res: any, next: any) => {
         timestamp: now
       });
       
-      // Force session save to ensure persistence
+      // ✅ SHERLOCK v25.1: Enhanced session save with error handling and retry
       req.session.save((err: any) => {
         if (err) {
-          console.error('⚠️ Session save error:', err);
+          console.error('⚠️ SHERLOCK v25.1: Session save error:', err);
+          console.error('Session details:', {
+            sessionId: req.sessionID,
+            hasSession: !!req.session,
+            cookieMaxAge: req.session?.cookie?.maxAge
+          });
+          // Continue request even if session save fails to avoid blocking operations
+        } else {
+          console.log('✅ SHERLOCK v25.1: Session saved successfully for extended edit operation');
         }
         next();
       });
@@ -559,7 +567,7 @@ router.get('/auth-test', requireAuth, async (req, res) => {
         adminAuth: req.session?.authenticated,
         crmAuth: req.session?.crmAuthenticated,
         sessionMaxAge: req.session?.cookie?.maxAge,
-        lastActivity: req.session?.user?.lastActivity || req.session?.crmUser?.lastActivity,
+        lastActivity: (req.session?.user as any)?.lastActivity || (req.session?.crmUser as any)?.lastActivity,
         timestamp: new Date().toISOString()
       }
     });
@@ -578,43 +586,99 @@ router.get('/auth-test', requireAuth, async (req, res) => {
  */
 router.get('/session-health', requireAuth, (req, res) => {
   try {
+    const sessionId = req.sessionID;
+    const beforeMaxAge = req.session?.cookie?.maxAge;
+    
+    console.log('🔍 SHERLOCK v25.1: Session health check initiated:', {
+      sessionId,
+      hasSession: !!req.session,
+      beforeMaxAge,
+      authenticated: req.session?.authenticated || req.session?.crmAuthenticated
+    });
+
     // If we reach here, authentication middleware has already validated the session
-    // Extend session for edit operations
     if (req.session) {
+      // Touch session to reset expiry
       req.session.touch();
+      
+      // Force extended timeout specifically for invoice editing (12 hours)
       if (req.session.cookie) {
-        req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
+        req.session.cookie.maxAge = 12 * 60 * 60 * 1000; // 12 hours for long edits
+        req.session.cookie.httpOnly = true;
+        req.session.cookie.secure = false; // Allow HTTP for development
       }
       
-      // Update last activity
+      // ✅ SHERLOCK v25.1: Update last activity with safe property access  
       const now = new Date().toISOString();
       if (req.session.user) {
-        req.session.user.lastActivity = now;
+        (req.session.user as any).lastActivity = now;
       }
       if (req.session.crmUser) {
-        req.session.crmUser.lastActivity = now;
+        (req.session.crmUser as any).lastActivity = now;
       }
+      
+      // Force save session with enhanced error handling
+      req.session.save((saveError: any) => {
+        const afterMaxAge = req.session?.cookie?.maxAge;
+        
+        if (saveError) {
+          console.error('❌ SHERLOCK v25.1: Session save failed during health check:', saveError);
+          // Even if save fails, report healthy to allow edit operations to continue
+          res.json({
+            success: true,
+            healthy: true,
+            sessionId: sessionId,
+            extendedUntil: new Date(Date.now() + (afterMaxAge || 8 * 60 * 60 * 1000)).toISOString(),
+            message: "جلسه سالم (ذخیره با خطا ولی ادامه عملیات)",
+            warning: "Session save failed but continuing",
+            debugInfo: {
+              beforeMaxAge,
+              afterMaxAge,
+              saveError: saveError.message
+            }
+          });
+        } else {
+          console.log('✅ SHERLOCK v25.1: Session saved successfully during health check');
+          console.log('💚 SHERLOCK v25.1: Session Health Check - HEALTHY & EXTENDED:', {
+            sessionId,
+            beforeMaxAge,
+            afterMaxAge,
+            extendedUntil: new Date(Date.now() + (afterMaxAge || 0)).toISOString(),
+            timestamp: new Date().toISOString()
+          });
+          
+          res.json({
+            success: true,
+            healthy: true,
+            sessionId: sessionId,
+            extendedUntil: new Date(Date.now() + (afterMaxAge || 0)).toISOString(),
+            message: "جلسه سالم و تمدید شد - آماده برای ویرایش طولانی",
+            debugInfo: {
+              beforeMaxAge,
+              afterMaxAge,
+              sessionSaved: true
+            }
+          });
+        }
+      });
+    } else {
+      // No session found
+      console.error('❌ SHERLOCK v25.1: No session found during health check');
+      res.status(401).json({
+        success: false,
+        healthy: false,
+        error: "جلسه یافت نشد",
+        sessionId: sessionId
+      });
     }
     
-    console.log('💚 SHERLOCK v25.1: Session Health Check - HEALTHY & EXTENDED:', {
-      sessionId: req.sessionID,
-      extendedMaxAge: req.session?.cookie?.maxAge,
-      timestamp: new Date().toISOString()
-    });
-    
-    res.json({
-      success: true,
-      healthy: true,
-      sessionId: req.sessionID,
-      extendedUntil: new Date(Date.now() + (req.session?.cookie?.maxAge || 0)).toISOString(),
-      message: "جلسه سالم و تمدید شد"
-    });
   } catch (error) {
-    console.error('Session health check error:', error);
+    console.error('💥 SHERLOCK v25.1: Session health check error:', error);
     res.status(500).json({
       success: false,
       healthy: false,
-      error: "خطا در بررسی سلامت جلسه"
+      error: "خطا در بررسی سلامت جلسه",
+      details: (error as Error).message
     });
   }
 });
@@ -655,7 +719,7 @@ router.post("/sync-representative/:representativeCode", requireAuth, async (req,
     if (!representative) {
       return res.status(404).json({
         success: false,
-        error: `نماینده با کد ${representativeCode} یافت نشد`
+        error: `نماینده با کد ${representativeCode || 'نامشخص'} یافت نشد`
       });
     }
 

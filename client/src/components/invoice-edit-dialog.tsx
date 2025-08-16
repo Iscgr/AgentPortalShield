@@ -553,9 +553,9 @@ export default function InvoiceEditDialog({
           <DialogTitle className="text-right flex items-center justify-between">
             <div className="flex items-center gap-2">
               {sessionHealthy ? (
-                <Wifi className="h-4 w-4 text-green-500" title="جلسه فعال" />
+                <Wifi className="h-4 w-4 text-green-500" />
               ) : (
-                <WifiOff className="h-4 w-4 text-red-500" title="جلسه منقضی شده" />
+                <WifiOff className="h-4 w-4 text-red-500" />
               )}
               <span className={sessionHealthy ? "text-green-600" : "text-red-600"}>
                 {sessionHealthy ? "متصل" : "قطع شده"}
