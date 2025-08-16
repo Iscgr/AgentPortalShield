@@ -18,7 +18,7 @@ const NewRepresentativesManager = lazy(() => import('./new-representatives-manag
 const EnhancedAIHelper = lazy(() => import('./enhanced-ai-helper'));
 const SettingsHub = lazy(() => import('./settings/SettingsHub').then(module => ({ default: module.SettingsHub })));
 import { SettingsPasswordModal } from './settings/SettingsPasswordModal';
-import { useCrmAuth } from '@/hooks/use-crm-auth';
+import { useCrmAuth } from '@/hooks/use-crm-auth.ts';
 import { useToast } from '@/hooks/use-toast';
 
 
