@@ -573,48 +573,42 @@ router.get('/auth-test', requireAuth, async (req, res) => {
 });
 
 /**
- * ✅ SHERLOCK v24.3: Session health check برای عملیات‌های طولانی مدت (ویرایش فاکتور)
+ * ✅ SHERLOCK v25.1: Session health check برای عملیات‌های طولانی مدت (ویرایش فاکتور)
  * GET /api/unified-financial/session-health
  */
-router.get('/session-health', (req, res) => {
+router.get('/session-health', requireAuth, (req, res) => {
   try {
-    const sessionValid = req.session && (req.session.authenticated || req.session.crmAuthenticated);
-    
-    if (sessionValid) {
-      // Extend session for edit operations
+    // If we reach here, authentication middleware has already validated the session
+    // Extend session for edit operations
+    if (req.session) {
       req.session.touch();
       if (req.session.cookie) {
-        req.session.cookie.maxAge = 4 * 60 * 60 * 1000; // 4 hours
+        req.session.cookie.maxAge = 8 * 60 * 60 * 1000; // 8 hours
       }
       
-      console.log('💚 SHERLOCK v24.3: Session Health Check - HEALTHY & EXTENDED:', {
-        sessionId: req.sessionID,
-        extendedMaxAge: req.session.cookie?.maxAge,
-        timestamp: new Date().toISOString()
-      });
-      
-      res.json({
-        success: true,
-        healthy: true,
-        sessionId: req.sessionID,
-        extendedUntil: new Date(Date.now() + (req.session.cookie?.maxAge || 0)).toISOString(),
-        message: "جلسه سالم و تمدید شد"
-      });
-    } else {
-      console.log('💔 SHERLOCK v24.3: Session Health Check - EXPIRED:', {
-        sessionId: req.sessionID,
-        hasSession: !!req.session,
-        timestamp: new Date().toISOString()
-      });
-      
-      res.status(401).json({
-        success: false,
-        healthy: false,
-        error: "جلسه منقضی شده است",
-        errorCode: "SESSION_EXPIRED",
-        timestamp: new Date().toISOString()
-      });
+      // Update last activity
+      const now = new Date().toISOString();
+      if (req.session.user) {
+        req.session.user.lastActivity = now;
+      }
+      if (req.session.crmUser) {
+        req.session.crmUser.lastActivity = now;
+      }
     }
+    
+    console.log('💚 SHERLOCK v25.1: Session Health Check - HEALTHY & EXTENDED:', {
+      sessionId: req.sessionID,
+      extendedMaxAge: req.session?.cookie?.maxAge,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({
+      success: true,
+      healthy: true,
+      sessionId: req.sessionID,
+      extendedUntil: new Date(Date.now() + (req.session?.cookie?.maxAge || 0)).toISOString(),
+      message: "جلسه سالم و تمدید شد"
+    });
   } catch (error) {
     console.error('Session health check error:', error);
     res.status(500).json({

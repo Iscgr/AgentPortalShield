@@ -136,7 +136,20 @@ export default function InvoiceEditDialog({
   const editMutation = useMutation({
     mutationFn: async (editData: any) => {
       setIsProcessing(true);
+      
+      // Ensure session is healthy before attempting to save
+      await checkSessionHealth();
+      if (!sessionHealthy) {
+        throw new Error("جلسه منقضی شده است. لطفاً صفحه را بازخوانی کنید.");
+      }
+      
       const response = await apiRequest('/api/invoices/edit', { method: 'POST', data: editData });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'خطا در ذخیره تغییرات');
+      }
+      
       return response.json();
     },
     onSuccess: async (data) => {
@@ -416,20 +429,24 @@ export default function InvoiceEditDialog({
     editMutation.mutate(editData);
   };
 
-  // Session health monitoring
+  // Session health monitoring - using the same auth system as invoice edit
   const checkSessionHealth = async () => {
     try {
-      const response = await fetch('/api/unified-financial/session-health', {
-        method: 'GET',
-        credentials: 'include' // Important for sending cookies
+      // Use the same apiRequest method as the edit mutation to ensure consistency
+      const response = await apiRequest('/api/unified-financial/session-health', { 
+        method: 'GET' 
       });
 
       if (response.ok) {
         const result = await response.json();
         setSessionHealthy(result.healthy);
         if (!result.healthy) {
-          setError("جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی کنید.");
-          // Optionally, clear the interval and prevent further saves
+          toast({
+            title: "جلسه منقضی شده",
+            description: "جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی کنید.",
+            variant: "destructive",
+          });
+          // Clear the interval and prevent further saves
           if (sessionCheckInterval) {
             clearInterval(sessionCheckInterval);
             setSessionCheckInterval(null);
@@ -437,7 +454,11 @@ export default function InvoiceEditDialog({
         }
       } else {
         setSessionHealthy(false);
-        setError("اتصال به سرور قطع شده است.");
+        toast({
+          title: "خطای اتصال",
+          description: "اتصال به سرور قطع شده است.",
+          variant: "destructive",
+        });
         if (sessionCheckInterval) {
           clearInterval(sessionCheckInterval);
           setSessionCheckInterval(null);
@@ -446,7 +467,11 @@ export default function InvoiceEditDialog({
     } catch (error) {
       console.error('Session health check failed:', error);
       setSessionHealthy(false);
-      setError("خطا در بررسی وضعیت جلسه");
+      toast({
+        title: "خطای بررسی جلسه",
+        description: "خطا در بررسی وضعیت جلسه",
+        variant: "destructive",
+      });
       if (sessionCheckInterval) {
         clearInterval(sessionCheckInterval);
         setSessionCheckInterval(null);
@@ -454,29 +479,13 @@ export default function InvoiceEditDialog({
     }
   };
 
-  // Effect to handle the interval and initial check when dialog opens
+  // Simplified session health check - only on critical operations
   useEffect(() => {
-    if (isOpen && !editMode) { // Only start monitoring if dialog is open and not in edit mode yet
-      const interval = setInterval(checkSessionHealth, 30000); // Check every 30 seconds
-      setSessionCheckInterval(interval);
-      checkSessionHealth(); // Perform an initial check
-
-      return () => {
-        if (interval) {
-          clearInterval(interval);
-        }
-      };
+    if (isOpen && editMode) {
+      // Only check session health when starting edit mode
+      checkSessionHealth();
     }
-  }, [isOpen, editMode]); // Depend on isOpen and editMode
-
-  // Cleanup interval when component unmounts
-  useEffect(() => {
-    return () => {
-      if (sessionCheckInterval) {
-        clearInterval(sessionCheckInterval);
-      }
-    };
-  }, [sessionCheckInterval]);
+  }, [isOpen, editMode]);
 
   const getRecordRowClass = (record: EditableUsageRecord) => {
     if (record.isDeleted) return "bg-red-50 dark:bg-red-900/20 opacity-60";
@@ -495,10 +504,14 @@ export default function InvoiceEditDialog({
   const handleSave = async () => {
     if (!invoice) return;
 
-    // Check session health before save
+    // Check session health before save using the same authentication method
     await checkSessionHealth();
     if (!sessionHealthy) {
-      setError("جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی و مجدداً وارد شوید.");
+      toast({
+        title: "جلسه منقضی شده",
+        description: "جلسه شما منقضی شده است. لطفاً صفحه را بازخوانی و مجدداً وارد شوید.",
+        variant: "destructive",
+      });
       return;
     }
 
