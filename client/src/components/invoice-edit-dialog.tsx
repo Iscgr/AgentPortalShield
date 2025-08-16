@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -45,10 +44,10 @@ interface InvoiceEditDialogProps {
   onEditComplete?: () => void;
 }
 
-export default function InvoiceEditDialog({ 
-  invoice, 
+export default function InvoiceEditDialog({
+  invoice,
   representativeCode,
-  onEditComplete 
+  onEditComplete
 }: InvoiceEditDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -66,11 +65,11 @@ export default function InvoiceEditDialog({
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // SHERLOCK v1.0: UNIFIED AUTHENTICATION SYSTEM
   const adminAuth = useAuth();
   const crmAuth = useCrmAuth();
-  
+
   // Determine authentication status
   const isAuthenticated = adminAuth.isAuthenticated || crmAuth.isAuthenticated;
   const currentUser = adminAuth.isAuthenticated ? adminAuth.user : crmAuth.user;
@@ -113,7 +112,7 @@ export default function InvoiceEditDialog({
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
       });
-      
+
       setSessionHealthy(response.ok);
       return response.ok;
     } catch (error) {
@@ -127,13 +126,13 @@ export default function InvoiceEditDialog({
   useEffect(() => {
     if (isOpen && editMode) {
       checkSessionHealth();
-      
+
       const interval = setInterval(() => {
         checkSessionHealth();
       }, 2 * 60 * 1000); // Every 2 minutes
-      
+
       setSessionCheckInterval(interval);
-      
+
       return () => {
         if (interval) clearInterval(interval);
       };
@@ -169,52 +168,52 @@ export default function InvoiceEditDialog({
   const editMutation = useMutation({
     mutationFn: async (editData: any) => {
       setIsProcessing(true);
-      
+
       // Enhanced session validation before save
       const isSessionValid = await checkSessionHealth();
       if (!isSessionValid) {
         throw new Error("جلسه منقضی شده است. لطفاً صفحه را بازخوانی کنید و مجدداً وارد شوید.");
       }
-      
-      const response = await apiRequest('/api/invoices/edit', { 
-        method: 'POST', 
-        data: editData 
+
+      const response = await apiRequest('/api/invoices/edit', {
+        method: 'POST',
+        data: editData
       });
-      
+
       return response;
     },
     onSuccess: async (data) => {
       const transactionId = data.transactionId;
       const editId = data.editId;
       const amountDifference = calculatedAmount - originalAmount;
-      
+
       console.log(`✅ SHERLOCK v1.0: Invoice edit successful - Transaction: ${transactionId}, Edit: ${editId}, Amount difference: ${amountDifference}`);
-      
+
       // COMPREHENSIVE: Invalidate all related financial data
       await Promise.all([
         // Invoice-specific data
         queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/usage-details`] }),
         queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] }),
         queryClient.invalidateQueries({ queryKey: ['/api/invoices'] }),
-        
+
         // Representative financial data
         queryClient.invalidateQueries({ queryKey: ['/api/representatives'] }),
         queryClient.invalidateQueries({ queryKey: [`/api/representatives/${representativeCode}`] }),
-        
+
         // Global dashboard and statistics
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] }),
         queryClient.invalidateQueries({ queryKey: ['/api/unified-financial/summary'] }),
         queryClient.invalidateQueries({ queryKey: ['/api/unified-financial/debtors'] }),
-        
+
         // Payment-related data (for debt calculations)
         queryClient.invalidateQueries({ queryKey: ['/api/payments'] })
       ]);
-      
+
       // SHERLOCK v1.0: Additional financial synchronization if amount changed
       if (Math.abs(amountDifference) > 0) {
         try {
           console.log(`💰 SHERLOCK v1.0: Triggering financial sync for amount change: ${amountDifference} تومان`);
-          
+
           // Force representative financial recalculation
           await apiRequest(`/api/unified-financial/representative/${representativeCode}/sync`, {
             method: 'POST',
@@ -225,21 +224,21 @@ export default function InvoiceEditDialog({
               timestamp: new Date().toISOString()
             }
           });
-          
+
           console.log(`✅ SHERLOCK v1.0: Financial synchronization completed for representative ${representativeCode}`);
         } catch (syncError) {
           console.warn('⚠️ Financial sync warning (non-critical):', syncError);
         }
       }
-      
+
       setIsProcessing(false);
       setEditMode(false);
       setIsOpen(false);
-      
+
       if (onEditComplete) {
         onEditComplete();
       }
-      
+
       toast({
         title: "ویرایش موفق",
         description: `فاکتور ${invoice.invoiceNumber} با موفقیت ویرایش شد${amountDifference !== 0 ? ' - آمار مالی بروزرسانی گردید' : ''}`,
@@ -249,9 +248,9 @@ export default function InvoiceEditDialog({
     onError: (error: any) => {
       setIsProcessing(false);
       console.error('Invoice edit error:', error);
-      
+
       const errorMessage = error?.message || error?.response?.data?.error || 'خطای ناشناخته در ویرایش فاکتور';
-      
+
       if (errorMessage.includes('جلسه منقضی')) {
         toast({
           title: "جلسه منقضی شده",
@@ -365,7 +364,7 @@ export default function InvoiceEditDialog({
   useEffect(() => {
     const newAmount = calculateTotalAmount(editableRecords);
     setCalculatedAmount(newAmount);
-    
+
     // SHERLOCK v1.0: Auto-sync total amount with usage details
     // Update the invoice amount in parent state if callback is available
     if (typeof onEditComplete === 'function' && newAmount !== originalAmount) {
@@ -428,7 +427,7 @@ export default function InvoiceEditDialog({
     }
 
     const activeRecords = editableRecords.filter(record => !record.isDeleted);
-    
+
     if (activeRecords.length === 0) {
       toast({
         title: "خطای اعتبارسنجی",
@@ -438,7 +437,7 @@ export default function InvoiceEditDialog({
       return;
     }
 
-    const invalidRecords = activeRecords.filter(record => 
+    const invalidRecords = activeRecords.filter(record =>
       !record.description.trim() || record.amount <= 0
     );
 
@@ -505,7 +504,7 @@ export default function InvoiceEditDialog({
           ویرایش ریز جزئیات
         </Button>
       </DialogTrigger>
-      
+
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -548,7 +547,7 @@ export default function InvoiceEditDialog({
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">کد نماینده: {representativeCode}</Badge>
                     <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
-                      {invoice.status === 'paid' ? 'پرداخت شده' : 
+                      {invoice.status === 'paid' ? 'پرداخت شده' :
                        invoice.status === 'partial' ? 'پرداخت جزئی' : 'پرداخت نشده'}
                     </Badge>
                   </div>
@@ -623,7 +622,7 @@ export default function InvoiceEditDialog({
                           </Badge>
                           <span className="text-sm text-gray-500">رکورد #{index + 1}</span>
                         </div>
-                        
+
                         {editMode && (
                           <div className="flex gap-2">
                             {record.isDeleted ? (
@@ -649,7 +648,7 @@ export default function InvoiceEditDialog({
                             disabled={!editMode || record.isDeleted}
                           />
                         </div>
-                        
+
                         <div>
                           <Label htmlFor={`timestamp-${record.id}`}>زمان</Label>
                           <Input
@@ -660,12 +659,12 @@ export default function InvoiceEditDialog({
                             disabled={!editMode || record.isDeleted}
                           />
                         </div>
-                        
+
                         <div>
                           <Label htmlFor={`type-${record.id}`}>نوع رویداد</Label>
                           <Select
                             value={record.event_type}
-                            onValueChange={(value) => updateRecord(record.id, 'event_type', value)}
+                            onValueChange={(value) => updateRecord(record.id, 'event_type', value as any)}
                             disabled={!editMode || record.isDeleted}
                           >
                             <SelectTrigger>
@@ -678,7 +677,7 @@ export default function InvoiceEditDialog({
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         <div>
                           <Label htmlFor={`amount-${record.id}`}>مبلغ (تومان)</Label>
                           <Input
@@ -692,7 +691,7 @@ export default function InvoiceEditDialog({
                           />
                         </div>
                       </div>
-                      
+
                       <div className="mt-4">
                         <Label htmlFor={`description-${record.id}`}>توضیحات</Label>
                         <Textarea
@@ -734,8 +733,8 @@ export default function InvoiceEditDialog({
                       </div>
                     )}
                   </div>
-                  <Button 
-                    onClick={saveChanges} 
+                  <Button
+                    onClick={saveChanges}
                     disabled={isProcessing || !sessionHealthy}
                     className="min-w-[120px]"
                   >

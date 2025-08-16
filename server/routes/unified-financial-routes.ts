@@ -614,9 +614,9 @@ router.post("/sync-debt", requireAuth, async (req, res) => {
 router.post("/representative/:code/sync", requireAuth, async (req, res) => {
   try {
     const { code } = req.params;
-    const { reason, invoiceId, amountChange, timestamp } = req.body;
+    const { reason, invoiceId, amountChange, timestamp, validationPassed, editDetails } = req.body;
 
-    console.log(`🔄 SHERLOCK v1.0: Financial sync requested for representative ${code}, reason: ${reason}`);
+    console.log(`🔄 SHERLOCK v28.0: Enhanced financial sync for representative ${code}, reason: ${reason}`);
 
     // Find representative by code
     const representative = await storage.getRepresentativeByCode(code);
@@ -624,26 +624,120 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
       return res.status(404).json({ error: `Representative ${code} not found` });
     }
 
-    // Sync using unified financial engine
+    // Enhanced validation for invoice edits
+    if (reason === "invoice_edit" && !validationPassed) {
+      return res.status(400).json({ 
+        error: 'Validation required for invoice edits',
+        code: 'VALIDATION_REQUIRED'
+      });
+    }
+
+    // Atomic financial synchronization with enhanced logging
+    const syncStartTime = Date.now();
     await unifiedFinancialEngine.syncRepresentativeDebt(representative.id);
+    
+    // Force immediate cache invalidation with cascade
+    UnifiedFinancialEngine.forceInvalidateRepresentative(representative.id, {
+      cascadeGlobal: true,
+      reason: reason,
+      immediate: true
+    });
 
     // Get updated financial data
     const financialData = await unifiedFinancialEngine.calculateRepresentative(representative.id);
+    const syncDuration = Date.now() - syncStartTime;
 
-    console.log(`✅ SHERLOCK v1.0: Financial sync completed for ${code} - New debt: ${financialData.actualDebt}`);
+    // Enhanced response with real-time data
+    const responseData = {
+      representativeCode: code,
+      representativeId: representative.id,
+      financialData,
+      syncReason: reason,
+      syncDuration,
+      amountChange: amountChange || 0,
+      editDetails: editDetails || null,
+      cacheInvalidated: true,
+      timestamp: new Date().toISOString(),
+      
+      // Real-time UI update data
+      uiUpdateData: {
+        displayDebt: financialData.actualDebt?.toLocaleString() || "0",
+        displaySales: financialData.totalSales?.toLocaleString() || "0",
+        paymentRatio: financialData.paymentRatio || 0,
+        debtLevel: financialData.debtLevel || 'UNKNOWN',
+        lastSync: new Date().toISOString()
+      }
+    };
+
+    console.log(`✅ SHERLOCK v28.0: Enhanced sync completed for ${code} in ${syncDuration}ms - New debt: ${financialData.actualDebt}`);
 
     res.json({
       success: true,
-      data: {
-        representativeCode: code,
-        financialData,
-        syncReason: reason,
-        timestamp: new Date().toISOString()
+      data: responseData,
+      meta: {
+        syncType: "ENHANCED_REAL_TIME",
+        performance: {
+          syncDuration,
+          cacheInvalidated: true,
+          backgroundRefreshScheduled: true
+        }
       }
     });
   } catch (error) {
-    console.error('❌ Financial sync error:', error);
-    res.status(500).json({ error: 'خطا در همگام‌سازی مالی' });
+    console.error('❌ Enhanced financial sync error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'خطا در همگام‌سازی مالی پیشرفته',
+      details: error.message 
+    });
+  }
+});
+
+/**
+ * ✅ SHERLOCK v28.0: Real-time UI update notification endpoint
+ * POST /api/unified-financial/notify-ui-update
+ */
+router.post('/notify-ui-update', requireAuth, async (req, res) => {
+  try {
+    const { representativeId, updateType, data } = req.body;
+
+    console.log(`📡 SHERLOCK v28.0: UI update notification for rep ${representativeId}, type: ${updateType}`);
+
+    // Get fresh financial data for UI
+    const financialData = await unifiedFinancialEngine.calculateRepresentative(representativeId);
+    
+    const uiNotification = {
+      type: updateType,
+      representativeId,
+      timestamp: new Date().toISOString(),
+      financialData: {
+        displayDebt: financialData.actualDebt?.toLocaleString() || "0",
+        displaySales: financialData.totalSales?.toLocaleString() || "0",
+        paymentRatio: financialData.paymentRatio || 0,
+        debtLevel: financialData.debtLevel || 'UNKNOWN'
+      },
+      changeIndicator: data?.amountChange ? {
+        amount: data.amountChange,
+        direction: data.amountChange > 0 ? "INCREASE" : "DECREASE",
+        percentage: data.changePercentage || 0
+      } : null
+    };
+
+    // Here you would typically broadcast to connected WebSocket clients
+    // For now, we'll return the notification data for client polling
+    
+    res.json({
+      success: true,
+      notification: uiNotification,
+      message: "UI notification prepared for real-time update"
+    });
+
+  } catch (error) {
+    console.error('❌ UI notification error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'خطا در ارسال اعلان بروزرسانی UI' 
+    });
   }
 });
 
@@ -703,6 +797,179 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
 });
 
 /**
+
+/**
+ * ✅ SHERLOCK v28.0: Comprehensive System Integrity Validation
+ * POST /api/unified-financial/validate-system-integrity
+ */
+router.post('/validate-system-integrity', requireAuth, async (req, res) => {
+  try {
+    const { triggerReason, representativeId, skipCache } = req.body;
+
+    console.log(`🔍 SHERLOCK v28.0: System integrity validation triggered by: ${triggerReason}`);
+
+    const validationStartTime = Date.now();
+    const validationResults = {
+      timestamp: new Date().toISOString(),
+      triggerReason,
+      validationTests: [],
+      systemHealth: 'UNKNOWN',
+      recommendations: [],
+      errors: [],
+      warnings: []
+    };
+
+    // Test 1: Financial Calculation Consistency
+    try {
+      const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
+      const manualVerification = await unifiedFinancialEngine.verifyTotalDebtSum();
+      
+      const isConsistent = Math.abs(globalSummary.totalSystemDebt - manualVerification.unifiedEngineSum) < 1000;
+      
+      validationResults.validationTests.push({
+        testName: "Financial Calculation Consistency",
+        status: isConsistent ? "PASS" : "FAIL",
+        details: {
+          globalEngineSum: globalSummary.totalSystemDebt,
+          manualVerificationSum: manualVerification.unifiedEngineSum,
+          difference: Math.abs(globalSummary.totalSystemDebt - manualVerification.unifiedEngineSum),
+          consistencyThreshold: 1000
+        }
+      });
+
+      if (!isConsistent) {
+        validationResults.errors.push("Financial calculation inconsistency detected");
+        validationResults.recommendations.push("Run full financial reconciliation");
+      }
+    } catch (error) {
+      validationResults.errors.push(`Financial validation failed: ${error.message}`);
+    }
+
+    // Test 2: Representative Data Integrity
+    if (representativeId) {
+      try {
+        const repData = await unifiedFinancialEngine.calculateRepresentative(representativeId);
+        const dbRep = await storage.getRepresentativeById(representativeId);
+        
+        const dbDebt = parseFloat(dbRep.totalDebt) || 0;
+        const calculatedDebt = repData.actualDebt;
+        const debtDifference = Math.abs(dbDebt - calculatedDebt);
+        
+        const isRepConsistent = debtDifference < 100;
+        
+        validationResults.validationTests.push({
+          testName: "Representative Data Integrity",
+          status: isRepConsistent ? "PASS" : "WARN",
+          details: {
+            representativeId,
+            databaseDebt: dbDebt,
+            calculatedDebt: calculatedDebt,
+            difference: debtDifference,
+            toleranceThreshold: 100
+          }
+        });
+
+        if (!isRepConsistent) {
+          validationResults.warnings.push(`Representative ${representativeId} data inconsistency: ${debtDifference.toFixed(2)} difference`);
+          validationResults.recommendations.push(`Sync representative ${representativeId} financial data`);
+        }
+      } catch (error) {
+        validationResults.errors.push(`Representative validation failed: ${error.message}`);
+      }
+    }
+
+    // Test 3: Cache Consistency
+    try {
+      const cacheValidation = {
+        queryCacheSize: UnifiedFinancialEngine.queryCache?.size || 0,
+        mainCacheSize: UnifiedFinancialEngine.cache?.size || 0,
+        invalidationQueueSize: UnifiedFinancialEngine.invalidationQueue?.size || 0
+      };
+
+      validationResults.validationTests.push({
+        testName: "Cache System Health",
+        status: "PASS",
+        details: cacheValidation
+      });
+
+      if (cacheValidation.invalidationQueueSize > 10) {
+        validationResults.warnings.push("High cache invalidation queue size");
+        validationResults.recommendations.push("Consider cache optimization");
+      }
+    } catch (error) {
+      validationResults.errors.push(`Cache validation failed: ${error.message}`);
+    }
+
+    // Test 4: Database Performance
+    try {
+      const perfTestStart = Date.now();
+      await unifiedFinancialEngine.getDebtorRepresentatives(5);
+      const perfTestDuration = Date.now() - perfTestStart;
+
+      const isPerfGood = perfTestDuration < 2000;
+
+      validationResults.validationTests.push({
+        testName: "Database Performance",
+        status: isPerfGood ? "PASS" : "WARN",
+        details: {
+          queryDuration: perfTestDuration,
+          performanceThreshold: 2000,
+          performanceRating: perfTestDuration < 500 ? "EXCELLENT" : 
+                            perfTestDuration < 1000 ? "GOOD" : 
+                            perfTestDuration < 2000 ? "ACCEPTABLE" : "SLOW"
+        }
+      });
+
+      if (!isPerfGood) {
+        validationResults.warnings.push("Database query performance is slow");
+        validationResults.recommendations.push("Consider query optimization or database indexing");
+      }
+    } catch (error) {
+      validationResults.errors.push(`Performance validation failed: ${error.message}`);
+    }
+
+    // Calculate overall system health
+    const totalTests = validationResults.validationTests.length;
+    const passedTests = validationResults.validationTests.filter(t => t.status === "PASS").length;
+    const errorCount = validationResults.errors.length;
+    const warningCount = validationResults.warnings.length;
+
+    if (errorCount === 0 && passedTests === totalTests) {
+      validationResults.systemHealth = "EXCELLENT";
+    } else if (errorCount === 0 && passedTests >= totalTests * 0.8) {
+      validationResults.systemHealth = "GOOD";
+    } else if (errorCount <= 1 && warningCount <= 3) {
+      validationResults.systemHealth = "NEEDS_ATTENTION";
+    } else {
+      validationResults.systemHealth = "CRITICAL";
+    }
+
+    const validationDuration = Date.now() - validationStartTime;
+
+    console.log(`✅ SHERLOCK v28.0: System integrity validation completed in ${validationDuration}ms - Health: ${validationResults.systemHealth}`);
+
+    res.json({
+      success: true,
+      validation: validationResults,
+      performance: {
+        validationDuration,
+        testsRun: totalTests,
+        healthScore: Math.round((passedTests / totalTests) * 100)
+      },
+      actionRequired: validationResults.systemHealth === "CRITICAL",
+      nextValidationRecommended: new Date(Date.now() + (24 * 60 * 60 * 1000)).toISOString() // 24 hours
+    });
+
+  } catch (error) {
+    console.error('❌ System integrity validation error:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در اعتبارسنجی یکپارچگی سیستم",
+      details: error.message
+    });
+  }
+});
+
  * ✅ SHERLOCK v27.0: Atomic System Validation
  * GET /api/unified-financial/atomic-validation
  */
@@ -816,3 +1083,5 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
     });
   }
 });
+
+export default router;

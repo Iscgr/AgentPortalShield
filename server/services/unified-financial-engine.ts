@@ -75,16 +75,34 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ SHERLOCK v24.0: Force immediate cache invalidation for real-time updates
+   * ✅ SHERLOCK v28.0: Enhanced immediate cache invalidation with cascade support
    */
-  static forceInvalidateRepresentative(representativeId: number): void {
+  static forceInvalidateRepresentative(representativeId: number, options: {
+    cascadeGlobal?: boolean;
+    reason?: string;
+    immediate?: boolean;
+  } = {}): void {
+    const { cascadeGlobal = true, reason = "manual", immediate = true } = options;
+    
+    console.log(`🔄 SHERLOCK v28.0: Starting cache invalidation for rep ${representativeId}, reason: ${reason}`);
+    
     const cacheKeys = [
       `rep_calc_${representativeId}`,
-      `debtor_list`,
-      `global_summary`,
-      `all_representatives`
+      `rep_financial_${representativeId}`,
+      `rep_sync_${representativeId}`
     ];
     
+    if (cascadeGlobal) {
+      cacheKeys.push(
+        `debtor_list`,
+        `global_summary`,
+        `all_representatives`,
+        `batch_calc_active`,
+        `system_totals`
+      );
+    }
+    
+    // Immediate invalidation
     cacheKeys.forEach(key => {
       this.queryCache.delete(key);
       this.cache.delete(key);
@@ -92,7 +110,50 @@ export class UnifiedFinancialEngine {
       this.lastInvalidation.set(key, Date.now());
     });
     
-    console.log(`🔄 SHERLOCK v24.0: Force invalidated cache for representative ${representativeId}`);
+    // Mark for background refresh if immediate
+    if (immediate) {
+      this.scheduleBackgroundRefresh(representativeId, reason);
+    }
+    
+    console.log(`✅ SHERLOCK v28.0: Invalidated ${cacheKeys.length} cache entries for representative ${representativeId}`);
+  }
+
+  /**
+   * ✅ SHERLOCK v28.0: Background refresh scheduling for immediate data availability
+   */
+  private static scheduleBackgroundRefresh(representativeId: number, reason: string): void {
+    setTimeout(async () => {
+      try {
+        console.log(`🔄 SHERLOCK v28.0: Background refresh starting for rep ${representativeId}`);
+        
+        // Pre-calculate and cache new data
+        const newData = await this.calculateRepresentative(representativeId);
+        
+        // Cache the fresh data
+        this.queryCache.set(`rep_calc_${representativeId}`, {
+          data: newData,
+          timestamp: Date.now()
+        });
+        
+        console.log(`✅ SHERLOCK v28.0: Background refresh completed for rep ${representativeId}`);
+      } catch (error) {
+        console.error(`❌ SHERLOCK v28.0: Background refresh failed for rep ${representativeId}:`, error);
+      }
+    }, 100); // 100ms delay for immediate background refresh
+  }
+
+  /**
+   * ✅ SHERLOCK v28.0: Global cache invalidation for system-wide updates
+   */
+  static forceInvalidateGlobal(reason: string = "system_update"): void {
+    console.log(`🌐 SHERLOCK v28.0: Global cache invalidation initiated, reason: ${reason}`);
+    
+    this.queryCache.clear();
+    this.cache.clear();
+    this.invalidationQueue.clear();
+    this.lastInvalidation.clear();
+    
+    console.log(`✅ SHERLOCK v28.0: Global cache cleared completely`);
   }
 
   /**
