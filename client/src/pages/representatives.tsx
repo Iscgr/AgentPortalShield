@@ -1954,6 +1954,101 @@ function EditInvoiceDialog({
 
   const [usageItems, setUsageItems] = useState<any[]>(parseUsageData(invoice.usageData));
   const [isLoadingEditInvoice, setIsLoadingEditInvoice] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editableRecords, setEditableRecords] = useState<any[]>([]);
+  const [editInvoiceDialogOpen, setEditInvoiceDialogOpen] = useState(open);
+
+  const generateId = () => `temp-${Math.random().toString(36).substring(2, 9)}`;
+
+  const hasChanges = () => {
+    if (!editableRecords || editableRecords.length === 0) return false;
+
+    const originalRecords = ((invoice.usageData as any)?.records || []).map((record: any) => ({
+      id: record.id || record.tempId, // Use tempId if available
+      admin_username: record.admin_username || '',
+      event_timestamp: record.event_timestamp || '',
+      event_type: record.event_type || 'CREATE',
+      description: record.description || '',
+      amount: parseFloat(record.amount || '0')
+    }));
+
+    if (originalRecords.length !== editableRecords.length) return true;
+
+    for (const editable of editableRecords) {
+      const original = originalRecords.find(orig => orig.id === editable.id);
+      if (!original) {
+        // New or deleted record
+        if (!editable.isDeleted) return true; // If it's marked as new/modified and not deleted
+      } else {
+        // Check for modifications
+        if (editable.admin_username !== original.admin_username ||
+            editable.event_timestamp !== original.event_timestamp ||
+            editable.event_type !== original.event_type ||
+            editable.description !== original.description ||
+            editable.amount !== original.amount) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+
+  // Populate editableRecords when dialog opens or invoice changes
+  useEffect(() => {
+    if (open && invoice) {
+      setEditInvoiceDialogOpen(true);
+      setEditMode(false); // Reset edit mode when opening
+      const records = ((invoice.usageData as any)?.records || []).map((record: any) => ({
+        id: record.id || generateId(), // Ensure records have IDs
+        admin_username: record.admin_username || '',
+        event_timestamp: record.event_timestamp || '',
+        event_type: record.event_type || 'CREATE',
+        description: record.description || '',
+        amount: parseFloat(record.amount || '0'),
+        isNew: false,
+        isModified: false,
+        isDeleted: false
+      }));
+      setEditableRecords(records);
+      setUsageItems(records); // Initialize usageItems as well for simpler rendering
+    }
+  }, [open, invoice]);
+
+
+  const updateEditableRecord = (index: number, field: string, value: string | number | boolean) => {
+    const updatedRecords = [...editableRecords];
+    updatedRecords[index] = {
+      ...updatedRecords[index],
+      [field]: value,
+      isModified: true // Mark as modified on any field change
+    };
+    setEditableRecords(updatedRecords);
+  };
+
+  const addEditableRecord = () => {
+    const newRecord = {
+      id: generateId(),
+      admin_username: '',
+      event_timestamp: '',
+      event_type: 'CREATE',
+      description: '',
+      amount: 0,
+      isNew: true,
+      isModified: false,
+      isDeleted: false
+    };
+    setEditableRecords([...editableRecords, newRecord]);
+    setUsageItems([...usageItems, newRecord]); // Also update usageItems
+  };
+
+  const deleteEditableRecord = (index: number) => {
+    const updatedRecords = [...editableRecords];
+    updatedRecords[index] = { ...updatedRecords[index], isDeleted: true };
+    setEditableRecords(updatedRecords);
+    setUsageItems(updatedRecords.filter(r => !r.isDeleted)); // Update usageItems to reflect deletion
+  };
 
   const updateUsageField = (field: string, value: string) => {
     const newData = { ...parsedUsageData, [field]: value };
@@ -1985,7 +2080,7 @@ function EditInvoiceDialog({
 
   const addNewUsageItem = () => {
     const newItem = {
-      id: usageItems.length + 1,
+      id: generateId(), // Use generated ID
       description: "سرویس جدید",
       date: new Date().toLocaleDateString('fa-IR'),
       amount: 0
@@ -2074,7 +2169,7 @@ function EditInvoiceDialog({
   };
 
   const handleSave = async () => {
-    if (!editingUsage || !selectedRep) return;
+    if (!editMode || !representative) return;
 
     try {
       // Check unified authentication
@@ -2102,13 +2197,12 @@ function EditInvoiceDialog({
       const amountDifference = newAmount - oldAmount;
       const finalUsageData = parsedUsageData;
 
-      // Update invoice with complete financial synchronization
       const updateData = {
         amount,
         issueDate,
         status,
         usageData: finalUsageData,
-        representativeId: representative?.id // Pass representativeId for sync
+        representativeId: representative.id // Pass representativeId for sync
       };
 
       await apiRequest(`/api/invoices/${invoice.id}`, {
@@ -2131,8 +2225,8 @@ function EditInvoiceDialog({
         description: `فاکتور بروزرسانی شد${amountDifference !== 0 ? ' - سیستم مالی همگام‌سازی گردید' : ''}`,
       });
 
-      onSave();
-      onOpenChange(false);
+      onSave(); // Callback to parent to refresh data
+      setEditInvoiceDialogOpen(false); // Close dialog
     } catch (error: any) {
       console.error('Failed to update invoice:', error);
       toast({
@@ -2217,130 +2311,212 @@ function EditInvoiceDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] admin-glass-card border-white/20 shadow-2xl backdrop-blur-xl" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-        <DialogHeader>
-          <DialogTitle className="text-white text-xl flex items-center gap-2">
-            <Edit className="w-5 h-5 text-blue-400" />
-            ویرایش جزئیات فاکتور
-          </DialogTitle>
-          <DialogDescription className="text-blue-200">
-            ویرایش اطلاعات فاکتور شماره {invoice.invoiceNumber}
-          </DialogDescription>
-        </DialogHeader>
+    <Dialog open={editInvoiceDialogOpen} onOpenChange={setEditInvoiceDialogOpen}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-gray-900 text-white border-gray-700 flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-xl font-bold text-white">
+              ویرایش فاکتور {selectedInvoice?.invoiceNumber}
+            </DialogTitle>
+            <DialogDescription className="text-gray-300">
+              ویرایش جزئیات فاکتور و اطلاعات مصرف نماینده
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4 p-1">
-          <div>
-            <Label htmlFor="invoiceNumber" className="text-white">شماره فاکتور</Label>
-            <Input
-              id="invoiceNumber"
-              value={invoice.invoiceNumber}
-              disabled
-              className="bg-white/10 border-white/20 text-white mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="amount" className="text-white">مبلغ (ریال)</Label>
-            <Input
-              id="amount"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="مبلغ فاکتور"
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="issueDate" className="text-white">تاریخ صدور</Label>
-            <Input
-              id="issueDate"
-              value={issueDate}
-              onChange={(e) => setIssueDate(e.target.value)}
-              placeholder="1403/01/01"
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="status" className="text-white">وضعیت</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="bg-white/10 border-white/20 text-white mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-900 border-white/20">
-                <SelectItem value="unpaid" className="text-white hover:bg-white/10">پرداخت نشده</SelectItem>
-                <SelectItem value="paid" className="text-white hover:bg-white/10">پرداخت شده</SelectItem>
-                <SelectItem value="partial" className="text-white hover:bg-white/10">پرداخت جزئی</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label className="text-white">ویرایش ریزجزئیات مصرف نماینده</Label>
-            <div className="mt-2 admin-glass-card border-white/10">
-              <div className="max-h-96 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/20">
-                <div className="text-sm text-blue-200 mb-3">
-                  ویرایش سطر به سطر جزئیات مصرف و مبلغ هر قلم:
-                </div>
-
-                {/* Usage Details Table */}
-                <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-                  <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 px-4 py-2 border-b border-white/10">
-                    <div className="grid grid-cols-4 gap-4 text-sm font-medium text-blue-200">
-                      <div>ردیف</div>
-                      <div>شرح سرویس</div>
-                      <div>تاریخ</div>
-                      <div>مبلغ (ریال)</div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 space-y-3">
-                    {renderUsageDetailsEditor()}
-                  </div>
-                </div>
-
-                {/* Add New Item Button */}
-                <div className="flex justify-between items-center pt-2 border-t border-white/10">
+        <div className="flex-1 overflow-y-auto space-y-6 mt-4 pr-2">
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">اطلاعات فاکتور</h3>
+                <div className="flex space-x-2 space-x-reverse">
                   <Button
-                    type="button"
-                    onClick={addNewUsageItem}
-                    className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1"
+                    variant={editMode ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      if (editMode) {
+                        // Cancel edit mode
+                        setEditMode(false);
+                        setEditableRecords(
+                          ((invoice.usageData as any)?.records || []).map((record: any) => ({
+                            id: record.id || generateId(),
+                            admin_username: record.admin_username || '',
+                            event_timestamp: record.event_timestamp || '',
+                            event_type: record.event_type || 'CREATE',
+                            description: record.description || '',
+                            amount: parseFloat(record.amount || '0'),
+                            isNew: false,
+                            isModified: false,
+                            isDeleted: false
+                          }))
+                        );
+                      } else {
+                        setEditMode(true);
+                      }
+                    }}
                   >
-                    <Plus className="w-4 h-4 mr-1" />
-                    افزودن ردیف جدید
+                    {editMode ? 'لغو ویرایش' : 'ویرایش فاکتور'}
                   </Button>
-
-                  <div className="text-sm text-blue-200">
-                    مجموع: {calculateUsageTotal().toLocaleString('fa-IR')} ریال
-                  </div>
                 </div>
               </div>
-              <p className="text-xs text-blue-300 mt-2 p-2">
-                💡 تغییر مبلغ هر ردیف، مبلغ کل فاکتور را بروزرسانی می‌کند
-              </p>
+
+              {/* Invoice Details Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="invoiceNumber" className="text-white">شماره فاکتور</Label>
+                  <Input
+                    id="invoiceNumber"
+                    value={invoice.invoiceNumber}
+                    disabled
+                    className="bg-white/10 border-white/20 text-white mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="amount" className="text-white">مبلغ (ریال)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="مبلغ فاکتور"
+                    className={`bg-white/10 border-white/20 text-white placeholder:text-white/50 mt-1 ${editMode ? '' : 'cursor-not-allowed'}`}
+                    disabled={!editMode}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="issueDate" className="text-white">تاریخ صدور</Label>
+                  <Input
+                    id="issueDate"
+                    value={issueDate}
+                    onChange={(e) => setIssueDate(e.target.value)}
+                    placeholder="1403/01/01"
+                    className={`bg-white/10 border-white/20 text-white placeholder:text-white/50 mt-1 ${editMode ? '' : 'cursor-not-allowed'}`}
+                    disabled={!editMode}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="status" className="text-white">وضعیت</Label>
+                  <Select value={status} onValueChange={setStatus} disabled={!editMode}>
+                    <SelectTrigger className={`bg-white/10 border-white/20 text-white mt-1 ${!editMode ? 'cursor-not-allowed' : ''}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-white/20">
+                      <SelectItem value="unpaid" className="text-white hover:bg-white/10">پرداخت نشده</SelectItem>
+                      <SelectItem value="paid" className="text-white hover:bg-white/10">پرداخت شده</SelectItem>
+                      <SelectItem value="partial" className="text-white hover:bg-white/10">پرداخت جزئی</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+
+            {/* Usage Details Section */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-white mb-4">جزئیات مصرف</h3>
+              {editMode ? (
+                <div className="space-y-4">
+                  <div className="flex justify-end mb-4">
+                    <Button
+                      onClick={addEditableRecord}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      افزودن رکورد جدید
+                    </Button>
+                  </div>
+
+                  {/* Editable Records Table */}
+                  <div className="space-y-3">
+                    {editableRecords.filter(r => !r.isDeleted).map((record, index) => (
+                      <div key={record.id} className="grid grid-cols-12 gap-3 items-center p-3 bg-white/5 rounded-lg border border-white/10">
+                        <div className="col-span-1 text-center text-blue-200 text-sm font-medium">
+                          {index + 1}
+                        </div>
+
+                        <div className="col-span-5">
+                          <Input
+                            value={record.description}
+                            onChange={(e) => updateEditableRecord(index, 'description', e.target.value)}
+                            placeholder="شرح مصرف..."
+                            className="bg-white/10 border-white/20 text-white text-sm focus:border-blue-400"
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <Input
+                            value={record.event_timestamp}
+                            onChange={(e) => updateEditableRecord(index, 'event_timestamp', e.target.value)}
+                            placeholder="YYYY-MM-DD HH:MM"
+                            className="bg-white/10 border-white/20 text-white text-sm focus:border-blue-400"
+                          />
+                        </div>
+
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            value={record.amount}
+                            onChange={(e) => updateEditableRecord(index, 'amount', parseFloat(e.target.value) || 0)}
+                            placeholder="مبلغ ریال"
+                            className="bg-white/10 border-white/20 text-white text-sm focus:border-blue-400"
+                          />
+                        </div>
+
+                        <div className="col-span-1 flex justify-center">
+                          <Button
+                            onClick={() => deleteEditableRecord(index)}
+                            className="bg-red-600 hover:bg-red-700 text-white p-1 h-8 w-8 flex items-center justify-center"
+                            title="حذف این رکورد"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {usageItems.length > 0 ? (
+                    usageItems.map((item, index) => (
+                      <div key={`usage-${item.id || index}`} className="grid grid-cols-12 gap-3 items-center p-3 bg-white/5 rounded-lg border border-white/10">
+                        <div className="col-span-1 text-center text-blue-200 text-sm font-medium">
+                          {index + 1}
+                        </div>
+                        <div className="col-span-5 text-white">{item.description}</div>
+                        <div className="col-span-2 text-blue-200">{item.date}</div>
+                        <div className="col-span-3 font-bold text-green-300">
+                          {formatCurrency(item.amount)}
+                        </div>
+                        <div className="col-span-1"></div> {/* Spacer */}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-gray-400">بدون جزئیات مصرف</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end space-x-2 pt-4 border-t border-white/10 mt-6">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoadingEditInvoice}
-            className="ml-2 bg-white/10 border-white/20 text-white hover:bg-white/20"
-          >
-            انصراف
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={isLoadingEditInvoice}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-          >
-            {isLoadingEditInvoice ? "در حال ذخیره..." : "ذخیره تغییرات"}
-          </Button>
-        </div>
+          <div className="flex-shrink-0 flex justify-end space-x-2 pt-4 border-t border-white/10 mt-6 px-1 bg-gray-900 sticky bottom-0">
+            <Button
+              variant="outline"
+              onClick={() => setEditInvoiceDialogOpen(false)}
+              disabled={isLoadingEditInvoice}
+            >
+              انصراف
+            </Button>
+            {editMode && (
+              <Button
+                onClick={handleSave}
+                disabled={isLoadingEditInvoice || !hasChanges()}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isLoadingEditInvoice ? 'در حال ذخیره...' : 'ذخیره تغییرات'}
+              </Button>
+            )}
+          </div>
       </DialogContent>
     </Dialog>
   );
