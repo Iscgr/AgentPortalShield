@@ -12,7 +12,7 @@ import {
   type InvoiceEdit, type InsertInvoiceEdit,
   type FinancialTransaction, type InsertFinancialTransaction,
   type DataIntegrityConstraint, type InsertDataIntegrityConstraint,
-  // فاز ۱: Import برای مدیریت دوره‌ای فաکتورها
+  // فاز ۱: Import برای مدیریت دوره‌ای فاکتورها
   type InvoiceBatch, type InsertInvoiceBatch,
   // CRM Users Import
   type CrmUser, type InsertCrmUser,
@@ -37,16 +37,16 @@ async function withDatabaseRetry<T>(
       return await operation();
     } catch (error: any) {
       console.error(`Database operation "${operationName}" failed (attempt ${attempt}/${maxRetries}):`, error.message);
-      
+
       if (attempt === maxRetries) {
         throw new Error(`Database operation "${operationName}" failed after ${maxRetries} attempts: ${error.message}`);
       }
-      
+
       // Exponential backoff: wait 2^attempt seconds
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
     }
   }
-  
+
   // This should never be reached, but TypeScript requires it
   throw new Error(`Database operation "${operationName}" failed unexpectedly`);
 }
@@ -175,7 +175,7 @@ export interface IStorage {
     totalSalesPartners: number;
     recentActivities: ActivityLog[];
   }>;
-  
+
   // SHERLOCK v10.0: Debtor representatives
   getDebtorRepresentatives(): Promise<Array<{
     id: number;
@@ -192,7 +192,7 @@ export interface IStorage {
   getActiveRepresentativesCount(): Promise<number>;
   getUnpaidInvoicesCount(): Promise<number>;
   getOverdueInvoicesCount(): Promise<number>;
-  
+
   // SHERLOCK v11.0: Batch-based active representatives (unified calculation)
   getBatchBasedActiveRepresentatives(): Promise<number>;
 
@@ -284,7 +284,7 @@ export class DatabaseStorage implements IStorage {
       .insert(representatives)
       .values({ ...rep, publicId })
       .returning();
-    
+
     await this.createActivityLog({
       type: "representative_created",
       description: `نماینده جدید "${newRep.name}" اضافه شد`,
@@ -312,7 +312,7 @@ export class DatabaseStorage implements IStorage {
       async () => {
         // Get all sales partners
         const partners = await db.select().from(salesPartners).orderBy(desc(salesPartners.createdAt));
-        
+
         // For each partner, calculate representativesCount
         const partnersWithCounts = await Promise.all(
           partners.map(async (partner) => {
@@ -320,14 +320,14 @@ export class DatabaseStorage implements IStorage {
               .select({ count: sql<number>`count(*)::int` })
               .from(representatives)
               .where(eq(representatives.salesPartnerId, partner.id));
-            
+
             return {
               ...partner,
               representativesCount: countResult?.count || 0
             };
           })
         );
-        
+
         return partnersWithCounts;
       },
       'getSalesPartners'
@@ -344,7 +344,7 @@ export class DatabaseStorage implements IStorage {
       .insert(salesPartners)
       .values(partner)
       .returning();
-    
+
     await this.createActivityLog({
       type: "sales_partner_created",
       description: `همکار فروش جدید "${newPartner.name}" اضافه شد`,
@@ -398,7 +398,7 @@ export class DatabaseStorage implements IStorage {
           .insert(invoiceBatches)
           .values(batch)
           .returning();
-        
+
         await this.createActivityLog({
           type: "batch_created",
           description: `دسته فاکتور جدید "${newBatch.batchName}" ایجاد شد`,
@@ -649,27 +649,27 @@ export class DatabaseStorage implements IStorage {
 
     while (attempts < maxAttempts) {
       attempts++;
-      
+
       // Generate unique invoice number using timestamp + random
       const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
       const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
       invoiceNumber = `INV-${timestamp}${random}`;
-      
+
       // Check if this invoice number already exists
       const existing = await db.select({ id: invoices.id })
         .from(invoices)
         .where(eq(invoices.invoiceNumber, invoiceNumber))
         .limit(1);
-      
+
       if (existing.length === 0) {
         // Unique number found, break the loop
         break;
       }
-      
+
       if (attempts === maxAttempts) {
         throw new Error(`Unable to generate unique invoice number after ${maxAttempts} attempts`);
       }
-      
+
       // Wait a small amount before retry
       await new Promise(resolve => setTimeout(resolve, 10));
     }
@@ -728,20 +728,20 @@ export class DatabaseStorage implements IStorage {
         .from(invoices)
         .where(eq(invoices.id, invoiceId))
         .limit(1);
-      
+
       if (!invoice.length) return 'unpaid';
-      
+
       const invoiceAmount = parseFloat(invoice[0].amount);
       const dueDate = invoice[0].dueDate;
-      
+
       // Get total payments allocated to this invoice
       const paymentResults = await db.select({ amount: payments.amount })
         .from(payments)
         .where(eq(payments.invoiceId, invoiceId));
-      
+
       const totalPaid = paymentResults.reduce((sum, payment) => 
         sum + parseFloat(payment.amount), 0);
-      
+
       // Calculate status based on payment coverage
       if (totalPaid >= invoiceAmount) {
         return 'paid'; // Fully paid
@@ -778,7 +778,7 @@ export class DatabaseStorage implements IStorage {
     // Use OR conditions for multiple IDs instead of ANY array syntax
     const whereConditions = invoiceIds.map(id => eq(invoices.id, id));
     const whereClause = whereConditions.length === 1 ? whereConditions[0] : or(...whereConditions);
-    
+
     await db
       .update(invoices)
       .set({ 
@@ -828,10 +828,10 @@ export class DatabaseStorage implements IStorage {
       async () => {
         const whereConditions = invoiceIds.map(id => eq(invoices.id, id));
         const whereClause = whereConditions.length === 1 ? whereConditions[0] : or(...whereConditions);
-        
+
         // Get current invoices to check if they were previously sent
         const currentInvoices = await db.select().from(invoices).where(whereClause);
-        
+
         // Update invoices with send info
         await db
           .update(invoices)
@@ -845,7 +845,7 @@ export class DatabaseStorage implements IStorage {
         // Create history records for each invoice
         for (const invoice of currentInvoices) {
           const sendType = invoice.sentToTelegram ? 'RESEND' : 'FIRST_SEND';
-          
+
           await this.createTelegramSendHistory({
             invoiceId: invoice.id,
             sendType,
@@ -863,7 +863,7 @@ export class DatabaseStorage implements IStorage {
 
         const resendCount = currentInvoices.filter(inv => inv.sentToTelegram).length;
         const firstSendCount = invoiceIds.length - resendCount;
-        
+
         let description = '';
         if (firstSendCount > 0 && resendCount > 0) {
           description = `${firstSendCount} فاکتور جدید و ${resendCount} فاکتور مجددا به تلگرام ارسال شد`;
@@ -909,7 +909,7 @@ export class DatabaseStorage implements IStorage {
 
     const rep = await db.select().from(representatives)
       .where(eq(representatives.id, newPayment.representativeId));
-    
+
     await this.createActivityLog({
       type: "payment_received",
       description: `پرداخت ${newPayment.amount} تومانی از نماینده "${rep[0]?.name}" ثبت شد`,
@@ -996,7 +996,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateSetting(key: string, value: string): Promise<Setting> {
     const existing = await this.getSetting(key);
-    
+
     if (existing) {
       const [updated] = await db
         .update(settings)
@@ -1017,7 +1017,7 @@ export class DatabaseStorage implements IStorage {
     return await withDatabaseRetry(async () => {
       // SHERLOCK v17.8 FINANCIAL INTEGRITY: Use standardized calculations
       const { unifiedFinancialEngine } = await import("./services/unified-financial-engine.js");
-      
+
       // Calculate standardized total revenue = Sum of ALLOCATED payments only
       const [totalRevenueResult] = await db
         .select({ 
@@ -1029,8 +1029,7 @@ export class DatabaseStorage implements IStorage {
       const remainingDebtQuery = await db
         .select({
           representativeId: representatives.id,
-          totalInvoices: sql<string>`COALESCE(SUM(CAST(invoices.amount as DECIMAL)), 0)`,
-          unpaidInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
+          totalInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
           allocatedPayments: sql<string>`COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0)`,
           remainingDebt: sql<string>`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0))`
         })
@@ -1050,7 +1049,7 @@ export class DatabaseStorage implements IStorage {
       // Find the batch with most representatives (>=10) within the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const significantBatches = await db
         .select({
           uploadDate: sql<string>`DATE(invoices.created_at)`,
@@ -1070,7 +1069,7 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
 
       let batchActiveReps = { count: 0 };
-      
+
       if (significantBatches.length > 0) {
         const latestSignificantBatch = significantBatches[0];
         batchActiveReps = { count: latestSignificantBatch.repCount };
@@ -1084,7 +1083,7 @@ export class DatabaseStorage implements IStorage {
           .where(
             sql`invoices.created_at >= ${thirtyDaysAgo.toISOString()}`
           );
-          
+
         batchActiveReps = fallbackResult;
         console.log(`🎯 SHERLOCK v10.0: No significant batch found, using recent activity count: ${batchActiveReps.count}`);
       }
@@ -1106,7 +1105,7 @@ export class DatabaseStorage implements IStorage {
 
       // SHERLOCK v10.0 FIX: Get recent activities (limited to last 30 days)
       // Reuse thirtyDaysAgo variable from above batch calculation
-      
+
       const recentActivities = await db
         .select()
         .from(activityLogs)
@@ -1139,7 +1138,7 @@ export class DatabaseStorage implements IStorage {
       // Find the batch with most representatives (>=10) within the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const significantBatches = await db
         .select({
           uploadDate: sql<string>`DATE(invoices.created_at)`,
@@ -1170,7 +1169,7 @@ export class DatabaseStorage implements IStorage {
           .where(
             sql`invoices.created_at >= ${thirtyDaysAgo.toISOString()}`
           );
-          
+
         console.log(`🎯 SHERLOCK v11.0 BATCH-SYNC: No significant batch found, using recent activity count: ${fallbackResult.count}`);
         return fallbackResult.count || 0;
       }
@@ -1190,11 +1189,11 @@ export class DatabaseStorage implements IStorage {
       // SHERLOCK v17.8 AUTO-CLEANUP: Remove activity logs older than 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const cleanupResult = await db
         .delete(activityLogs)
         .where(sql`activity_logs.created_at < ${thirtyDaysAgo.toISOString()}`);
-      
+
       if (cleanupResult.rowCount && cleanupResult.rowCount > 0) {
         console.log(`🧹 SHERLOCK v17.8 Auto-cleanup: Removed ${cleanupResult.rowCount} old activity logs`);
       }
@@ -1206,7 +1205,7 @@ export class DatabaseStorage implements IStorage {
           id: representatives.id,
           name: representatives.name,
           code: representatives.code,
-          totalInvoices: sql<string>`COALESCE(SUM(CAST(invoices.amount as DECIMAL)), 0)`,
+          totalInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
           totalPayments: sql<string>`COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0)`,
           remainingDebt: sql<string>`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0))`
         })
@@ -1274,21 +1273,60 @@ export class DatabaseStorage implements IStorage {
 
   // Initialize default admin user if not exists
   async initializeDefaultAdminUser(username: string, password: string): Promise<void> {
-    return await withDatabaseRetry(
-      async () => {
-        const existingUser = await this.getAdminUser(username);
-        if (!existingUser) {
-          const passwordHash = await bcrypt.hash(password, 10);
-          await this.createAdminUser({
-            username,
+    try {
+      // Check if admin user already exists
+      const existingUser = await db
+        .select()
+        .from(adminUsers)
+        .where(eq(adminUsers.username, username))
+        .limit(1);
+
+      if (existingUser.length === 0) {
+        // Hash the password with higher salt rounds for security
+        const passwordHash = await bcrypt.hash(password, 12);
+
+        // Create the admin user
+        await db.insert(adminUsers).values({
+          username,
+          passwordHash,
+          role: 'SUPER_ADMIN',
+          permissions: JSON.stringify([
+            'FULL_ACCESS',
+            'FINANCIAL_MANAGEMENT',
+            'USER_MANAGEMENT',
+            'SYSTEM_SETTINGS',
+            'REPORTS',
+            'AI_ASSISTANT',
+            'INVOICE_MANAGEMENT',
+            'PAYMENT_MANAGEMENT',
+            'REPRESENTATIVE_MANAGEMENT',
+            'BATCH_PROCESSING',
+            'EXPORT_REPORTS',
+            'DATABASE_ACCESS'
+          ]),
+          isActive: true,
+          createdAt: new Date()
+        });
+
+        console.log(`✅ Default admin user '${username}' created successfully with hash: ${passwordHash.substring(0, 10)}...`);
+      } else {
+        // Update existing user password if it exists but might be corrupted
+        const passwordHash = await bcrypt.hash(password, 12);
+        await db
+          .update(adminUsers)
+          .set({ 
             passwordHash,
-            isActive: true
-          });
-          console.log(`Default admin user created: ${username}`);
-        }
-      },
-      'initializeDefaultAdminUser'
-    );
+            isActive: true,
+            role: 'SUPER_ADMIN'
+          })
+          .where(eq(adminUsers.username, username));
+
+        console.log(`🔄 Admin user '${username}' password reset successfully`);
+      }
+    } catch (error) {
+      console.error('Error initializing default admin user:', error);
+      throw error;
+    }
   }
 
   // CRM Users (Authentication) Implementation
@@ -1325,24 +1363,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async initializeDefaultCrmUser(username: string, password: string): Promise<void> {
-    return await withDatabaseRetry(
-      async () => {
-        const existingUser = await this.getCrmUser(username);
-        if (!existingUser) {
-          const passwordHash = await bcrypt.hash(password, 10);
-          await this.createCrmUser({
-            username,
+    try {
+      // Check if CRM user already exists
+      const existingUser = await db
+        .select()
+        .from(crmUsers)
+        .where(eq(crmUsers.username, username))
+        .limit(1);
+
+      if (existingUser.length === 0) {
+        // Hash the password with higher salt rounds for security
+        const passwordHash = await bcrypt.hash(password, 12);
+
+        // Create the CRM user
+        await db.insert(crmUsers).values({
+          username,
+          passwordHash,
+          fullName: 'مدیر CRM',
+          email: `${username}@system.local`,
+          role: 'CRM_MANAGER',
+          permissions: JSON.stringify([
+            'CRM_ACCESS',
+            'REPRESENTATIVE_VIEW',
+            'TASK_MANAGEMENT',
+            'REPORT_GENERATION',
+            'AI_ASSISTANCE'
+          ]),
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+
+        console.log(`✅ Default CRM user '${username}' created successfully with hash: ${passwordHash.substring(0, 10)}...`);
+      } else {
+        // Update existing user password if it exists but might be corrupted
+        const passwordHash = await bcrypt.hash(password, 12);
+        await db
+          .update(crmUsers)
+          .set({ 
             passwordHash,
-            fullName: 'مدیر CRM',
-            role: 'CRM_MANAGER',
-            permissions: ['VIEW_REPRESENTATIVES', 'MANAGE_TASKS', 'VIEW_ANALYTICS'],
-            isActive: true
-          });
-          console.log(`Default CRM user created: ${username}`);
-        }
-      },
-      'initializeDefaultCrmUser'
-    );
+            isActive: true,
+            role: 'CRM_MANAGER'
+          })
+          .where(eq(crmUsers.username, username));
+
+        console.log(`🔄 CRM user '${username}' password reset successfully`);
+      }
+    } catch (error) {
+      console.error('Error initializing default CRM user:', error);
+      throw error;
+    }
   }
 
   // CRM Enhanced Methods
@@ -1353,7 +1423,7 @@ export class DatabaseStorage implements IStorage {
           .select()
           .from(representatives)
           .where(eq(representatives.id, representativeId));
-        
+
         return representative || undefined;
       },
       'getRepresentativeById'
@@ -1519,7 +1589,7 @@ export class DatabaseStorage implements IStorage {
           .insert(invoiceEdits)
           .values(edit)
           .returning();
-        
+
         await this.createActivityLog({
           type: "invoice_edited",
           description: `فاکتور ${edit.invoiceId} توسط ${edit.editedBy} ویرایش شد`,
@@ -1661,13 +1731,13 @@ export class DatabaseStorage implements IStorage {
         if (transaction.rollbackData) {
           // Implementation depends on transaction type
           const rollbackData = transaction.rollbackData as any;
-          
+
           if (transaction.type === 'INVOICE_EDIT') {
             // Restore original invoice amount and representative debt
             await db.update(invoices)
               .set({ amount: rollbackData.originalAmount })
               .where(eq(invoices.id, rollbackData.invoiceId));
-              
+
             await db.update(representatives)
               .set({ 
                 totalDebt: rollbackData.originalRepresentativeDebt,
@@ -1679,7 +1749,7 @@ export class DatabaseStorage implements IStorage {
 
         // Mark transaction as rolled back
         await this.updateTransactionStatus(transactionId, 'ROLLED_BACK');
-        
+
         await this.createActivityLog({
           type: "transaction_rollback",
           description: `تراکنش ${transactionId} برگردانده شد`,
@@ -1720,10 +1790,10 @@ export class DatabaseStorage implements IStorage {
           ));
 
         const violations: any[] = [];
-        
+
         for (const constraint of constraints) {
           const rule = constraint.constraintRule as any;
-          
+
           if (constraint.constraintType === 'BALANCE_CHECK') {
             // Check representative balance consistency
             const [rep] = await db.select().from(representatives).where(eq(representatives.id, entityId));
@@ -1792,7 +1862,7 @@ export class DatabaseStorage implements IStorage {
           lastValidationAt: new Date(),
           updatedAt: new Date()
         };
-        
+
         if (details) {
           updateData.violationDetails = details;
         }
@@ -1837,11 +1907,11 @@ export class DatabaseStorage implements IStorage {
     originalAmount: number;
     editedAmount: number;
   }): Promise<{transactionId: string, editId: number, success: boolean}> {
-    
+
     // Generate unique transaction ID with high precision timestamp
     const uniqueTimestamp = Date.now() + Math.random() * 1000;
     const transactionId = `EDIT-${editData.invoiceId}-${Math.floor(uniqueTimestamp)}-${nanoid(12)}`;
-    
+
     return await withDatabaseRetry(
       async () => {
         try {
@@ -1853,7 +1923,7 @@ export class DatabaseStorage implements IStorage {
 
           const [representative] = await db.select().from(representatives)
             .where(eq(representatives.id, invoice.representativeId));
-          
+
           if (!representative) {
             throw new Error(`Representative ${invoice.representativeId} not found`);
           }
@@ -1862,7 +1932,7 @@ export class DatabaseStorage implements IStorage {
           const existingTransaction = await db.select()
             .from(financialTransactions)
             .where(eq(financialTransactions.transactionId, transactionId));
-          
+
           if (existingTransaction.length === 0) {
             await this.createFinancialTransaction({
               transactionId,
@@ -1960,7 +2030,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // فاز ۳: Payment Synchronization and Allocation Methods
-  
+
   async getUnallocatedPayments(representativeId?: number): Promise<Payment[]> {
     return await withDatabaseRetry(
       async () => {
@@ -1968,7 +2038,7 @@ export class DatabaseStorage implements IStorage {
           .select()
           .from(payments)
           .where(eq(payments.isAllocated, false));
-        
+
         if (representativeId) {
           return await db
             .select()
@@ -1980,7 +2050,7 @@ export class DatabaseStorage implements IStorage {
               )
             );
         }
-        
+
         return await query;
       },
       'getUnallocatedPayments'
@@ -1999,10 +2069,10 @@ export class DatabaseStorage implements IStorage {
           })
           .where(eq(payments.id, paymentId))
           .returning();
-        
+
         // ✅ CRITICAL FIX: Update invoice status based on payment allocation
         await this.updateInvoiceStatusAfterAllocation(invoiceId);
-        
+
         return updatedPayment;
       },
       'allocatePaymentToInvoice'
@@ -2067,7 +2137,7 @@ export class DatabaseStorage implements IStorage {
             if (remainingAmount > 0 && parseFloat(payment.amount) <= remainingAmount) {
               // Allocate this payment to this invoice
               await this.allocatePaymentToInvoice(payment.id, invoice.id);
-              
+
               allocated++;
               totalAmount += parseFloat(payment.amount);
               details.push({
@@ -2075,10 +2145,10 @@ export class DatabaseStorage implements IStorage {
                 invoiceId: invoice.id,
                 amount: payment.amount
               });
-              
+
               // ✅ SHERLOCK v22.1: Update invoice status after allocation
               await this.updateInvoiceStatusAfterAllocation(invoice.id);
-              
+
               break; // This payment is now allocated, move to next payment
             }
           }
@@ -2131,7 +2201,7 @@ export class DatabaseStorage implements IStorage {
         .update(invoices)
         .set({ status: newStatus })
         .where(eq(invoices.id, invoiceId));
-      
+
       console.log(`📝 SHERLOCK v22.1: Updated invoice ${invoice.invoiceNumber} status: ${invoice.status} → ${newStatus}`);
     }
   }
@@ -2185,7 +2255,7 @@ export class DatabaseStorage implements IStorage {
     return await withDatabaseRetry(
       async () => {
         const data = await unifiedFinancialEngine.calculateRepresentative(representativeId);
-        
+
         return {
           previousDebt: "0", // Legacy compatibility
           newDebt: data.actualDebt.toString(),
@@ -2240,7 +2310,7 @@ export class DatabaseStorage implements IStorage {
             updatedAt: sql`NOW()`
           })
           .returning();
-        
+
         await this.createActivityLog({
           type: "ai_config_created",
           description: `تنظیمات AI جدید ایجاد شد: ${config.configName}`,
@@ -2267,7 +2337,7 @@ export class DatabaseStorage implements IStorage {
             !['createdAt', 'updatedAt', 'id'].includes(key)
           )
         );
-        
+
         const [updatedConfig] = await db
           .update(aiConfiguration)
           .set({
@@ -2281,7 +2351,7 @@ export class DatabaseStorage implements IStorage {
         if (!updatedConfig) {
           throw new Error(`AI configuration '${configName}' not found`);
         }
-        
+
         await this.createActivityLog({
           type: "ai_config_updated",
           description: `تنظیمات AI بروزرسانی شد: ${configName}`,
@@ -2309,7 +2379,7 @@ export class DatabaseStorage implements IStorage {
         if (result.rowCount === 0) {
           throw new Error(`AI configuration '${configName}' not found`);
         }
-        
+
         await this.createActivityLog({
           type: "ai_config_deleted",
           description: `تنظیمات AI حذف شد: ${configName}`,
@@ -2339,7 +2409,7 @@ export class DatabaseStorage implements IStorage {
         if (result.rowCount === 0) {
           throw new Error(`Sales partner with id ${id} not found`);
         }
-        
+
         await this.createActivityLog({
           type: "sales_partner_deleted",
           description: `همکار فروش حذف شد: ID ${id}`,
@@ -2448,10 +2518,10 @@ export class DatabaseStorage implements IStorage {
 
         console.log(`🔄 SHERLOCK v1.0: Auto-allocating payment ${paymentId} to representative ${representativeId}`);
         console.log(`📋 Found ${unpaidInvoices.length} unpaid invoices, oldest: ${unpaidInvoices[0].invoiceNumber} (${unpaidInvoices[0].issueDate})`);
-        
+
         // Find the oldest unpaid invoice and allocate payment to it
         const oldestInvoice = unpaidInvoices[0];
-        
+
         // Update payment to be allocated to this invoice
         await db
           .update(payments)
@@ -2502,7 +2572,7 @@ export class DatabaseStorage implements IStorage {
           })
           .from(invoices)
           .where(eq(invoices.status, 'paid'));
-        
+
         return result[0]?.total || "0";
       },
       'getTotalRevenue'
@@ -2517,7 +2587,7 @@ export class DatabaseStorage implements IStorage {
             total: sql<string>`COALESCE(SUM(CAST(total_debt as DECIMAL)), 0)`
           })
           .from(representatives);
-        
+
         return result[0]?.total || "0";
       },
       'getTotalDebt'
@@ -2531,7 +2601,7 @@ export class DatabaseStorage implements IStorage {
           .select({ count: sql<number>`count(*)` })
           .from(representatives)
           .where(eq(representatives.isActive, true));
-        
+
         return result[0]?.count || 0;
       },
       'getActiveRepresentativesCount'
@@ -2545,7 +2615,7 @@ export class DatabaseStorage implements IStorage {
           .select({ count: sql<number>`count(*)` })
           .from(invoices)
           .where(eq(invoices.status, 'unpaid'));
-        
+
         return result[0]?.count || 0;
       },
       'getUnpaidInvoicesCount'
@@ -2559,7 +2629,7 @@ export class DatabaseStorage implements IStorage {
           .select({ count: sql<number>`count(*)` })
           .from(invoices)
           .where(eq(invoices.status, 'overdue'));
-        
+
         return result[0]?.count || 0;
       },
       'getOverdueInvoicesCount'
@@ -2594,7 +2664,7 @@ export class DatabaseStorage implements IStorage {
 
         // Apply additional filters
         let conditions = [sql`${invoices.usageData}->>'type' = 'manual'`];
-        
+
         if (options.search) {
           conditions.push(
             or(

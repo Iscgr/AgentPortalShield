@@ -256,6 +256,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
 
+      console.log(`🔐 Login attempt for username: ${username}`);
+
       if (!username || !password) {
         return res.status(400).json({ error: "نام کاربری و رمز عبور الزامی است" });
       }
@@ -263,14 +265,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get admin user from database
       const adminUser = await storage.getAdminUser(username);
 
+      console.log(`👤 User found: ${!!adminUser}, Active: ${adminUser?.isActive}, Hash exists: ${!!adminUser?.passwordHash}`);
+
       if (!adminUser || !adminUser.isActive) {
+        console.log(`❌ User not found or inactive for ${username}`);
         return res.status(401).json({ error: "نام کاربری یا رمز عبور اشتباه است" });
       }
 
       // Verify password
       const isPasswordValid = await bcrypt.compare(password, adminUser.passwordHash);
 
+      console.log(`🔑 Password verification result: ${isPasswordValid} for user ${username}`);
+      console.log(`🔑 Hash preview: ${adminUser.passwordHash.substring(0, 20)}...`);
+
       if (!isPasswordValid) {
+        console.log(`❌ Invalid password for ${username}`);
         return res.status(401).json({ error: "نام کاربری یا رمز عبور اشتباه است" });
       }
 
@@ -2461,6 +2470,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development'
     });
+  });
+
+  // Emergency user reset endpoint for debugging
+  app.post("/api/emergency/reset-users", async (req, res) => {
+    try {
+      console.log('🚨 Emergency user reset requested');
+      
+      // Force recreate admin user
+      await storage.initializeDefaultAdminUser("mgr", "8679");
+      
+      // Force recreate CRM user  
+      await storage.initializeDefaultCrmUser("crm", "8679");
+      
+      res.json({
+        success: true,
+        message: "کاربران با موفقیت بازنشانی شدند",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error in emergency user reset:', error);
+      res.status(500).json({ 
+        error: "خطا در بازنشانی کاربران",
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   });
 
   // ====== FINANCIAL INTEGRITY API ======
