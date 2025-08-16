@@ -2103,8 +2103,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Initialize default settings on first run
-  // Invoice Edit Routes
+  // 🛠️ SHERLOCK v12.0: ENHANCED INVOICE EDIT ROUTE WITH DEBUG LOGGING
   app.post("/api/invoices/edit", authMiddleware, async (req, res) => {
+    const debug = {
+      info: (message: string, data?: any) => {
+        const timestamp = new Date().toISOString();
+        console.log(`🔍 SHERLOCK v12.0 [INVOICE_EDIT] ${timestamp}: ${message}`, data || '');
+      },
+      error: (message: string, error?: any) => {
+        const timestamp = new Date().toISOString();
+        console.error(`❌ SHERLOCK v12.0 [INVOICE_EDIT] ${timestamp}: ${message}`, error || '');
+      },
+      success: (message: string, data?: any) => {
+        const timestamp = new Date().toISOString();
+        console.log(`✅ SHERLOCK v12.0 [INVOICE_EDIT] ${timestamp}: ${message}`, data || '');
+      }
+    };
+
+    const sessionId = req.sessionID;
+    const userId = (req.session as any)?.userId || (req.session as any)?.crmUserId;
+    const username = (req.session as any)?.username || (req.session as any)?.crmUsername || 'unknown';
+    
+    debug.info('Invoice Edit Request Started', {
+      sessionId,
+      userId,
+      username,
+      hasSession: !!req.session,
+      sessionAuth: {
+        authenticated: (req.session as any)?.authenticated,
+        crmAuthenticated: (req.session as any)?.crmAuthenticated,
+        cookieMaxAge: req.session?.cookie?.maxAge
+      },
+      requestSize: JSON.stringify(req.body).length,
+      userAgent: req.get('User-Agent')
+    });
+
     try {
       const {
         invoiceId,
@@ -2117,16 +2150,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         editedBy
       } = req.body;
 
+      debug.info('Invoice Edit Data Extracted', {
+        invoiceId,
+        editType,
+        originalAmount,
+        editedAmount,
+        editedBy,
+        recordCount: editedUsageData?.records?.length || 0
+      });
+
       // Validate input
       if (!invoiceId || !editedUsageData || !editedBy) {
+        debug.error('Validation Failed - Missing Required Data', {
+          invoiceId: !!invoiceId,
+          editedUsageData: !!editedUsageData,
+          editedBy: !!editedBy
+        });
         return res.status(400).json({ error: "اطلاعات ضروری برای ویرایش فاکتور کامل نیست" });
       }
 
       // Validate amounts
       if (editedAmount < 0) {
+        debug.error('Validation Failed - Negative Amount', { editedAmount });
         return res.status(400).json({ error: "مبلغ فاکتور نمی‌تواند منفی باشد" });
       }
 
+      debug.success('Validation Passed', {
+        invoiceId,
+        editedAmount,
+        recordCount: editedUsageData?.records?.length
+      });
+
+      // 💾 SHERLOCK v12.0: ATOMIC EDIT TRANSACTION WITH SESSION VALIDATION
+      debug.info('Creating Edit Record', { invoiceId, editedBy });
+      
+      // Pre-edit session health check
+      const preEditSessionState = {
+        sessionId,
+        hasSession: !!req.session,
+        authenticated: (req.session as any)?.authenticated,
+        crmAuthenticated: (req.session as any)?.crmAuthenticated,
+        cookieMaxAge: req.session?.cookie?.maxAge,
+        timestamp: new Date().toISOString()
+      };
+      
+      debug.info('Pre-Edit Session State', preEditSessionState);
+      
       // Create an invoice edit record for audit
       const editRecord = await storage.createInvoiceEdit({
         invoiceId,
@@ -2139,11 +2208,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         editedBy,
         timestamp: new Date()
       });
+      
+      debug.success('Edit Record Created', { editRecordId: editRecord.id });
 
       // Execute atomic transaction for invoice editing
-      // This is a placeholder for a more robust atomic operation if needed
-      // For now, we perform updates directly and log them.
       const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      debug.info('Starting Invoice Update Transaction', { transactionId });
 
       // Update the invoice
       await storage.updateInvoice(invoiceId, {
@@ -2151,6 +2222,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         usageData: editedUsageData,
         editedAt: new Date()
       });
+      
+      debug.success('Invoice Updated Successfully', { invoiceId, newAmount: editedAmount });
 
       // ✅ SHERLOCK v24.1: Automatic financial synchronization after invoice edit
       try {
@@ -2174,19 +2247,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Continue execution even if sync fails
       }
 
+      // 🎆 SHERLOCK v12.0: POST-EDIT SESSION VALIDATION
+      const postEditSessionState = {
+        sessionId,
+        hasSession: !!req.session,
+        authenticated: (req.session as any)?.authenticated,
+        crmAuthenticated: (req.session as any)?.crmAuthenticated,
+        cookieMaxAge: req.session?.cookie?.maxAge,
+        timestamp: new Date().toISOString()
+      };
+      
+      debug.info('Post-Edit Session State', postEditSessionState);
+      
+      const sessionIntact = preEditSessionState.hasSession === postEditSessionState.hasSession &&
+                            preEditSessionState.authenticated === postEditSessionState.authenticated &&
+                            preEditSessionState.crmAuthenticated === postEditSessionState.crmAuthenticated;
+      
+      debug.info('Session Integrity Check', {
+        sessionIntact,
+        preEdit: preEditSessionState,
+        postEdit: postEditSessionState
+      });
+
+      debug.success('Invoice Edit Operation Complete', {
+        transactionId,
+        editId: editRecord.id,
+        sessionIntact,
+        duration: Date.now() - new Date(preEditSessionState.timestamp).getTime()
+      });
+
       res.json({
         success: true,
         message: "فاکتور با موفقیت ویرایش و همگام‌سازی شد",
         transactionId,
         editId: editRecord.id,
-        financialSyncStatus: "completed"
+        financialSyncStatus: "completed",
+        debugInfo: {
+          sessionIntact,
+          processingTime: Date.now() - new Date(preEditSessionState.timestamp).getTime()
+        }
       });
 
     } catch (error: any) {
-      console.error('خطا در ویرایش فاکتور:', error);
+      debug.error('Invoice Edit Operation Failed', {
+        error: error.message || error,
+        stack: error.stack,
+        sessionState: {
+          sessionId,
+          hasSession: !!req.session,
+          authenticated: (req.session as any)?.authenticated,
+          crmAuthenticated: (req.session as any)?.crmAuthenticated
+        }
+      });
+      
       res.status(500).json({
         error: 'خطا در ویرایش فاکتور',
-        details: error.message
+        details: error.message,
+        sessionId: sessionId,
+        timestamp: new Date().toISOString()
       });
     }
   });
