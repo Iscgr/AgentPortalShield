@@ -24,7 +24,7 @@
   --destructive-foreground: hsl(0, 0%, 100%);
   --ring: hsl(258, 30%, 65%);
   --radius: 1.2rem;
-  
+
   /* Claymorphism Specific Colors */
   --clay-lavender: hsl(258, 62%, 75%);
   --clay-mint: hsl(155, 45%, 78%);
@@ -32,13 +32,13 @@
   --clay-peach: hsl(25, 70%, 85%);
   --clay-rose: hsl(340, 50%, 82%);
   --clay-sage: hsl(85, 35%, 75%);
-  
+
   /* Shadow Variables */
   --clay-shadow-outer: 0 1px 2px rgba(0, 0, 0, 0.05);
   --clay-shadow-inner: inset 0 1px 1px rgba(0, 0, 0, 0.02);
   --clay-shadow-pressed: inset 0 1px 1px rgba(0, 0, 0, 0.03);
   --clay-shadow-hover: 0 1px 3px rgba(0, 0, 0, 0.08);
-  
+
   /* Custom MarFaNet colors with clay treatment */
   --marfanet-primary: var(--clay-lavender);
   --marfanet-secondary: var(--clay-mint);
@@ -123,7 +123,7 @@
   --destructive: hsl(350, 55%, 45%);
   --destructive-foreground: hsl(0, 0%, 100%);
   --ring: hsl(258, 30%, 55%);
-  
+
   /* Dark Claymorphism Colors */
   --clay-lavender: hsl(258, 62%, 65%);
   --clay-mint: hsl(155, 35%, 35%);
@@ -131,13 +131,13 @@
   --clay-peach: hsl(25, 50%, 45%);
   --clay-rose: hsl(340, 40%, 45%);
   --clay-sage: hsl(85, 25%, 35%);
-  
+
   /* Enhanced Dark Shadow Variables */
   --clay-shadow-outer: 0 4px 12px rgba(0, 0, 0, 0.3);
   --clay-shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.1);
   --clay-shadow-pressed: inset 0 2px 4px rgba(0, 0, 0, 0.2);
   --clay-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.4);
-  
+
   /* Dark mode MarFaNet colors */
   --marfanet-primary: var(--clay-lavender);
   --marfanet-secondary: var(--clay-mint);
@@ -201,14 +201,50 @@
 
   /* Enhanced Glassmorphism Cards for Admin Panel */
   .admin-glass-card {
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.4), rgba(30, 41, 59, 0.3)) !important;
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(148, 163, 184, 0.15);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(59, 130, 246, 0.1);
-    border-radius: 16px;
-    color: white !important;
-    position: relative;
-    overflow: hidden;
+    background: linear-gradient(135deg, rgba(17, 25, 40, 0.85) 0%, rgba(12, 17, 30, 0.9) 100%);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Modern glass effect for admin dialogs */
+  .admin-glass-card {
+    background: linear-gradient(135deg, rgba(17, 25, 40, 0.85) 0%, rgba(12, 17, 30, 0.9) 100%);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Custom scrollbar for better visibility */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-track-transparent {
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  }
+
+  .scrollbar-thumb-white\/20 {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+
+  /* Webkit scrollbar styles for better cross-browser support */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thumb-white\/20::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thumb-white\/20::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
   }
 
   .admin-glass-card::before {
@@ -311,7 +347,7 @@
       overflow-y: auto !important;
       overflow-x: hidden !important;
     }
-    
+
     .admin-dialog-stable:hover {
       position: fixed !important;
       top: 1rem !important;
@@ -408,7 +444,7 @@
   [data-radix-dialog-content]::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
   }
-  
+
   /* Dialog overlay stability - Prevent backdrop interference */
   [data-radix-dialog-overlay] {
     position: fixed !important;
@@ -740,7 +776,7 @@
   .rtl {
     direction: rtl;
   }
-  
+
   .ltr {
     direction: ltr;
   }
@@ -751,7 +787,7 @@
   .sidebar-nav {
     @apply w-64 bg-white dark:bg-gray-900 shadow-lg border-l border-gray-200 dark:border-gray-700;
   }
-  
+
   .main-content {
     @apply min-h-screen bg-gray-50 dark:bg-gray-900 transition-all duration-300;
   }
@@ -761,7 +797,7 @@
       @apply mr-64;
     }
   }
-  
+
   .stat-card {
     @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 lg:p-6 hover:shadow-md transition-shadow cursor-pointer;
   }
@@ -771,40 +807,40 @@
     .sidebar-nav {
       @apply w-80;
     }
-    
+
     .grid-mobile-optimize {
       @apply grid-cols-1 gap-3;
     }
-    
+
     .text-mobile-sm {
       @apply text-sm;
     }
-    
+
     .p-mobile-sm {
       @apply p-3;
     }
   }
-  
+
   .invoice-status-unpaid {
     @apply px-2 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 text-xs rounded-full;
   }
-  
+
   .invoice-status-paid {
     @apply px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full;
   }
-  
+
   .invoice-status-overdue {
     @apply px-2 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-xs rounded-full;
   }
-  
+
   .telegram-connected {
     @apply px-3 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-sm;
   }
-  
+
   .ai-assistant-card {
     @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6;
   }
-  
+
   .activity-item {
     @apply flex items-start space-x-3 space-x-reverse p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg;
   }
@@ -815,33 +851,33 @@
   .persian-digits {
     font-variant-numeric: normal;
   }
-  
+
   /* Loading states */
   .loading-shimmer {
     @apply animate-pulse bg-gray-200 dark:bg-gray-700 rounded;
   }
-  
+
   /* Portal-specific dark theme */
   .portal-dark {
     @apply bg-gray-900 text-white;
   }
-  
+
   .portal-card {
     @apply bg-gray-800 rounded-lg p-4;
   }
-  
+
   .portal-stat-value {
     @apply text-2xl font-bold;
   }
-  
+
   .portal-debt {
     @apply text-red-400;
   }
-  
+
   .portal-credit {
     @apply text-green-400;
   }
-  
+
   .portal-warning {
     @apply text-yellow-400;
   }
@@ -911,7 +947,7 @@
     max-width: calc(100vw - 2rem) !important;
     transform: none !important;
   }
-  
+
   /* Fix SelectContent itself */
   [data-radix-select-content] {
     position: relative !important;
@@ -924,14 +960,14 @@
     min-width: 100% !important;
     margin: 0.5rem 0 !important;
   }
-  
+
   /* Ensure SelectContent viewport is properly sized */
   [data-radix-select-viewport] {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 100% !important;
   }
-  
+
   /* Fix for all popper-based components (Select, Dropdown, etc.) */
   [data-radix-popper-content-wrapper],
   [data-radix-dropdown-content],
@@ -944,7 +980,7 @@
     max-width: calc(100vw - 2rem) !important;
     transform: translateX(0) translateY(0.5rem) !important;
   }
-  
+
   /* Portal interface specific fixes */
   .portal-dark [data-radix-popper-content-wrapper],
   .public-portal-isolated [data-radix-popper-content-wrapper] {
@@ -956,13 +992,13 @@
     max-width: calc(100vw - 2rem) !important;
     transform: translateX(0) translateY(0.5rem) !important;
   }
-  
+
   /* Fix Select component trigger buttons on mobile */
   [data-radix-select-trigger] {
     width: 100% !important;
     max-width: 100% !important;
   }
-  
+
   /* Center-align dropdown content */
   [data-radix-select-content],
   [data-radix-dropdown-content],
@@ -983,7 +1019,7 @@
     max-width: calc(100vw - 1rem) !important;
     width: calc(100vw - 1rem) !important;
   }
-  
+
   [data-radix-select-content],
   [data-radix-dropdown-content],
   [data-radix-popover-content] {
@@ -1010,7 +1046,7 @@
     overflow-y: auto !important;
     z-index: 70 !important;
   }
-  
+
   /* Backdrop for mobile dropdowns */
   .invoice-filters [data-radix-select-content]::before,
   .categorization-dropdown [data-radix-select-content]::before {
