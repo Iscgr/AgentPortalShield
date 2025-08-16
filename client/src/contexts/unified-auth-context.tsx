@@ -234,23 +234,7 @@ export function useUnifiedAuth() {
   return context;
 }
 
-// Legacy compatibility - keep existing hooks working
+// Export unified auth as default
 export const useAuth = useUnifiedAuth;
-export const useCrmAuth = () => {
-  const unified = useUnifiedAuth();
-  return {
-    user: unified.userType === 'CRM' ? unified.user : null,
-    isAuthenticated: unified.userType === 'CRM' && unified.isAuthenticated,
-    isLoading: unified.isLoading,
-    loginMutation: unified.crmLoginMutation,
-    logoutMutation: {
-      mutate: unified.logout,
-      isPending: false,
-      isError: false,
-      error: null
-    },
-    checkAuth: unified.checkAuth,
-  };
-};
 
 export default UnifiedAuthContext;
