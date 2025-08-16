@@ -3,7 +3,7 @@ import { Bot, Send, Menu, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/auth-context";
+import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 import { useToast } from "@/hooks/use-toast";
 
 interface HeaderProps {
@@ -12,7 +12,7 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick }: HeaderProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const { logout } = useAuth();
+  const { logout } = useUnifiedAuth();
   const { toast } = useToast();
 
   // Update time every second
