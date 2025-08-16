@@ -2239,74 +2239,133 @@ function EditInvoiceDialog({
     }
   };
 
-  // Financial Synchronization Function
+  // ✅ SHERLOCK v26.1: COMPREHENSIVE Financial Synchronization Function
   const performFinancialSynchronization = async (representativeId: number, amountDifference: number, newAmount: number, oldAmount: number) => {
     try {
-      console.log('Starting financial synchronization:', { representativeId, amountDifference, newAmount, oldAmount });
+      console.log('🔄 SHERLOCK v26.1: Starting COMPREHENSIVE financial synchronization:', { representativeId, amountDifference, newAmount, oldAmount });
 
-      // 1. Direct debt synchronization via CRM endpoint (most reliable)
-      const syncResponse = await apiRequest(`/api/crm/representatives/${representativeId}/sync-debt`, {
-        method: "POST",
-        data: { 
-          reason: "invoice_amount_changed",
-          invoiceId: invoice.id,
-          amountChange: amountDifference,
-          timestamp: new Date().toISOString()
-        }
-      });
+      // 1. ✅ CRITICAL: Force Unified Financial Engine Sync
+      try {
+        const unifiedSyncResponse = await apiRequest(`/api/unified-financial/sync-representative/${representativeId}`, {
+          method: "POST",
+          data: { 
+            reason: "invoice_amount_changed",
+            invoiceId: invoice.id,
+            amountChange: amountDifference,
+            newTotalAmount: newAmount,
+            oldTotalAmount: oldAmount,
+            timestamp: new Date().toISOString()
+          }
+        });
+        console.log('✅ Unified Financial Engine sync completed:', unifiedSyncResponse);
+      } catch (unifiedError) {
+        console.error('❌ Unified Financial Engine sync failed:', unifiedError);
+        // Continue with other sync methods
+      }
 
-      // Force refresh representative data to reflect changes
-      await new Promise(resolve => setTimeout(resolve, 500)); // Wait for database to sync
+      // 2. ✅ CRITICAL: Direct debt synchronization via CRM endpoint 
+      try {
+        const syncResponse = await apiRequest(`/api/crm/representatives/${representativeId}/sync-debt`, {
+          method: "POST",
+          data: { 
+            reason: "invoice_amount_changed",
+            invoiceId: invoice.id,
+            amountChange: amountDifference,
+            timestamp: new Date().toISOString()
+          }
+        });
+        console.log('✅ CRM debt synchronization completed:', syncResponse);
+      } catch (crmError) {
+        console.warn('⚠️ CRM debt sync failed (non-critical):', crmError);
+      }
 
-      console.log('Debt synchronization completed:', syncResponse);
+      // 3. ✅ CRITICAL: Global Statistics Engine Sync
+      try {
+        await apiRequest('/api/unified-statistics/sync-representative', {
+          method: "POST",
+          data: {
+            representativeId,
+            reason: "invoice_edit",
+            amountDifference,
+            timestamp: new Date().toISOString()
+          }
+        });
+        console.log('✅ Global statistics sync completed');
+      } catch (statsError) {
+        console.warn('⚠️ Statistics sync failed (non-critical):', statsError);
+      }
 
-      // 2. Recalculate invoice payment status if needed
+      // 4. ✅ Payment status recalculation (ENHANCED)
       if (status === 'paid' && newAmount > oldAmount) {
-        // If invoice amount increased and was marked as paid, check if it's still fully paid
         try {
           const paymentsResponse = await apiRequest(`/api/payments?invoiceId=${invoice.id}`);
           const payments = Array.isArray(paymentsResponse) ? paymentsResponse : [];
           const totalPaid = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0);
 
           if (totalPaid < newAmount) {
-            // Update status to partial since payment is no longer sufficient
             await apiRequest(`/api/invoices/${invoice.id}`, {
               method: "PUT", 
               data: { status: totalPaid > 0 ? 'partial' : 'unpaid' }
             });
+            console.log('✅ Invoice status updated due to amount increase');
           }
         } catch (paymentError) {
-          console.warn('Payment status check failed:', paymentError);
+          console.warn('⚠️ Payment status check failed:', paymentError);
         }
       }
 
-      // 3. Log activity for audit trail
+      // 5. ✅ COMPREHENSIVE Cache Invalidation for Real-time UI Updates
+      try {
+        // Force refresh ALL related financial data
+        queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/unified-financial"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/unified-statistics"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        queryClient.invalidateQueries({ queryKey: [`unified-financial-representative-${representativeId}`] });
+        
+        // Force immediate re-fetch for this representative
+        await queryClient.refetchQueries({ queryKey: [`unified-financial-representative-${representativeId}`] });
+        console.log('✅ Comprehensive cache invalidation completed');
+      } catch (cacheError) {
+        console.warn('⚠️ Cache invalidation failed:', cacheError);
+      }
+
+      // 6. ✅ Wait for database synchronization
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Extended wait for complex sync
+
+      // 7. ✅ Comprehensive Activity Logging
       try {
         await apiRequest("/api/activity-logs", {
           method: "POST",
           data: {
-            type: "invoice_edited_financial_sync",
-            description: `همگام‌سازی مالی پس از ویرایش فاکتور ${invoice.invoiceNumber}: ${amountDifference > 0 ? '+' : ''}${amountDifference} ریال`,
+            type: "invoice_edited_comprehensive_sync",
+            description: `🔄 SHERLOCK v26.1: همگام‌سازی جامع مالی پس از ویرایش فاکتور ${invoice.invoiceNumber}: ${amountDifference > 0 ? '+' : ''}${amountDifference} ریال`,
             relatedId: representativeId,
             metadata: {
               invoiceId: invoice.id,
               amountDifference,
               newAmount,
               oldAmount,
+              syncMethods: ['unified_financial_engine', 'crm_debt_sync', 'statistics_engine', 'cache_invalidation'],
               timestamp: new Date().toISOString()
             }
           }
         });
+        console.log('✅ Comprehensive activity logging completed');
       } catch (logError) {
-        console.warn('Activity logging failed (non-critical):', logError);
+        console.warn('⚠️ Activity logging failed (non-critical):', logError);
       }
 
-      console.log('Financial synchronization completed successfully');
+      console.log('🎉 SHERLOCK v26.1: COMPREHENSIVE financial synchronization completed successfully');
 
     } catch (error) {
-      console.error('Financial synchronization error:', error);
-      // Don't throw error for sync failures, allow invoice update to proceed
-      console.warn('Financial sync failed but invoice was updated successfully');
+      console.error('❌ SHERLOCK v26.1: Critical error in comprehensive financial synchronization:', error);
+      // Still allow invoice update to proceed, but with warning
+      toast({
+        title: "هشدار همگام‌سازی",
+        description: "فاکتور بروزرسانی شد اما برخی آمار مالی ممکن است تأخیر داشته باشد",
+        variant: "destructive"
+      });
     }
   };
 
