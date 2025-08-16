@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/auth-context";
 import { 
   Edit3, 
   Save, 
@@ -86,9 +87,26 @@ export default function InvoiceEditDialog({
   const [calculatedAmount, setCalculatedAmount] = useState(0);
   const [activeTab, setActiveTab] = useState("edit");
   const [isInitialized, setIsInitialized] = useState(false);
+  const [originalAmount, setOriginalAmount] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // ✅ SHERLOCK v24.1: Authentication check
+  if (!user || !user.authenticated) {
+    return (
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" disabled>
+            <Edit3 className="w-4 h-4 mr-2" />
+            ویرایش ریز جزئیات (نیاز به ورود مجدد)
+          </Button>
+        </DialogTrigger>
+      </Dialog>
+    );
+  }
 
   // Fetch invoice usage details
   const { data: usageDetails, isLoading } = useQuery({
@@ -108,25 +126,55 @@ export default function InvoiceEditDialog({
     enabled: isOpen && activeTab === "transactions"
   });
 
-  // Edit mutation
+  // Edit mutation with financial synchronization
   const editMutation = useMutation({
     mutationFn: async (editData: any) => {
+      setIsProcessing(true);
       const response = await apiRequest('/api/invoices/edit', { method: 'POST', data: editData });
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const transactionId = data.transactionId;
       const editId = data.editId;
+      const amountDifference = calculatedAmount - originalAmount;
       
       toast({
         title: "فاکتور ویرایش شد",
-        description: `تغییرات با موفقیت ذخیره شد | تراکنش: ${transactionId?.slice(-8) || 'نامشخص'}`,
+        description: `تغییرات با موفقیت ذخیره شد | تراکنش: ${transactionId?.slice(-8) || 'نامشخص'} | تفاوت: ${formatCurrency(amountDifference.toString())} تومان`,
       });
+      
+      // ✅ SHERLOCK v24.1: Force financial synchronization
+      try {
+        if (Math.abs(amountDifference) > 0) {
+          console.log(`🔄 SHERLOCK v24.1: Synchronizing financial data for representative ${representativeCode}, amount difference: ${amountDifference}`);
+          
+          // Force sync representative debt immediately
+          await apiRequest(`/api/unified-financial/sync-representative/${representativeCode}`, {
+            method: 'POST',
+            data: { 
+              amountDifference,
+              newTotalAmount: calculatedAmount,
+              oldTotalAmount: originalAmount,
+              invoiceId: invoice.id,
+              reason: 'INVOICE_EDIT_SYNC'
+            }
+          });
+
+          // Force invalidate all financial caches
+          queryClient.invalidateQueries({ queryKey: ['/api/unified-financial'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+          queryClient.invalidateQueries({ queryKey: [`/api/unified-financial/representative`] });
+          
+          console.log(`✅ SHERLOCK v24.1: Financial synchronization completed for representative ${representativeCode}`);
+        }
+      } catch (syncError) {
+        console.warn('⚠️ Financial sync warning (non-critical):', syncError);
+      }
       
       // Mark all records as saved (remove modified/new flags)
       setEditableRecords(prevRecords => 
         prevRecords
-          .filter(record => !record.isDeleted) // Remove deleted records
+          .filter(record => !record.isDeleted)
           .map(record => ({
             ...record,
             isNew: false,
@@ -136,20 +184,20 @@ export default function InvoiceEditDialog({
       
       setEditMode(false);
       setEditReason("");
+      setIsProcessing(false);
       
-      // Don't invalidate usage details query to preserve our state
-      // Only invalidate related queries
+      // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: [`/api/representatives/${representativeCode}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] });
       
       onEditComplete?.();
     },
     onError: (error: any) => {
+      setIsProcessing(false);
       toast({
         title: "خطا در ویرایش فاکتور",
-        description: error.message,
+        description: error.message || 'خطای ناشناخته در ویرایش فاکتور',
         variant: "destructive",
       });
     }
@@ -169,11 +217,16 @@ export default function InvoiceEditDialog({
         isModified: false,
         isDeleted: false
       }));
+      
+      const initialAmount = calculateTotalAmount(records);
       setEditableRecords(records);
-      setCalculatedAmount(calculateTotalAmount(records));
+      setCalculatedAmount(initialAmount);
+      setOriginalAmount(parseFloat(invoice.amount)); // Store original for comparison
       setIsInitialized(true);
+      
+      console.log(`🧮 SHERLOCK v24.1: Initialized invoice edit - Original: ${invoice.amount}, Calculated: ${initialAmount}`);
     }
-  }, [usageDetails, isInitialized, editMode]);
+  }, [usageDetails, isInitialized, editMode, invoice.amount]);
 
   // Reset initialization when dialog is closed
   useEffect(() => {
@@ -412,9 +465,18 @@ export default function InvoiceEditDialog({
                           <RotateCcw className="w-4 h-4 mr-2" />
                           انصراف
                         </Button>
-                        <Button onClick={validateAndSave} disabled={editMutation.isPending}>
+                        <Button 
+                          onClick={validateAndSave} 
+                          disabled={editMutation.isPending || isProcessing || editableRecords.filter(r => !r.isDeleted).length === 0}
+                          className={Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01 ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                        >
                           <Save className="w-4 h-4 mr-2" />
-                          {editMutation.isPending ? "در حال ذخیره..." : "ذخیره تغییرات"}
+                          {editMutation.isPending || isProcessing 
+                            ? "در حال ذخیره و همگام‌سازی..." 
+                            : Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01
+                            ? `ذخیره تغییرات (${calculatedAmount > parseFloat(invoice.amount) ? '+' : ''}${formatCurrency((calculatedAmount - parseFloat(invoice.amount)).toString())})`
+                            : "ذخیره تغییرات"
+                          }
                         </Button>
                       </>
                     )}
@@ -424,23 +486,33 @@ export default function InvoiceEditDialog({
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">مبلغ اصلی</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">مبلغ اصلی فاکتور</p>
                     <p className="text-xl font-bold">{formatCurrency(invoice.amount)} تومان</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">مبلغ محاسبه شده</p>
-                    <p className={`text-xl font-bold ${
-                      calculatedAmount !== parseFloat(invoice.amount) 
-                        ? 'text-orange-600 dark:text-orange-400' 
-                        : 'text-green-600 dark:text-green-400'
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {editMode ? 'مبلغ محاسبه شده (زنده)' : 'مبلغ محاسبه شده'}
+                      {editMode && <span className="text-xs text-blue-500 mr-2">🔄 Real-time</span>}
+                    </p>
+                    <p className={`text-xl font-bold transition-colors duration-300 ${
+                      Math.abs(calculatedAmount - parseFloat(invoice.amount)) < 0.01
+                        ? 'text-green-600 dark:text-green-400' 
+                        : editMode
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-orange-600 dark:text-orange-400'
                     }`}>
                       {formatCurrency(calculatedAmount.toString())} تومان
                     </p>
+                    {editMode && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        تعداد آیتم‌های فعال: {toPersianDigits(editableRecords.filter(r => !r.isDeleted).length.toString())}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">تفاوت</p>
-                    <p className={`text-xl font-bold ${
-                      calculatedAmount - parseFloat(invoice.amount) === 0 
+                    <p className="text-sm text-gray-600 dark:text-gray-400">تفاوت مبلغ</p>
+                    <p className={`text-xl font-bold transition-colors duration-300 ${
+                      Math.abs(calculatedAmount - parseFloat(invoice.amount)) < 0.01
                         ? 'text-gray-600 dark:text-gray-400'
                         : calculatedAmount - parseFloat(invoice.amount) > 0
                         ? 'text-green-600 dark:text-green-400'
@@ -449,6 +521,11 @@ export default function InvoiceEditDialog({
                       {calculatedAmount - parseFloat(invoice.amount) > 0 ? '+' : ''}
                       {formatCurrency((calculatedAmount - parseFloat(invoice.amount)).toString())} تومان
                     </p>
+                    {editMode && Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {calculatedAmount > parseFloat(invoice.amount) ? '↗️ افزایش' : '↘️ کاهش'} مبلغ فاکتور
+                      </p>
+                    )}
                   </div>
                 </div>
 

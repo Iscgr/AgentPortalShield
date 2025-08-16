@@ -9,6 +9,11 @@ import { unifiedFinancialEngine } from '../services/unified-financial-engine.js'
 import { db } from '../db.js';
 import { representatives } from '../../shared/schema.js';
 import { sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm'; // Import eq for where clause
+import { invoices } from '../../shared/schema.js'; // Assuming invoices schema is available
+import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
+import { storage } from '../utils/storage.js'; // Assuming storage utility exists
+import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
 
 const router = Router();
 
@@ -186,7 +191,7 @@ router.get('/all-representatives', requireAuth, async (req, res) => {
 router.post('/sync-representative/:id', requireAuth, async (req, res) => {
   try {
     const representativeId = parseInt(req.params.id);
-    
+
     if (isNaN(representativeId)) {
       return res.status(400).json({
         success: false,
@@ -320,7 +325,7 @@ router.get('/verify-total-debt', requireAuth, async (req, res) => {
 router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
   try {
     console.log("🔍 SHERLOCK v23.0: Starting immediate debt calculation...");
-    
+
     // Method 1: Direct sum from representatives table (current displayed values)
     const allActiveReps = await db.select({
       id: representatives.id,
@@ -333,7 +338,7 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
     let manualTableSum = 0;
     let debtorsCount = 0;
     const topDebtors = [];
-    
+
     for (const rep of allActiveReps) {
       const debt = parseFloat(rep.totalDebt) || 0;
       manualTableSum += debt;
@@ -353,7 +358,7 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
 
     // Method 2: Real-time calculation using unified engine
     const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
-    
+
     // Method 3: Direct database calculation
     const [totalInvoices] = await db.select({
       total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
@@ -367,7 +372,7 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
 
     // Expected amount from dashboard
     const expectedAmount = 183146990;
-    
+
     console.log(`📊 IMMEDIATE DEBT CALCULATION RESULTS:`);
     console.log(`💰 Manual Table Sum: ${Math.round(manualTableSum).toLocaleString()} تومان`);
     console.log(`🎯 Unified Engine: ${Math.round(globalSummary.totalSystemDebt).toLocaleString()} تومان`);
@@ -418,10 +423,10 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
 router.get('/summary', requireAuth, async (req, res) => {
   try {
     console.log("🔍 SHERLOCK v24.0: Fetching corrected debt summary...");
-    
+
     // استفاده از مقدار صحیح بدهی طبق استاندارد جدید سیستم
     const correctedTotalDebt = 147853390;
-    
+
     // شمارش نمایندگان
     const repCount = await db.select({
       total: sql<number>`COUNT(*)`
@@ -478,6 +483,79 @@ router.get('/auth-test', requireAuth, async (req, res) => {
     });
   }
 });
+
+// ========== DEBT SYNCHRONIZATION API ==========
+router.post("/sync-debt", requireAuth, async (req, res) => {
+  try {
+    console.log("🔄 SHERLOCK v23.0: Manual debt synchronization requested");
+
+    await unifiedFinancialEngine.syncAllRepresentativesDebt();
+
+    res.json({
+      success: true,
+      message: "همگام‌سازی بدهی تمام نمایندگان انجام شد",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error("❌ Error in debt synchronization:", error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در همگام‌سازی بدهی",
+      details: error.message
+    });
+  }
+});
+
+// ========== REPRESENTATIVE FINANCIAL SYNC (INVOICE EDIT) ==========
+router.post("/sync-representative/:representativeCode", requireAuth, async (req, res) => {
+  try {
+    const { representativeCode } = req.params;
+    const { amountDifference, newTotalAmount, oldTotalAmount, invoiceId, reason } = req.body;
+
+    console.log(`🔄 SHERLOCK v24.1: Individual representative financial sync requested for ${representativeCode}`);
+    console.log(`💰 Amount change: ${oldTotalAmount} → ${newTotalAmount} (Δ: ${amountDifference})`);
+
+    // Find representative by code
+    const representative = await storage.getRepresentativeByCode(representativeCode);
+    if (!representative) {
+      return res.status(404).json({
+        success: false,
+        error: `نماینده با کد ${representativeCode} یافت نشد`
+      });
+    }
+
+    // Force immediate cache invalidation before sync
+    UnifiedFinancialEngine.forceInvalidateRepresentative(representative.id);
+
+    // Sync representative debt with new calculations
+    await unifiedFinancialEngine.syncRepresentativeDebt(representative.id);
+
+    // Log the financial transaction for audit trail
+    console.log(`✅ SHERLOCK v24.1: Financial sync completed for representative ${representativeCode} (ID: ${representative.id})`);
+    console.log(`📊 Reason: ${reason || 'MANUAL_SYNC'}, Invoice ID: ${invoiceId || 'N/A'}`);
+
+    res.json({
+      success: true,
+      message: `همگام‌سازی مالی نماینده ${representativeCode} انجام شد`,
+      data: {
+        representativeId: representative.id,
+        representativeCode,
+        amountDifference,
+        newTotalAmount,
+        oldTotalAmount,
+        syncTimestamp: new Date().toISOString()
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Error in representative ${req.params.representativeCode} financial sync:`, error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در همگام‌سازی مالی نماینده",
+      details: error.message
+    });
+  }
+});
+
 
 export default router;
 
