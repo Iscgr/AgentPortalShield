@@ -20,66 +20,97 @@ const router = Router();
 // Import authentication middleware from main routes
 import type { Request, Response, NextFunction } from 'express';
 
-// Enhanced Authentication middleware with session extension and proper error handling
+// 🔐 SHERLOCK v25.0: Enhanced Authentication Middleware with Auto-Recovery
 const requireAuth = (req: any, res: any, next: any) => {
-  console.log('🔐 SHERLOCK v24.3: Authentication check:', {
-    sessionId: req.sessionID,
-    adminAuth: req.session?.authenticated,
-    crmAuth: req.session?.crmAuthenticated,
-    adminUser: !!req.session?.user,
-    crmUser: !!req.session?.crmUser,
-    path: req.path,
-    method: req.method,
-    userAgent: req.get('User-Agent')?.slice(0, 50),
+  const path = req.path;
+  const method = req.method;
+  const sessionId = req.sessionID;
+  
+  console.log('🔐 SHERLOCK v25.0: Authentication check:', {
+    sessionId,
+    path,
+    method,
+    hasSession: !!req.session,
     timestamp: new Date().toISOString()
   });
 
-  // Multiple authentication checks with fallbacks
-  const isAdminAuthenticated = req.session?.authenticated === true ||
-                              (req.session?.user && (req.session.user.role === 'admin' || req.session.user.role === 'ADMIN' || req.session.user.role === 'SUPER_ADMIN'));
-  const isCrmAuthenticated = req.session?.crmAuthenticated === true || req.session?.crmUser;
+  // Simplified and robust authentication check
+  let isAuthenticated = false;
+  let userType = null;
 
-  // Additional session recovery check
-  const hasValidSession = req.session && (req.session.authenticated || req.session.crmAuthenticated);
-  
-  const isAuthenticated = isAdminAuthenticated || isCrmAuthenticated || hasValidSession;
+  if (req.session) {
+    // Check admin authentication
+    if (req.session.authenticated === true || 
+        (req.session.user && ['admin', 'ADMIN', 'SUPER_ADMIN'].includes(req.session.user.role))) {
+      isAuthenticated = true;
+      userType = 'ADMIN';
+    }
+    
+    // Check CRM authentication
+    if (req.session.crmAuthenticated === true || req.session.crmUser) {
+      isAuthenticated = true;
+      userType = 'CRM';
+    }
+  }
 
   if (isAuthenticated) {
-    // Extend session activity - critical for long edit operations
+    // Extend session for authenticated users - critical for long operations
     try {
       req.session.touch();
-      if (req.session.crmUser) {
-        req.session.crmUser.lastActivity = new Date().toISOString();
-        // Extend session timeout for edit operations
-        req.session.cookie.maxAge = 4 * 60 * 60 * 1000; // 4 hours for edit operations
-      }
+      
+      // Extended session timeout for edit operations (8 hours)
+      const extendedTimeout = 8 * 60 * 60 * 1000;
+      req.session.cookie.maxAge = extendedTimeout;
+      
+      // Update last activity
+      const now = new Date().toISOString();
       if (req.session.user) {
-        req.session.user.lastActivity = new Date().toISOString();
+        req.session.user.lastActivity = now;
       }
-      console.log('✅ SHERLOCK v24.3: Auth Success & Session Extended:', {
-        sessionId: req.sessionID,
-        path: req.path,
-        extendedMaxAge: req.session.cookie.maxAge
+      if (req.session.crmUser) {
+        req.session.crmUser.lastActivity = now;
+      }
+      
+      console.log('✅ SHERLOCK v25.0: Auth Success & Session Extended:', {
+        sessionId,
+        userType,
+        path,
+        extendedTimeout: '8 hours',
+        timestamp: now
       });
+      
+      // Force session save to ensure persistence
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('⚠️ Session save error:', err);
+        }
+        next();
+      });
+      
     } catch (sessionError) {
-      console.error('⚠️ Session extension error (non-critical):', sessionError);
+      console.error('⚠️ Session extension error:', sessionError);
+      next(); // Continue even if session extension fails
     }
-    next();
   } else {
-    console.log('❌ SHERLOCK v24.3: Auth Failed - Session Expired:', {
-      sessionId: req.sessionID,
-      path: req.path,
+    console.log('❌ SHERLOCK v25.0: Authentication Failed:', {
+      sessionId,
+      path,
+      method,
       hasSession: !!req.session,
       adminAuth: req.session?.authenticated,
       crmAuth: req.session?.crmAuthenticated,
       timestamp: new Date().toISOString()
     });
+    
+    // Enhanced error response with recovery instructions
     res.status(401).json({ 
-      error: "انقضای جلسه - لطفاً مجدداً وارد شوید",
+      error: "جلسه منقضی شده است",
       errorCode: "SESSION_EXPIRED",
+      message: "لطفاً صفحه را رفرش کرده و مجدداً وارد شوید",
       path: req.path,
       timestamp: new Date().toISOString(),
-      sessionId: req.sessionID
+      sessionId: req.sessionID,
+      recoveryAction: "REFRESH_AND_LOGIN"
     });
   }
 };

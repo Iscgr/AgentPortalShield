@@ -296,7 +296,7 @@ export default function InvoiceEditDialog({
       setEditableRecords(originalRecords);
       setCalculatedAmount(calculateTotalAmount(originalRecords));
     }
-    
+
     if (sessionCheckInterval) {
       clearInterval(sessionCheckInterval);
       setSessionCheckInterval(null);

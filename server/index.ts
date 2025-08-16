@@ -69,7 +69,7 @@ const sessionMiddleware = session({
   cookie: {
     secure: false, // Set to true in production with HTTPS
     httpOnly: true,
-    maxAge: 4 * 60 * 60 * 1000, // 4 hours base session, extended dynamically for long operations
+    maxAge: 8 * 60 * 60 * 1000, // 8 hours base session for stable operations
     sameSite: 'lax' // Better cross-origin handling
   },
   name: 'marfanet.sid', // Custom session name for identification
