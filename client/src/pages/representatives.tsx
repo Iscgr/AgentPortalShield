@@ -2315,7 +2315,7 @@ function EditInvoiceDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-gray-900 text-white border-gray-700 flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-xl font-bold text-white">
-              ویرایش فاکتور {selectedInvoice?.invoiceNumber}
+              ویرایش فاکتور {invoice?.invoiceNumber}
             </DialogTitle>
             <DialogDescription className="text-gray-300">
               ویرایش جزئیات فاکتور و اطلاعات مصرف نماینده
