@@ -653,7 +653,6 @@ export default router;
 export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
   app.use('/api/unified-financial', router);
 }
-<line_number>350</line_number>
 /**
  * ✅ SHERLOCK v27.0: Batch financial calculation for multiple representatives
  * POST /api/unified-financial/batch-calculate
@@ -661,7 +660,7 @@ export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
 router.post('/batch-calculate', requireAuth, async (req, res) => {
   try {
     const { representativeIds } = req.body;
-    
+
     if (!Array.isArray(representativeIds) || representativeIds.length === 0) {
       return res.status(400).json({
         success: false,
@@ -702,7 +701,7 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
     });
   }
 });
-<line_number>450</line_number>
+
 /**
  * ✅ SHERLOCK v27.0: Atomic System Validation
  * GET /api/unified-financial/atomic-validation
@@ -735,9 +734,9 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
     try {
       const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
       const manualSum = await unifiedFinancialEngine.verifyTotalDebtSum();
-      
+
       const isConsistent = Math.abs(globalSummary.totalSystemDebt - manualSum.unifiedEngineSum) < 1000;
-      
+
       validationResults.validations.push({
         test: "Financial Calculation Consistency",
         status: isConsistent ? "PASS" : "FAIL",
@@ -756,7 +755,7 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
       const startTime = Date.now();
       const debtors = await unifiedFinancialEngine.getDebtorRepresentatives(10);
       const queryTime = Date.now() - startTime;
-      
+
       validationResults.validations.push({
         test: "Database Query Performance",
         status: queryTime < 2000 ? "PASS" : "WARN",
@@ -774,7 +773,7 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
     try {
       // Test cache invalidation
       UnifiedFinancialEngine.forceInvalidateRepresentative(1);
-      
+
       validationResults.validations.push({
         test: "Cache System Health",
         status: "PASS",
