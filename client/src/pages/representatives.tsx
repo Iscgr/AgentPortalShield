@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Users, 
@@ -239,10 +239,53 @@ export default function Representatives() {
     retryDelay: 1000
   });
 
+  // SHERLOCK v27.0: Batch financial data fetching
+  const representativeIds = useMemo(() => 
+    representatives?.map(rep => rep.id) || [], [representatives]
+  );
 
+  const { data: batchFinancialData, isLoading: financialLoading } = useQuery({
+    queryKey: [`/api/unified-financial/batch-calculate`, representativeIds],
+    queryFn: async () => {
+      if (representativeIds.length === 0) return [];
+
+      return await apiRequest('/api/unified-financial/batch-calculate', {
+        method: 'POST',
+        data: { representativeIds }
+      });
+    },
+    enabled: representativeIds.length > 0,
+    staleTime: 30000, // 30 seconds cache
+    refetchInterval: 60000 // Refresh every minute
+  });
+
+
+  // SHERLOCK v27.0: Batch financial data fetching
+  // Enhanced financial data with batch processing
+  const enhancedReps = useMemo(() => {
+    if (!representatives || !batchFinancialData?.data) return [];
+
+    const financialMap = new Map(
+      batchFinancialData.data.map(f => [f.representativeId, f])
+    );
+
+    return representatives.map(rep => {
+      const financialData = financialMap.get(rep.id);
+
+      return {
+        ...rep,
+        displayDebt: financialData?.actualDebt?.toLocaleString() || rep.totalDebt,
+        displaySales: financialData?.totalSales?.toLocaleString() || rep.totalSales,
+        paymentRatio: financialData?.paymentRatio || 0,
+        debtLevel: financialData?.debtLevel || 'UNKNOWN',
+        isLoading: financialLoading,
+        lastSync: financialData?.calculationTimestamp || null
+      };
+    });
+  }, [representatives, batchFinancialData, financialLoading]);
 
   // SHERLOCK v11.0: Enhanced filtering and sorting
-  const filteredRepresentatives = representatives
+  const filteredRepresentatives = enhancedReps
     .filter(rep => {
       const matchesSearch = 
         rep.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1805,6 +1848,7 @@ function EditInvoiceDialog({
   onSave: () => void;
 }) {
   const { toast } = useToast();
+  const queryClient = useQueryClient(); // Add queryClient here
   const [amount, setAmount] = useState(invoice.amount);
   const [issueDate, setIssueDate] = useState(invoice.issueDate);
   const [status, setStatus] = useState(invoice.status);
@@ -2322,7 +2366,7 @@ function EditInvoiceDialog({
         queryClient.invalidateQueries({ queryKey: ["/api/unified-statistics"] });
         queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
         queryClient.invalidateQueries({ queryKey: [`unified-financial-representative-${representativeId}`] });
-        
+
         // Force immediate re-fetch for this representative
         await queryClient.refetchQueries({ queryKey: [`unified-financial-representative-${representativeId}`] });
         console.log('✅ Comprehensive cache invalidation completed');

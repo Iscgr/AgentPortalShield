@@ -85,13 +85,9 @@ const upload = multer({
   }
 });
 
-// SHERLOCK v26.0: NO AUTHENTICATION SYSTEM
-  // Simple pass-through middleware
-  const authMiddleware = (req: any, res: any, next: any) => {
-    console.log('🔓 SHERLOCK v26.0: Main routes pass-through middleware');
-    next();
-  };
-  const enhancedAuthMiddleware = authMiddleware;
+// SHERLOCK v27.0: UNIFIED AUTHENTICATION SYSTEM
+  const authMiddleware = unifiedAuthMiddleware;
+  const enhancedAuthMiddleware = enhancedUnifiedAuthMiddleware;
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -333,10 +329,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard API - Protected
+  // Dashboard API - Redirected to Unified System
   app.get("/api/dashboard", authMiddleware, async (req, res) => {
     try {
-      const dashboardData = await storage.getDashboardData();
+      // SHERLOCK v27.0: Redirect to unified financial engine
+      const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
+      const debtors = await unifiedFinancialEngine.getDebtorRepresentatives(10);
+      
+      const dashboardData = {
+        totalRevenue: globalSummary.totalSystemPaid.toString(),
+        totalDebt: globalSummary.totalSystemDebt.toString(),
+        activeRepresentatives: globalSummary.activeRepresentatives,
+        pendingInvoices: debtors.filter(d => d.debtLevel !== 'HEALTHY').length,
+        overdueInvoices: debtors.filter(d => d.debtLevel === 'CRITICAL').length,
+        totalSalesPartners: 0, // محاسبه جداگانه
+        recentActivities: []
+      };
+      
       res.json(dashboardData);
     } catch (error) {
       res.status(500).json({ error: "خطا در دریافت اطلاعات داشبورد" });
