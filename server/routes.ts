@@ -2120,7 +2120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create an invoice edit record for audit
-      const editRecord = await storage.createInvoiceEditRecord({
+      const editRecord = await storage.createInvoiceEdit({
         invoiceId,
         originalUsageData,
         editedUsageData,
@@ -2141,12 +2141,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateInvoice(invoiceId, {
         amount: editedAmount.toString(),
         usageData: editedUsageData,
-        updatedAt: new Date()
+        editedAt: new Date()
       });
 
       // ✅ SHERLOCK v24.1: Automatic financial synchronization after invoice edit
       try {
-        const invoice = await storage.getInvoiceById(invoiceId);
+        const invoice = await storage.getInvoice(invoiceId);
         if (invoice && Math.abs(editedAmount - originalAmount) > 0.01) {
           console.log(`🔄 SHERLOCK v24.1: Auto-syncing financial data for representative ${invoice.representativeId}`);
 
