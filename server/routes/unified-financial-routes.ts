@@ -697,7 +697,7 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
   } catch (error) {
     console.error('❌ Enhanced financial sync error:', error);
     res.status(500).json({ 
-      success: false,
+      success: false, 
       error: 'خطا در همگام‌سازی مالی پیشرفته',
       details: error.message 
     });
@@ -760,43 +760,69 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
   try {
     const { representativeIds } = req.body;
 
-    if (!Array.isArray(representativeIds) || representativeIds.length === 0) {
+    // ✅ SHERLOCK v32.0: Enhanced validation
+    if (!representativeIds) {
       return res.status(400).json({
         success: false,
-        error: "فهرست شناسه نمایندگان الزامی است"
+        error: "شناسه نمایندگان ارسال نشده است",
+        details: "representativeIds field is required"
       });
     }
 
-    // Batch calculation with single database transaction
+    if (!Array.isArray(representativeIds)) {
+      return res.status(400).json({
+        success: false,
+        error: "فرمت شناسه نمایندگان نامعتبر است",
+        details: "representativeIds must be an array"
+      });
+    }
+
+    if (representativeIds.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        processed: 0,
+        successful: 0,
+        message: "هیچ نماینده‌ای برای محاسبه ارسال نشده"
+      });
+    }
+
+    console.log(`🔄 SHERLOCK v32.0: Batch calculating ${representativeIds.length} representatives`);
+
     const results = await Promise.all(
-      representativeIds.map(id => unifiedFinancialEngine.calculateRepresentative(id))
+      representativeIds.map(async (id) => {
+        try {
+          const numericId = parseInt(id);
+          if (isNaN(numericId)) {
+            console.warn(`Invalid representative ID: ${id}`);
+            return null;
+          }
+          return await unifiedFinancialEngine.calculateRepresentative(numericId);
+        } catch (error) {
+          console.warn(`Batch calculation failed for representative ${id}:`, error);
+          return null;
+        }
+      })
     );
 
-    // Cache all results for future use
-    results.forEach(result => {
-      const cacheKey = `rep_calc_${result.representativeId}`;
-      UnifiedFinancialEngine.queryCache.set(cacheKey, {
-        data: result,
-        timestamp: Date.now()
-      });
-    });
+    const validResults = results.filter(result => result !== null);
+
+    console.log(`✅ SHERLOCK v32.0: Batch calculation complete: ${validResults.length}/${representativeIds.length} successful`);
 
     res.json({
       success: true,
-      data: results,
-      meta: {
-        count: results.length,
-        cached: true,
-        batchProcessed: true,
-        timestamp: new Date().toISOString()
-      }
+      data: validResults,
+      processed: representativeIds.length,
+      successful: validResults.length,
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Batch calculation error:', error);
+    console.error('❌ SHERLOCK v32.0: Error in batch calculation:', error);
     res.status(500).json({
       success: false,
-      error: "خطا در محاسبه دسته‌ای اطلاعات مالی"
+      error: "خطا در محاسبه دسته‌ای",
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });

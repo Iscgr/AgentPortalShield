@@ -408,10 +408,13 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ همگام‌سازی تمام نمایندگان
+   * ✅ SHERLOCK v32.0: همگام‌سازی تمام نمایندگان با cache invalidation
    */
   async syncAllRepresentativesDebt(): Promise<void> {
-    console.log("🔄 SHERLOCK v23.0: Syncing all representatives debt...");
+    console.log("🔄 SHERLOCK v32.0: Syncing all representatives debt with cache invalidation...");
+
+    // Global cache invalidation before starting
+    UnifiedFinancialEngine.forceInvalidateGlobal("sync_all_representatives");
 
     const allReps = await db.select({
       id: representatives.id,
@@ -421,17 +424,36 @@ export class UnifiedFinancialEngine {
     let successCount = 0;
     let errorCount = 0;
 
-    for (const rep of allReps) {
-      try {
-        await this.syncRepresentativeDebt(rep.id);
-        successCount++;
-      } catch (error) {
-        console.error(`❌ Failed to sync rep ${rep.id} (${rep.name}):`, error);
-        errorCount++;
+    // Process in smaller batches to avoid overwhelming the database
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < allReps.length; i += BATCH_SIZE) {
+      const batch = allReps.slice(i, i + BATCH_SIZE);
+      
+      const batchPromises = batch.map(async (rep) => {
+        try {
+          await this.syncRepresentativeDebt(rep.id);
+          console.log(`✅ SHERLOCK v32.0: Synced representative ${rep.id} (${rep.name})`);
+          return { success: true, id: rep.id };
+        } catch (error) {
+          console.error(`❌ Failed to sync rep ${rep.id} (${rep.name}):`, error);
+          return { success: false, id: rep.id, error };
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      successCount += batchResults.filter(r => r.success).length;
+      errorCount += batchResults.filter(r => !r.success).length;
+
+      // Small delay between batches to prevent overwhelming the system
+      if (i + BATCH_SIZE < allReps.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
-    console.log(`✅ Debt synchronization complete: ${successCount} success, ${errorCount} errors`);
+    // Final global cache invalidation after completion
+    UnifiedFinancialEngine.forceInvalidateGlobal("sync_all_complete");
+
+    console.log(`✅ SHERLOCK v32.0: Debt synchronization complete: ${successCount} success, ${errorCount} errors`);
   }
 
   /**

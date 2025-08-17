@@ -73,19 +73,22 @@ import { z } from "zod";
 import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 import InvoiceEditDialog from "@/components/invoice-edit-dialog";
 
-// ✅ SHERLOCK v24.0: کامپوننت Real-time نمایش بدهی با بهینه‌سازی
+// ✅ SHERLOCK v32.0: Enhanced Real-time debt display with aggressive refresh
 function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId: number, fallbackDebt?: string }) {
   const queryClient = useQueryClient();
 
-  const { data: financialData, isLoading, error } = useQuery({
+  const { data: financialData, isLoading, error, refetch } = useQuery({
     queryKey: [`unified-financial-representative-${representativeId}`],
-    queryFn: () => apiRequest(`/api/unified-financial/representative/${representativeId}`),
+    queryFn: async () => {
+      console.log(`🔄 SHERLOCK v32.0: Calculating real-time debt for representative ${representativeId}`);
+      return apiRequest(`/api/unified-financial/representative/${representativeId}`);
+    },
     select: (response: any) => response.data || response,
-    staleTime: 30000, // Increased to prevent too frequent requests
-    gcTime: 60000, // Keep in memory longer
-    retry: 1, // Reduce retries to prevent blocking
-    refetchOnWindowFocus: false,
-    refetchOnMount: false, // Don't always refetch to improve performance
+    staleTime: 10000, // Reduced to 10 seconds for more frequent updates
+    gcTime: 30000, // Reduced cache time
+    retry: 2, // Allow more retries for reliability
+    refetchOnWindowFocus: true, // Enable refetch on focus for freshest data
+    refetchOnMount: true, // Always refetch on mount for accuracy
     enabled: !!representativeId // Only run if ID exists
   });
 
@@ -255,13 +258,29 @@ export default function Representatives() {
     return sortOrder === "asc" ? "⬆️" : "⬇️";
   };
 
-  const { data: representatives = [], isLoading, error: repsError } = useQuery<Representative[]>({
+  const { data: representatives = [], isLoading, error: repsError, refetch } = useQuery<Representative[]>({
     queryKey: ["/api/representatives"],
     queryFn: async () => {
       console.log("🔍 SHERLOCK v32.0: Fetching representatives data");
       try {
         const data = await apiRequest("/api/representatives");
         console.log("✅ Representatives data loaded:", data?.length || 0, "items");
+        
+        // ✅ SHERLOCK v32.0: Debug specific representative "Abedmb"
+        const abedmbRep = data?.find((rep: Representative) => 
+          rep.name.toLowerCase().includes('abedmb') || 
+          rep.code.toLowerCase().includes('abedmb')
+        );
+        if (abedmbRep) {
+          console.log("🔍 SHERLOCK v32.0: Found Abedmb representative:", {
+            id: abedmbRep.id,
+            name: abedmbRep.name,
+            code: abedmbRep.code,
+            totalDebt: abedmbRep.totalDebt,
+            totalSales: abedmbRep.totalSales
+          });
+        }
+        
         return data;
       } catch (error) {
         console.error("❌ Error fetching representatives:", error);
@@ -274,7 +293,7 @@ export default function Representatives() {
     refetchOnWindowFocus: false
   });
 
-  // SHERLOCK v27.0: Batch financial data fetching - Fixed with fallback
+  // ✅ SHERLOCK v32.0: Enhanced batch financial data with robust fallback
   const representativeIds = useMemo(() => 
     representatives?.map(rep => rep.id) || [], [representatives]
   );
@@ -284,21 +303,15 @@ export default function Representatives() {
     queryFn: async () => {
       if (representativeIds.length === 0) return { data: [] };
 
-      try {
-        const response = await apiRequest('/api/unified-financial/batch-calculate', {
-          method: 'POST',
-          data: { representativeIds }
-        });
-        return response;
-      } catch (error) {
-        console.warn('Batch financial data fetch failed, using fallback:', error);
-        return { data: [] };
-      }
+      // Always return empty array to force individual calculations
+      // This ensures all representatives get real-time debt calculations
+      console.log('🔄 SHERLOCK v32.0: Using individual debt calculations for reliability');
+      return { data: [] };
     },
-    enabled: representativeIds.length > 0,
-    staleTime: 30000, // 30 seconds cache
-    refetchInterval: false, // Disable auto-refresh to prevent issues
-    retry: 1 // Only retry once
+    enabled: false, // Disable batch to force individual calculations
+    staleTime: 30000,
+    refetchInterval: false,
+    retry: 0
   });
 
   // SHERLOCK v27.0: Enhanced financial data with fallback rendering
@@ -614,6 +627,8 @@ export default function Representatives() {
   const handleSyncAllDebts = async () => {
     setIsSyncing(true);
     try {
+      console.log('🔄 SHERLOCK v32.0: Starting comprehensive debt synchronization...');
+      
       const response = await fetch('/api/unified-financial/sync-all-representatives', {
         method: 'POST',
         credentials: 'include',
@@ -631,12 +646,29 @@ export default function Representatives() {
           description: "همگام‌سازی تمام نمایندگان با موفقیت انجام شد"
         });
         
-        // ✅ SHERLOCK v32.0: Force refresh representatives data after sync
-        await refetch();
-        console.log('🔄 SHERLOCK v32.0: Representatives data refreshed after debt sync');
+        // ✅ SHERLOCK v32.0: Comprehensive cache invalidation and refresh
+        console.log('🔄 SHERLOCK v32.0: Invalidating all caches...');
+        
+        // Invalidate all related queries
         queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
+        queryClient.invalidateQueries({ queryKey: ["unified-financial"] });
         queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] });
         queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] });
+        
+        // Force refresh all individual representative calculations
+        representatives?.forEach((rep: Representative) => {
+          queryClient.invalidateQueries({ 
+            queryKey: [`unified-financial-representative-${rep.id}`] 
+          });
+          queryClient.refetchQueries({ 
+            queryKey: [`unified-financial-representative-${rep.id}`] 
+          });
+        });
+
+        // Refresh main representatives data
+        queryClient.refetchQueries({ queryKey: ["/api/representatives"] });
+        
+        console.log('✅ SHERLOCK v32.0: All debt data refreshed successfully');
       } else {
         toast({
           title: "خطا",
