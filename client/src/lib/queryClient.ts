@@ -19,18 +19,26 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
   typeof window !== 'undefined' ? window.location.origin : ''
 );
 
-export async function apiRequest(endpoint: string, options: RequestInit = {}) {
+export async function apiRequest(endpoint: string, options: RequestInit & { data?: any } = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
 
   console.log(`SHERLOCK v32.0: Fetching URL:`, endpoint);
 
+  // Extract data from options if present
+  const { data, ...fetchOptions } = options;
+  
+  // If data is provided, serialize it as JSON body
+  if (data !== undefined) {
+    fetchOptions.body = JSON.stringify(data);
+  }
+
   try {
     const response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        ...options.headers,
+        ...fetchOptions.headers,
       },
     });
 
