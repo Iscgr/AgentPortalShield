@@ -172,9 +172,23 @@ function ActivityItem({ activity }: { activity: any }) {
 }
 
 export default function Dashboard() {
-  const { data: dashboardData, isLoading } = useQuery<DashboardData>({
+  const { data: dashboardData, isLoading, error } = useQuery<DashboardData>({
     queryKey: ["/api/unified-statistics/global"],
-    select: (data: any) => data.data // Extract data from unified response structure
+    queryFn: () => apiRequest("/api/unified-statistics/global"),
+    select: (response: any) => {
+      console.log('📊 SHERLOCK v26.1: Dashboard data received:', response);
+      
+      // Handle different response structures
+      if (response.success && response.data) {
+        return response.data;
+      } else if (response.data) {
+        return response.data;
+      } else {
+        return response;
+      }
+    },
+    retry: 3,
+    retryDelay: 1000
   });
 
   const { data: telegramConfig } = useQuery({
@@ -190,9 +204,19 @@ export default function Dashboard() {
   });
 
 
+  console.log('🔍 SHERLOCK v26.1: Dashboard render state:', { 
+    isLoading, 
+    hasError: !!error, 
+    hasData: !!dashboardData,
+    dataKeys: dashboardData ? Object.keys(dashboardData) : []
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <p className="text-blue-800">🔄 در حال بارگذاری اطلاعات داشبورد...</p>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -208,10 +232,41 @@ export default function Dashboard() {
     );
   }
 
+  if (error) {
+    console.error('❌ Dashboard error:', error);
+    return (
+      <div className="text-center py-12">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
+          <h3 className="text-red-800 font-semibold mb-2">❌ خطا در بارگذاری داده‌ها</h3>
+          <p className="text-red-600 text-sm mb-4">
+            {(error as any)?.message || 'خطای ناشناخته در دریافت اطلاعات'}
+          </p>
+          <Button 
+            onClick={() => window.location.reload()} 
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            🔄 تلاش مجدد
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!dashboardData) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">خطا در بارگذاری اطلاعات داشبورد</p>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md mx-auto">
+          <h3 className="text-yellow-800 font-semibold mb-2">⚠️ هیچ داده‌ای یافت نشد</h3>
+          <p className="text-yellow-600 text-sm mb-4">
+            ممکن است سیستم نیاز به راه‌اندازی اولیه داشته باشد
+          </p>
+          <Button 
+            onClick={() => window.location.reload()} 
+            className="bg-yellow-600 hover:bg-yellow-700 text-white"
+          >
+            🔄 بازخوانی صفحه
+          </Button>
+        </div>
       </div>
     );
   }
@@ -222,7 +277,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         <StatCard
           title="کل درآمدها"
-          value={formatCurrency(dashboardData.totalRevenue)}
+          value={formatCurrency(dashboardData.totalRevenue || 0)}
           subtitle="مبلغ پرداخت شده - تومان"
           icon={TrendingUp}
           colorClass="text-green-600"
@@ -231,7 +286,7 @@ export default function Dashboard() {
 
         <StatCard
           title="مطالبات معوق"
-          value={formatCurrency(dashboardData.totalDebt)}
+          value={formatCurrency(dashboardData.totalDebt || 0)}
           subtitle="مانده بدهی - تومان"
           icon={AlertTriangle}
           colorClass="text-red-600"
@@ -240,7 +295,7 @@ export default function Dashboard() {
 
         <StatCard
           title="نمایندگان فعال"
-          value={toPersianDigits(dashboardData.activeRepresentatives.toString())}
+          value={toPersianDigits((dashboardData.activeRepresentatives || 0).toString())}
           subtitle="آخرین آپلود فایل ریزجزئیات"
           icon={Users}
           colorClass="text-blue-600"
