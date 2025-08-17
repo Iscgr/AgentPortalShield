@@ -1279,4 +1279,37 @@ router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) =>
   }
 });
 
+// Health endpoint for dashboard
+app.get('/api/unified-financial/health', async (req, res) => {
+  try {
+    console.log('🏥 SHERLOCK v32.0: Health endpoint called for dashboard');
+
+    const engine = new UnifiedFinancialEngine(storage);
+    const globalSummary = await engine.calculateGlobalSummary();
+
+    // Calculate system health metrics
+    const healthData = {
+      healthScore: Math.max(0, 100 - Math.round((globalSummary.criticalReps / globalSummary.totalRepresentatives) * 100)),
+      activeDebtors: globalSummary.criticalReps + globalSummary.highRiskReps,
+      totalAmount: globalSummary.totalSystemDebt,
+      overdueAmount: Math.round(globalSummary.totalSystemDebt * 0.3), // Estimate
+      recommendations: globalSummary.criticalReps > 10 ? [
+        'تطبیق مالی سراسری انجام دهید',
+        'نمایندگان پرریسک را بررسی کنید'
+      ] : []
+    };
+
+    res.json({
+      success: true,
+      data: healthData
+    });
+  } catch (error) {
+    console.error('❌ Health endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'خطا در دریافت آمار سلامت سیستم'
+    });
+  }
+});
+
 export default router;

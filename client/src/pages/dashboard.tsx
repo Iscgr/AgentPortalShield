@@ -15,6 +15,7 @@ import AiChat from "@/components/ai-chat";
 import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/axios";
 
 interface DashboardData {
   totalRevenue: number;
@@ -173,8 +174,11 @@ function ActivityItem({ activity }: { activity: any }) {
 
 export default function Dashboard() {
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
-    queryKey: ["/api/unified-statistics/global"],
-    select: (data: any) => data.data // Extract data from unified response structure
+    queryKey: ["/api/dashboard"],
+    queryFn: () => apiRequest("/api/dashboard"),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
+    select: (data: any) => data?.value || data
   });
 
   const { data: telegramConfig } = useQuery({
