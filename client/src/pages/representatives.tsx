@@ -74,18 +74,19 @@ import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 import InvoiceEditDialog from "@/components/invoice-edit-dialog";
 
 // ✅ SHERLOCK v24.0: کامپوننت Real-time نمایش بدهی با بهینه‌سازی
-function RealTimeDebtCell({ representativeId }: { representativeId: number }) {
+function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId: number, fallbackDebt?: string }) {
   const queryClient = useQueryClient();
 
   const { data: financialData, isLoading, error } = useQuery({
     queryKey: [`unified-financial-representative-${representativeId}`],
     queryFn: () => apiRequest(`/api/unified-financial/representative/${representativeId}`),
     select: (response: any) => response.data || response,
-    staleTime: 5000, // Reduced to 5 seconds for immediate updates
-    gcTime: 30000, // Keep in memory for 30 seconds
-    retry: 2,
+    staleTime: 30000, // Increased to prevent too frequent requests
+    gcTime: 60000, // Keep in memory longer
+    retry: 1, // Reduce retries to prevent blocking
     refetchOnWindowFocus: false,
-    refetchOnMount: 'always'
+    refetchOnMount: false, // Don't always refetch to improve performance
+    enabled: !!representativeId // Only run if ID exists
   });
 
   // Force refresh when payment operations complete
@@ -104,11 +105,38 @@ function RealTimeDebtCell({ representativeId }: { representativeId: number }) {
     };
   }, [representativeId, queryClient]);
 
+  // Show fallback immediately if available
+  if (isLoading && fallbackDebt) {
+    const debt = parseFloat(fallbackDebt || '0');
+    return (
+      <span className={`transition-colors duration-200 ${
+        debt > 1000000 ? "text-red-600 dark:text-red-400 font-semibold" : 
+        debt > 500000 ? "text-orange-600 dark:text-orange-400 font-semibold" : 
+        "text-green-600 dark:text-green-400"
+      }`}>
+        {formatCurrency(debt)}
+      </span>
+    );
+  }
+
   if (isLoading) {
     return <div className="animate-pulse bg-gray-200 dark:bg-gray-600 h-4 w-16 rounded"></div>;
   }
 
   if (error || !financialData) {
+    // Use fallback debt if API fails
+    if (fallbackDebt) {
+      const debt = parseFloat(fallbackDebt);
+      return (
+        <span className={`transition-colors duration-200 ${
+          debt > 1000000 ? "text-red-600 dark:text-red-400 font-semibold" : 
+          debt > 500000 ? "text-orange-600 dark:text-orange-400 font-semibold" : 
+          "text-green-600 dark:text-green-400"
+        }`}>
+          {formatCurrency(debt)}
+        </span>
+      );
+    }
     return <span className="text-gray-400 text-xs">خطا</span>;
   }
 
@@ -227,48 +255,64 @@ export default function Representatives() {
     return sortOrder === "asc" ? "⬆️" : "⬇️";
   };
 
-  const { data: representatives = [], isLoading } = useQuery<Representative[]>({
+  const { data: representatives = [], isLoading, error: repsError } = useQuery<Representative[]>({
     queryKey: ["/api/representatives"],
     queryFn: () => apiRequest("/api/representatives"),
     select: (data: any) => {
       console.log('SHERLOCK v12.1 DEBUG: Representatives data:', data);
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.data)) return data.data;
+      if (Array.isArray(data)) {
+        console.log('SHERLOCK v12.1 DEBUG: Found array with', data.length, 'representatives');
+        return data;
+      }
+      if (data && Array.isArray(data.data)) {
+        console.log('SHERLOCK v12.1 DEBUG: Found nested array with', data.data.length, 'representatives');
+        return data.data;
+      }
+      console.log('SHERLOCK v12.1 DEBUG: No valid representatives data found, returning empty array');
       return [];
     },
     retry: 3,
-    retryDelay: 1000
+    retryDelay: 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false
   });
 
-  // SHERLOCK v27.0: Batch financial data fetching
+  // SHERLOCK v27.0: Batch financial data fetching - Fixed with fallback
   const representativeIds = useMemo(() => 
     representatives?.map(rep => rep.id) || [], [representatives]
   );
 
-  const { data: batchFinancialData, isLoading: financialLoading } = useQuery({
+  const { data: batchFinancialData, isLoading: financialLoading, error: financialError } = useQuery({
     queryKey: [`/api/unified-financial/batch-calculate`, representativeIds],
     queryFn: async () => {
-      if (representativeIds.length === 0) return [];
+      if (representativeIds.length === 0) return { data: [] };
 
-      return await apiRequest('/api/unified-financial/batch-calculate', {
-        method: 'POST',
-        data: { representativeIds }
-      });
+      try {
+        const response = await apiRequest('/api/unified-financial/batch-calculate', {
+          method: 'POST',
+          data: { representativeIds }
+        });
+        return response;
+      } catch (error) {
+        console.warn('Batch financial data fetch failed, using fallback:', error);
+        return { data: [] };
+      }
     },
     enabled: representativeIds.length > 0,
     staleTime: 30000, // 30 seconds cache
-    refetchInterval: 60000 // Refresh every minute
+    refetchInterval: false, // Disable auto-refresh to prevent issues
+    retry: 1 // Only retry once
   });
 
-
-  // SHERLOCK v27.0: Batch financial data fetching
-  // Enhanced financial data with batch processing
+  // SHERLOCK v27.0: Enhanced financial data with fallback rendering
   const enhancedReps = useMemo(() => {
-    if (!representatives || !batchFinancialData?.data) return [];
+    if (!representatives) return [];
 
-    const financialMap = new Map(
-      batchFinancialData.data.map(f => [f.representativeId, f])
-    );
+    // Use original data if batch financial data is not available
+    const financialMap = new Map();
+    if (batchFinancialData?.data && Array.isArray(batchFinancialData.data)) {
+      batchFinancialData.data.forEach(f => financialMap.set(f.representativeId, f));
+    }
 
     return representatives.map(rep => {
       const financialData = financialMap.get(rep.id);
@@ -279,11 +323,11 @@ export default function Representatives() {
         displaySales: financialData?.totalSales?.toLocaleString() || rep.totalSales,
         paymentRatio: financialData?.paymentRatio || 0,
         debtLevel: financialData?.debtLevel || 'UNKNOWN',
-        isLoading: financialLoading,
+        isLoading: false, // Don't block UI on financial loading
         lastSync: financialData?.calculationTimestamp || null
       };
     });
-  }, [representatives, batchFinancialData, financialLoading]);
+  }, [representatives, batchFinancialData]);
 
   // SHERLOCK v11.0: Enhanced filtering and sorting
   const filteredRepresentatives = enhancedReps
@@ -682,6 +726,38 @@ export default function Representatives() {
     );
   }
 
+  if (repsError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            مدیریت نمایندگان
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                خطا در بارگذاری نمایندگان
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                {repsError?.message || 'خطای ناشناخته در دریافت اطلاعات نمایندگان'}
+              </p>
+              <Button 
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/representatives"] })}
+                className="mr-4"
+              >
+                <RefreshCw className="w-4 h-4 ml-2" />
+                تلاش مجدد
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -845,7 +921,7 @@ export default function Representatives() {
                       {formatCurrency(parseFloat(rep.totalSales))}
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      <RealTimeDebtCell representativeId={rep.id} />
+                      <RealTimeDebtCell representativeId={rep.id} fallbackDebt={rep.totalDebt} />
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
