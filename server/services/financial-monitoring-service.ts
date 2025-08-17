@@ -57,7 +57,8 @@ export class FinancialMonitoringService {
     try {
       console.log('🔍 SHERLOCK v28.0: Performing routine financial monitoring check...');
       
-      const validationResult = await financialConsistencyEngine.validateFinancialConsistency();
+      const { FinancialConsistencyEngine } = await import('./financial-consistency-engine.js');
+    const validationResult = await FinancialConsistencyEngine.validateFinancialConsistency();
       
       if (!validationResult.isValid) {
         console.warn(`⚠️ Financial inconsistencies detected: ${validationResult.summary.inconsistentCount} issues`);
