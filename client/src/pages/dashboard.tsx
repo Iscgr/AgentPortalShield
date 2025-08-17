@@ -5,14 +5,17 @@ import {
   Users, 
   FileText,
   Upload,
-  Bot
+  Bot,
+  DollarSign,
+  CreditCard
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import InvoiceUpload from "@/components/invoice-upload";
 import AiChat from "@/components/ai-chat";
-import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
+// SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table (now replaced by OverdueInvoicesCard)
+// import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
@@ -50,10 +53,15 @@ interface FinancialHealthData {
   recommendations: string[];
 }
 
-// SHERLOCK v1.0: UnifiedStatCard component (assuming this exists elsewhere in the project)
-// This is a placeholder for the purpose of this example.
-function UnifiedStatCard({ title, value, icon, trend, loading }: { title: string; value: any; icon: string; trend?: "up" | "down"; loading?: boolean }) {
-  if (loading) {
+// Placeholder for UnifiedStatCard - assuming it's defined elsewhere and used for generic stats
+function UnifiedStatCard({ title, statKey, endpoint, icon, formatter, color }: { title: string; statKey: keyof DashboardData | 'totalSystemDebt'; endpoint: string; icon: React.ReactNode; formatter: string; color: string }) {
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: [endpoint],
+    queryFn: () => apiRequest(endpoint),
+    select: (data: any) => data?.value || data
+  });
+
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -65,30 +73,37 @@ function UnifiedStatCard({ title, value, icon, trend, loading }: { title: string
     );
   }
 
+  let displayValue: React.ReactNode = "-";
+  const rawValue = dashboardData?.[statKey];
+
+  if (rawValue !== undefined && rawValue !== null) {
+    if (formatter === "currency") {
+      displayValue = formatCurrency(rawValue as number);
+    } else if (formatter === "number") {
+      displayValue = toPersianDigits(rawValue.toString());
+    } else {
+      displayValue = toPersianDigits(rawValue.toString());
+    }
+  }
+
   const getTrendColor = () => {
-    if (trend === "up") return "text-green-400";
-    if (trend === "down") return "text-red-400";
+    if (color === "green") return "text-green-400";
+    if (color === "red") return "text-red-400";
+    if (color === "blue") return "text-blue-400";
     return "text-gray-300";
   };
 
   return (
-    <Card className="bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700">
+    <Card className={`bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700`}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-300">{title}</p>
-            <p className="text-2xl font-bold text-white mt-2">
-              {value !== undefined ? toPersianDigits(value.toString()) : "-"}
-            </p>
-            {trend && (
-              <p className={`text-sm ${getTrendColor()} mt-1`}>
-                {trend === "up" && "افزایش"}
-                {trend === "down" && "کاهش"}
-              </p>
-            )}
+            <p className="text-2xl font-bold text-white mt-2">{displayValue}</p>
+            {/* Trend display can be added here if data is available */}
           </div>
           <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <span className="text-2xl">{icon}</span>
+            {icon}
           </div>
         </div>
       </CardContent>
@@ -171,6 +186,166 @@ function ActivityItem({ activity }: { activity: any }) {
     </div>
   );
 }
+
+// ✅ SHERLOCK v32.0: Enhanced Overdue Invoices Widget - Fixed and Optimized
+const OverdueInvoicesCard = () => {
+  const { data: debtorData, isLoading: debtorLoading, error: debtorError } = useQuery({
+    queryKey: ["/api/unified-financial/debtors"],
+    queryFn: async () => {
+      console.log('🔍 SHERLOCK v32.0: Fetching overdue debtors for dashboard widget...');
+      return apiRequest("/api/unified-financial/debtors?limit=50");
+    },
+    select: (response: any) => response?.data || response || [],
+    staleTime: 30000,
+    refetchInterval: 45000
+  });
+
+  if (debtorLoading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">مطالبات معوق</CardTitle>
+          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-2">
+            <div className="h-4 bg-gray-200 rounded"></div>
+            <div className="h-3 bg-gray-100 rounded w-3/4"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (debtorError || !debtorData) {
+    console.error('🔍 SHERLOCK v32.0: Error in overdue invoices widget:', debtorError);
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">مطالبات معوق</CardTitle>
+          <AlertTriangle className="h-4 w-4 text-red-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-red-600">خطا</div>
+          <p className="text-xs text-red-500">عدم دسترسی به اطلاعات</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => window.location.reload()}
+            className="mt-2"
+          >
+            تلاش مجدد
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  console.log('🔍 SHERLOCK v32.0: Processing debtor data for overdue widget:', {
+    totalDebtors: Array.isArray(debtorData) ? debtorData.length : 0,
+    dataStructure: debtorData?.[0] || 'No data'
+  });
+
+  // ✅ SHERLOCK v32.0: Enhanced filtering for truly overdue debtors
+  const overdueDebtors = Array.isArray(debtorData) 
+    ? debtorData.filter(debtor => {
+        const debt = debtor.actualDebt || debtor.debt || debtor.totalDebt || 0;
+        const level = debtor.debtLevel || 'UNKNOWN';
+
+        // Consider as overdue if:
+        // 1. Debt level is HIGH or CRITICAL
+        // 2. Debt amount is over 3 million Toman (significant amount)
+        // 3. Payment ratio is very low (less than 50%)
+        return (
+          level === 'HIGH' || 
+          level === 'CRITICAL' ||
+          debt > 3000000 ||
+          (debtor.paymentRatio !== undefined && debtor.paymentRatio < 0.5)
+        );
+      })
+    : [];
+
+  const totalOverdueAmount = overdueDebtors.reduce((sum, debtor) => {
+    const debt = debtor.actualDebt || debtor.debt || debtor.totalDebt || 0;
+    return sum + debt;
+  }, 0);
+
+  const criticalDebtors = overdueDebtors.filter(d => 
+    d.debtLevel === 'CRITICAL' || (d.actualDebt || 0) > 10000000
+  );
+
+  console.log('🔍 SHERLOCK v32.0: Overdue analysis complete:', {
+    totalOverdue: overdueDebtors.length,
+    criticalCount: criticalDebtors.length,
+    totalAmount: totalOverdueAmount
+  });
+
+  return (
+    <Card className={overdueDebtors.length > 10 ? "border-red-200 bg-red-50" : ""}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">مطالبات معوق</CardTitle>
+        <AlertTriangle className={`h-4 w-4 ${
+          criticalDebtors.length > 0 ? 'text-red-500' : 
+          overdueDebtors.length > 5 ? 'text-orange-500' : 
+          'text-muted-foreground'
+        }`} />
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold ${
+          criticalDebtors.length > 0 ? 'text-red-600' : 
+          overdueDebtors.length > 5 ? 'text-orange-600' : 
+          overdueDebtors.length > 0 ? 'text-yellow-600' : 'text-green-600'
+        }`}>
+          {toPersianDigits(overdueDebtors.length.toString())}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          مجموع: {formatCurrency(totalOverdueAmount)}
+        </p>
+
+        {criticalDebtors.length > 0 && (
+          <div className="mt-1">
+            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+              {toPersianDigits(criticalDebtors.length.toString())} مورد بحرانی
+            </span>
+          </div>
+        )}
+
+        <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
+          {overdueDebtors.slice(0, 4).map((debtor, index) => {
+            const debt = debtor.actualDebt || debtor.debt || debtor.totalDebt || 0;
+            const isCritical = debtor.debtLevel === 'CRITICAL' || debt > 10000000;
+
+            return (
+              <div key={debtor.id || index} className="flex justify-between text-xs">
+                <span className="truncate flex items-center">
+                  {isCritical && <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>}
+                  {debtor.name || debtor.representativeName}
+                </span>
+                <span className={`font-mono ${isCritical ? 'text-red-700 font-bold' : 'text-red-600'}`}>
+                  {formatCurrency(debt)}
+                </span>
+              </div>
+            );
+          })}
+          {overdueDebtors.length > 4 && (
+            <div className="text-xs text-gray-500 text-center pt-1 border-t">
+              و {toPersianDigits((overdueDebtors.length - 4).toString())} مورد دیگر...
+            </div>
+          )}
+        </div>
+
+        {overdueDebtors.length === 0 && (
+          <div className="text-center mt-2">
+            <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+              ✅ بدون مطالبات معوق
+            </span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 
 export default function Dashboard() {
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
@@ -336,14 +511,46 @@ export default function Dashboard() {
           <InvoiceUpload />
         </div>
 
-        {/* Placeholder for future widgets */}
-        <div className="space-y-6">
-          {/* Future dashboard widgets can be added here */}
-        </div>
+        {/* SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table */}
+        {/* This widget has been replaced by OverdueInvoicesCard */}
+        {/* <DebtorRepresentativesCard /> */}
       </div>
 
       {/* SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table */}
-      <DebtorRepresentativesCard />
+      {/* This component is now handled by the OverdueInvoicesCard in the grid above */}
+      {/* <DebtorRepresentativesCard /> */}
+
+      {/* Stats Grid - Updated to use OverdueInvoicesCard */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <UnifiedStatCard 
+            title="کل درآمد"
+            statKey="totalRevenue"
+            endpoint="/api/unified-statistics/global-summary"
+            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+            formatter="currency"
+            color="blue"
+          />
+
+          <UnifiedStatCard 
+            title="کل بدهی"
+            statKey="totalSystemDebt"
+            endpoint="/api/unified-statistics/global-summary"
+            icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+            formatter="currency"
+            color="red"
+          />
+
+          <UnifiedStatCard 
+            title="نمایندگان فعال"
+            statKey="activeRepresentatives"
+            endpoint="/api/unified-statistics/global-summary"
+            icon={<Users className="h-4 w-4 text-muted-foreground" />}
+            formatter="number"
+            color="green"
+          />
+
+          <OverdueInvoicesCard />
+        </div>
     </div>
   );
 }

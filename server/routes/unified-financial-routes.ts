@@ -119,22 +119,61 @@ router.get('/debtors', requireAuth, async (req, res) => {
     }
 
     console.log(`🚀 SHERLOCK v18.7: Fresh calculation for ${limit} debtors`);
-    const debtors = await unifiedFinancialEngine.getDebtorRepresentatives(limit);
+    
+    // Fetch representatives that might have debt
+    const candidates = await db.select({
+      id: representatives.id,
+      name: representatives.name,
+      code: representatives.code
+    }).from(representatives).where(sql`true`); // Placeholder, might need filtering later
 
-    // Transform to legacy format for compatibility
-    const transformedData = debtors.map(debtor => ({
-      id: debtor.representativeId,
-      representativeId: debtor.representativeId,
-      name: debtor.representativeName,
-      code: debtor.representativeCode,
-      remainingDebt: debtor.actualDebt.toString(),
-      totalInvoices: debtor.totalSales.toString(),
-      totalPayments: debtor.totalPaid.toString(),
-      // Additional fields for better UI
-      debtLevel: debtor.debtLevel,
-      paymentRatio: debtor.paymentRatio,
-      lastTransactionDate: debtor.lastTransactionDate
-    }));
+    // ✅ SHERLOCK v32.0: Enhanced debtor calculation with overdue analysis
+    const debtorList = await Promise.all(
+      candidates.map(async (candidate) => {
+        try {
+          const financialData = await unifiedFinancialEngine.calculateRepresentative(candidate.id);
+
+          if (financialData.actualDebt > 1000) {
+            // ✅ Calculate overdue indicators
+            const isOverdue = financialData.debtLevel === 'HIGH' || 
+                            financialData.debtLevel === 'CRITICAL' ||
+                            financialData.actualDebt > 3000000 ||
+                            financialData.paymentRatio < 0.5;
+
+            const daysSinceLastActivity = financialData.lastActivity 
+              ? Math.floor((Date.now() - new Date(financialData.lastActivity).getTime()) / (1000 * 60 * 60 * 24))
+              : null;
+
+            const overdueCategory = financialData.actualDebt > 10000000 ? 'CRITICAL' :
+                                  financialData.actualDebt > 5000000 ? 'HIGH' :
+                                  financialData.actualDebt > 2000000 ? 'MODERATE' : 'LOW';
+
+            return {
+              id: candidate.id,
+              name: candidate.name,
+              code: candidate.code,
+              actualDebt: financialData.actualDebt,
+              totalSales: financialData.totalSales,
+              debtLevel: financialData.debtLevel,
+              paymentRatio: financialData.paymentRatio,
+              lastActivity: financialData.lastActivity,
+              calculationTimestamp: financialData.calculationTimestamp,
+              // ✅ Overdue analysis fields
+              isOverdue: isOverdue,
+              overdueCategory: overdueCategory,
+              daysSinceLastActivity: daysSinceLastActivity,
+              urgencyScore: isOverdue ? Math.min(100, (financialData.actualDebt / 100000) + (daysSinceLastActivity || 0)) : 0
+            };
+          }
+          return null;
+        } catch (error) {
+          console.warn(`⚠️ Error calculating representative ${candidate.id}:`, error);
+          return null;
+        }
+      })
+    );
+
+    const transformedData = debtorList.filter(Boolean); // Remove nulls
 
     // Update cache
     debtorCache = {
