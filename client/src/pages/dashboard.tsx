@@ -186,11 +186,21 @@ export default function Dashboard() {
     select: (data: any) => data?.value || null
   });
 
-  // SHERLOCK v1.0: Financial health data
+  // SHERLOCK v28.0: Financial health data with accurate overdue calculation
   const { data: financialHealth, isLoading: healthLoading } = useQuery<FinancialHealthData>({
-    queryKey: ["/api/unified-financial/health"],
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    refetchInterval: 15 * 60 * 1000, // Refresh every 15 minutes
+    queryKey: ["/api/unified-financial/overdue-analysis"],
+    staleTime: 5 * 60 * 1000, // 5 minutes for real-time accuracy
+    refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
+    select: (data: any) => ({
+      healthScore: data?.data?.totals ? Math.max(0, 100 - Math.round((data.data.representatives.length / 246) * 100)) : 85,
+      activeDebtors: data?.data?.totals?.representativesWithOverdue || 0,
+      totalCredit: data?.data?.totals?.totalUnpaidAmount || 0,
+      overdueAmount: data?.data?.totals?.totalOverdueAmount || 0,
+      recommendations: data?.data?.totals?.totalOverdueAmount > 100000000 ? [
+        'تطبیق مالی سراسری انجام دهید',
+        'نمایندگان پرریسک را بررسی کنید'
+      ] : []
+    })
   });
 
 
