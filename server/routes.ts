@@ -265,7 +265,7 @@ import { registerWorkspaceRoutes } from './routes/workspace-routes.js';
 import { registerSettingsRoutes } from './routes/settings-routes.js';
 import { registerMaintenanceRoutes } from './routes/maintenance-routes.js';
 import { registerUnifiedStatisticsRoutes } from './routes/unified-statistics-routes.js';
-import { registerDatabaseOptimizationRoutes } from './routes/database-optimization-routes.js';
+import databaseOptimizationRouter from './routes/database-optimization-routes.js';
 import { registerStandardizedInvoiceRoutes } from './routes/standardized-invoice-routes.js';
 
 
@@ -277,7 +277,7 @@ export function registerRoutes(app: any, requireAuth: any, storage: any) {
   registerSettingsRoutes(app);
   registerMaintenanceRoutes(app, requireAuth);
   registerUnifiedStatisticsRoutes(app, requireAuth);
-  registerDatabaseOptimizationRoutes(app, requireAuth);
+  app.use('/api/database-optimization', databaseOptimizationRouter);
   registerStandardizedInvoiceRoutes(app, requireAuth);
 
   // Mount router-based modules
