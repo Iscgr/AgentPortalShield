@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 
-// Enhanced performance monitoring middleware
+// Enhanced performance monitoring middleware with batch detection
 export function performanceMonitoringMiddleware(req: Request, res: Response, next: NextFunction) {
   const startTime = Date.now();
+
+  // Detect batch operations
+  const isBatchOperation = req.url?.includes('batch-calculate') || 
+                          (req.body && Array.isArray(req.body.representativeIds) && req.body.representativeIds.length > 10);
 
   // Override res.json to log response time
   const originalJson = res.json;
@@ -14,7 +18,9 @@ export function performanceMonitoringMiddleware(req: Request, res: Response, nex
     if (req.url?.includes('/statistics') || req.url?.includes('/global')) {
       threshold = 1000;
     } else if (req.url?.includes('/debtors') || req.url?.includes('/unified-financial')) {
-      threshold = 500; // More lenient for financial calculations
+      threshold = isBatchOperation ? 2000 : 500; // More lenient for financial calculations
+    } else if (req.url?.includes('/batch-calculate')) {
+      threshold = 3000; // Even more lenient for explicit batch operations
     }
 
     // Performance categorization
@@ -27,18 +33,32 @@ export function performanceMonitoringMiddleware(req: Request, res: Response, nex
       perfLevel = '🟡 MODERATE';
     }
 
-    // Enhanced logging
+    // Enhanced logging with batch detection
+    const batchInfo = isBatchOperation ? 
+      `[BATCH: ${req.body?.representativeIds?.length || 'unknown'} items]` : '';
+
     if (duration > threshold || process.env.NODE_ENV === 'development') {
-      console.log(`${perfLevel} ${req.method} ${req.url} ${res.statusCode} in ${duration}ms`);
+      console.log(`${perfLevel} ${req.method} ${req.url} ${batchInfo} ${res.statusCode} in ${duration}ms`);
     }
 
-    // Memory usage check for heavy endpoints
-    if (duration > 1000) {
+    // Memory usage check for heavy endpoints with batch awareness
+    if (duration > (isBatchOperation ? 2000 : 1000)) {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
       if (heapUsedMB > 300) {
-        console.warn(`🧠 High memory usage: ${heapUsedMB}MB after ${req.url}`);
+        console.warn(`🧠 High memory usage: ${heapUsedMB}MB after ${req.url} ${batchInfo}`);
       }
+    }
+
+    // Special handling for 400 errors to help debugging
+    if (res.statusCode === 400 && req.url?.includes('batch-calculate')) {
+      console.error(`❌ Batch calculation 400 error: ${req.url}`, {
+        bodyKeys: req.body ? Object.keys(req.body) : [],
+        bodyType: typeof req.body,
+        hasRepIds: !!(req.body?.representativeIds),
+        repIdsType: typeof req.body?.representativeIds,
+        repIdsLength: Array.isArray(req.body?.representativeIds) ? req.body.representativeIds.length : 'not array'
+      });
     }
 
     return originalJson.call(this, body);

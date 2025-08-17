@@ -792,39 +792,66 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
 });
 
 /**
- * ✅ SHERLOCK v27.0: Batch financial calculation for multiple representatives
+ * ✅ SHERLOCK v32.1: Enhanced Batch financial calculation with improved error handling
  * POST /api/unified-financial/batch-calculate
  */
 router.post('/batch-calculate', requireAuth, async (req, res) => {
   try {
-    // ✅ SHERLOCK v32.0: Enhanced validation with better error handling
-    if (!req.body || typeof req.body !== 'object') {
+    console.log('🔍 SHERLOCK v32.1: Batch-calculate request received:', {
+      hasBody: !!req.body,
+      bodyType: typeof req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      bodySize: req.body ? JSON.stringify(req.body).length : 0
+    });
+
+    // ✅ SHERLOCK v32.1: More lenient validation with detailed logging
+    if (!req.body) {
+      console.warn('❌ SHERLOCK v32.1: No request body provided');
       return res.status(400).json({
         success: false,
         error: "درخواست نامعتبر است",
-        details: "Request body is required"
+        details: "Request body is required",
+        debug: { hasBody: false, bodyType: typeof req.body }
       });
     }
 
-    const { representativeIds } = req.body;
-
-    if (!representativeIds) {
+    // Handle both direct array and object with representativeIds
+    let representativeIds;
+    
+    if (Array.isArray(req.body)) {
+      representativeIds = req.body;
+      console.log('🔍 SHERLOCK v32.1: Direct array format detected');
+    } else if (req.body.representativeIds) {
+      representativeIds = req.body.representativeIds;
+      console.log('🔍 SHERLOCK v32.1: Object with representativeIds field detected');
+    } else {
+      console.warn('❌ SHERLOCK v32.1: No representativeIds found in request');
       return res.status(400).json({
         success: false,
         error: "شناسه نمایندگان ارسال نشده است",
-        details: "representativeIds field is required"
+        details: "representativeIds field is required",
+        debug: { 
+          receivedKeys: Object.keys(req.body),
+          expectedFormats: ['[1,2,3]', '{"representativeIds": [1,2,3]}']
+        }
       });
     }
 
     if (!Array.isArray(representativeIds)) {
+      console.warn('❌ SHERLOCK v32.1: representativeIds is not an array:', typeof representativeIds);
       return res.status(400).json({
         success: false,
         error: "فرمت شناسه نمایندگان نامعتبر است",
-        details: "representativeIds must be an array"
+        details: "representativeIds must be an array",
+        debug: { 
+          receivedType: typeof representativeIds,
+          receivedValue: representativeIds
+        }
       });
     }
 
     if (representativeIds.length === 0) {
+      console.log('ℹ️ SHERLOCK v32.1: Empty representativeIds array provided');
       return res.json({
         success: true,
         data: [],
@@ -834,42 +861,59 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
       });
     }
 
-    console.log(`🔄 SHERLOCK v32.0: Batch calculating ${representativeIds.length} representatives`);
+    console.log(`🔄 SHERLOCK v32.1: Batch calculating ${representativeIds.length} representatives:`, representativeIds.slice(0, 5));
 
-    const results = await Promise.all(
-      representativeIds.map(async (id) => {
-        try {
-          const numericId = parseInt(id);
-          if (isNaN(numericId)) {
-            console.warn(`Invalid representative ID: ${id}`);
-            return null;
-          }
-          return await unifiedFinancialEngine.calculateRepresentative(numericId);
-        } catch (error) {
-          console.warn(`Batch calculation failed for representative ${id}:`, error);
-          return null;
+    // ✅ SHERLOCK v32.1: Add timeout and better error handling
+    const calculationPromises = representativeIds.map(async (id, index) => {
+      try {
+        const numericId = parseInt(id);
+        if (isNaN(numericId)) {
+          console.warn(`⚠️ Invalid representative ID at index ${index}: ${id}`);
+          return { error: `Invalid ID: ${id}`, index };
         }
-      })
-    );
+        
+        const result = await Promise.race([
+          unifiedFinancialEngine.calculateRepresentative(numericId),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Calculation timeout')), 10000)
+          )
+        ]);
+        
+        return { data: result, id: numericId, index };
+      } catch (error) {
+        console.warn(`⚠️ Batch calculation failed for representative ${id} at index ${index}:`, error.message);
+        return { error: error.message, id, index };
+      }
+    });
 
-    const validResults = results.filter(result => result !== null);
+    const results = await Promise.all(calculationPromises);
+    
+    const validResults = results.filter(r => r.data).map(r => r.data);
+    const errors = results.filter(r => r.error);
 
-    console.log(`✅ SHERLOCK v32.0: Batch calculation complete: ${validResults.length}/${representativeIds.length} successful`);
+    console.log(`✅ SHERLOCK v32.1: Batch calculation complete: ${validResults.length}/${representativeIds.length} successful, ${errors.length} errors`);
+
+    if (errors.length > 0) {
+      console.log('⚠️ SHERLOCK v32.1: Calculation errors:', errors.slice(0, 3));
+    }
 
     res.json({
       success: true,
       data: validResults,
       processed: representativeIds.length,
       successful: validResults.length,
+      errors: errors.length,
+      errorDetails: errors.slice(0, 5), // First 5 errors for debugging
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('❌ SHERLOCK v32.0: Error in batch calculation:', error);
+    console.error('❌ SHERLOCK v32.1: Critical error in batch calculation:', error);
     res.status(500).json({
       success: false,
       error: "خطا در محاسبه دسته‌ای",
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
     });
   }
 });

@@ -267,7 +267,7 @@ export default function Representatives() {
       try {
         const data = await apiRequest("/api/representatives");
         console.log("✅ Representatives data loaded:", data?.length || 0, "items");
-        
+
         // ✅ SHERLOCK v32.0: Debug specific representative "Abedmb"
         const abedmbRep = data?.find((rep: Representative) => 
           rep.name.toLowerCase().includes('abedmb') || 
@@ -282,7 +282,7 @@ export default function Representatives() {
             totalSales: abedmbRep.totalSales
           });
         }
-        
+
         return data;
       } catch (error) {
         console.error("❌ Error fetching representatives:", error);
@@ -295,51 +295,137 @@ export default function Representatives() {
     refetchOnWindowFocus: false
   });
 
-  // ✅ SHERLOCK v32.0: Enhanced batch financial data with robust fallback
-  const representativeIds = useMemo(() => 
-    representatives?.map(rep => rep.id) || [], [representatives]
-  );
-
-  const { data: batchFinancialData, isLoading: financialLoading, error: financialError } = useQuery({
-    queryKey: [`/api/unified-financial/batch-calculate`, representativeIds],
+  // ✅ SHERLOCK v32.1: Optimized batch processing to prevent 400 errors
+  const { data: enhancedRepsData, isLoading: enhancedRepsLoading, error: enhancedRepsError } = useQuery({
+    queryKey: ["enhanced-representatives-data", representatives?.map(rep => rep.id)],
     queryFn: async () => {
-      if (representativeIds.length === 0) return { data: [] };
+      if (!representatives || representatives.length === 0) return [];
 
-      // Always return empty array to force individual calculations
-      // This ensures all representatives get real-time debt calculations
-      console.log('🔄 SHERLOCK v32.0: Using individual debt calculations for reliability');
-      return { data: [] };
+      console.log(`🔄 SHERLOCK v32.1: Processing ${representatives.length} representatives with optimized batch requests`);
+
+      // Group representatives into batches of 20 for better performance
+      const batchSize = 20;
+      const batches = [];
+      for (let i = 0; i < representatives.length; i += batchSize) {
+        batches.push(representatives.slice(i, i + batchSize));
+      }
+
+      console.log(`📦 SHERLOCK v32.1: Split into ${batches.length} batches of max ${batchSize} representatives`);
+
+      let enhancedRepresentatives = [...representatives]; // Start with original data
+
+      // Process each batch with retry logic
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const representativeIds = batch.map(rep => rep.id);
+
+        try {
+          console.log(`🔄 SHERLOCK v32.1: Processing batch ${batchIndex + 1}/${batches.length} with ${representativeIds.length} representatives`);
+
+          // Try batch calculation first
+          const response = await fetch('/api/unified-financial/batch-calculate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ representativeIds })
+          });
+
+          if (response.ok) {
+            const batchResult = await response.json();
+            console.log(`✅ SHERLOCK v32.1: Batch ${batchIndex + 1} successful: ${batchResult.successful}/${batchResult.processed} representatives`);
+
+            // Merge batch results with enhanced representatives
+            if (batchResult.data && Array.isArray(batchResult.data)) {
+              batchResult.data.forEach((financialData) => {
+                if (financialData?.representativeId) {
+                  const repIndex = enhancedRepresentatives.findIndex(rep => rep.id === financialData.representativeId);
+                  if (repIndex !== -1) {
+                    enhancedRepresentatives[repIndex] = {
+                      ...enhancedRepresentatives[repIndex],
+                      totalDebt: financialData.actualDebt?.toString() || enhancedRepresentatives[repIndex].totalDebt,
+                      totalSales: financialData.totalSales?.toString() || enhancedRepresentatives[repIndex].totalSales,
+                      financialData: {
+                        actualDebt: financialData.actualDebt || 0,
+                        paymentRatio: financialData.paymentRatio || 0,
+                        debtLevel: financialData.debtLevel || 'UNKNOWN',
+                        lastSync: financialData.calculationTimestamp || new Date().toISOString()
+                      }
+                    };
+                  }
+                }
+              });
+            }
+          } else {
+            console.warn(`⚠️ SHERLOCK v32.1: Batch ${batchIndex + 1} failed with status ${response.status}, falling back to individual requests`);
+
+            // Fallback to individual requests for this batch
+            for (const rep of batch) {
+              try {
+                const individualResponse = await fetch(`/api/unified-financial/representative/${rep.id}`);
+                if (individualResponse.ok) {
+                  const financialData = await individualResponse.json();
+                  const repIndex = enhancedRepresentatives.findIndex(r => r.id === rep.id);
+                  if (repIndex !== -1 && financialData.data) {
+                    enhancedRepresentatives[repIndex] = {
+                      ...enhancedRepresentatives[repIndex],
+                      totalDebt: financialData.data.actualDebt?.toString() || rep.totalDebt,
+                      totalSales: financialData.data.totalSales?.toString() || rep.totalSales,
+                      financialData: {
+                        actualDebt: financialData.data.actualDebt || 0,
+                        paymentRatio: financialData.data.paymentRatio || 0,
+                        debtLevel: financialData.data.debtLevel || 'UNKNOWN',
+                        lastSync: financialData.data.calculationTimestamp || new Date().toISOString()
+                      }
+                    };
+                  }
+                }
+              } catch (error) {
+                console.warn(`⚠️ SHERLOCK v32.1: Individual calculation failed for rep ${rep.id}:`, error);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`❌ SHERLOCK v32.1: Batch ${batchIndex + 1} processing error:`, error);
+          // Continue with next batch even if this one fails
+        }
+
+        // Add delay between batches to prevent overwhelming the server
+        if (batchIndex < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      return enhancedRepresentatives;
     },
-    enabled: false, // Disable batch to force individual calculations
-    staleTime: 30000,
-    refetchInterval: false,
-    retry: 0
+    enabled: !!representatives && representatives.length > 0, // Only run if representatives data is available
+    staleTime: 60000, // Cache for 1 minute
+    refetchOnMount: false, // Don't refetch on mount if already loaded
+    refetchOnWindowFocus: false,
+    retry: 0 // No retries, handled within the loop
   });
+
 
   // SHERLOCK v27.0: Enhanced financial data with fallback rendering
   const enhancedReps = useMemo(() => {
     if (!representatives) return [];
-
-    // Use original data if batch financial data is not available
-    const financialMap = new Map();
-    if (batchFinancialData?.data && Array.isArray(batchFinancialData.data)) {
-      batchFinancialData.data.forEach(f => financialMap.set(f.representativeId, f));
-    }
-
-    return representatives.map(rep => {
-      const financialData = financialMap.get(rep.id);
+    
+    // Use enhanced reps data if available, otherwise fallback to original representatives
+    const repsData = enhancedRepsData || representatives;
+    
+    return repsData.map(rep => {
+      // Use data from enhancedRepsData if available
+      const actualDebt = rep.financialData?.actualDebt ?? parseFloat(rep.totalDebt || '0');
+      const totalSales = rep.financialData?.totalSales ?? parseFloat(rep.totalSales || '0');
 
       return {
         ...rep,
-        displayDebt: financialData?.actualDebt?.toLocaleString() || rep.totalDebt,
-        displaySales: financialData?.totalSales?.toLocaleString() || rep.totalSales,
-        paymentRatio: financialData?.paymentRatio || 0,
-        debtLevel: financialData?.debtLevel || 'UNKNOWN',
-        isLoading: false, // Don't block UI on financial loading
-        lastSync: financialData?.calculationTimestamp || null
+        displayDebt: formatCurrency(actualDebt),
+        displaySales: formatCurrency(totalSales),
+        paymentRatio: rep.financialData?.paymentRatio || 0,
+        debtLevel: rep.financialData?.debtLevel || 'UNKNOWN',
+        isLoading: enhancedRepsLoading, // Indicate if the enhanced data is still loading
+        lastSync: rep.financialData?.lastSync || null
       };
     });
-  }, [representatives, batchFinancialData]);
+  }, [representatives, enhancedRepsData, enhancedRepsLoading]);
 
   // SHERLOCK v11.0: Enhanced filtering and sorting
   const filteredRepresentatives = enhancedReps
@@ -630,7 +716,7 @@ export default function Representatives() {
     setIsSyncing(true);
     try {
       console.log('🔄 SHERLOCK v32.0: Starting comprehensive debt synchronization...');
-      
+
       const response = await fetch('/api/unified-financial/sync-all-representatives', {
         method: 'POST',
         credentials: 'include',
@@ -647,16 +733,16 @@ export default function Representatives() {
           title: "موفقیت",
           description: "همگام‌سازی تمام نمایندگان با موفقیت انجام شد"
         });
-        
+
         // ✅ SHERLOCK v32.0: Comprehensive cache invalidation and refresh
         console.log('🔄 SHERLOCK v32.0: Invalidating all caches...');
-        
+
         // Invalidate all related queries
         queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
         queryClient.invalidateQueries({ queryKey: ["unified-financial"] });
         queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] });
         queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] });
-        
+
         // Force refresh all individual representative calculations
         representatives?.forEach((rep: Representative) => {
           queryClient.invalidateQueries({ 
@@ -669,7 +755,7 @@ export default function Representatives() {
 
         // Refresh main representatives data
         queryClient.refetchQueries({ queryKey: ["/api/representatives"] });
-        
+
         console.log('✅ SHERLOCK v32.0: All debt data refreshed successfully');
       } else {
         toast({
@@ -966,7 +1052,7 @@ export default function Representatives() {
                       {formatCurrency(parseFloat(rep.totalSales))}
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      <RealTimeDebtCell representativeId={rep.id} fallbackDebt={rep.totalDebt} />
+                      {rep.isLoading ? <Skeleton className="h-4 w-16 rounded" /> : <RealTimeDebtCell representativeId={rep.id} fallbackDebt={rep.totalDebt} />}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
