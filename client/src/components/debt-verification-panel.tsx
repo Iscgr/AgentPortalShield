@@ -47,6 +47,9 @@ interface VerificationSummary {
   consistencyRate: number;
   totalDiscrepancy: number;
   averageDiscrepancy: number;
+  totalCalculatedDebt?: number;
+  totalStoredDebt?: number;
+  debtDifferenceAmount?: number;
   verificationDuration: number;
 }
 
@@ -214,65 +217,152 @@ export default function DebtVerificationPanel() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">کل نمایندگان</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {toPersianDigits(summary.totalRepresentatives.toString())}
-                  </p>
+        <div className="space-y-4">
+          {/* First Row - Basic Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">کل نمایندگان</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {toPersianDigits(summary.totalRepresentatives.toString())}
+                    </p>
+                  </div>
+                  <Info className="w-8 h-8 text-blue-600" />
                 </div>
-                <Info className="w-8 h-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">سازگار</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {toPersianDigits(summary.consistentCount.toString())}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {toPersianDigits(summary.consistencyRate.toString())}%
-                  </p>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">سازگار</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {toPersianDigits(summary.consistentCount.toString())}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {toPersianDigits(summary.consistencyRate.toString())}%
+                    </p>
+                  </div>
+                  <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">ناسازگار</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {toPersianDigits(summary.inconsistentCount.toString())}
-                  </p>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">ناسازگار</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {toPersianDigits(summary.inconsistentCount.toString())}
+                    </p>
+                  </div>
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
                 </div>
-                <AlertTriangle className="w-8 h-8 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">کل اختلاف</p>
-                  <p className="text-lg font-bold text-orange-600">
-                    {formatCurrency(summary.totalDiscrepancy)}
-                  </p>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">کل اختلاف</p>
+                    <p className="text-lg font-bold text-orange-600">
+                      {formatCurrency(summary.totalDiscrepancy)}
+                    </p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-orange-600" />
                 </div>
-                <TrendingUp className="w-8 h-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ✅ SHERLOCK v32.0: Second Row - Total Debt Calculations */}
+          {summary.totalCalculatedDebt !== undefined && summary.totalStoredDebt !== undefined && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                        💰 مجموع بدهی محاسبه شده
+                      </p>
+                      <p className="text-xl font-bold text-blue-800 dark:text-blue-200">
+                        {formatCurrency(summary.totalCalculatedDebt)}
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        (از موتور مالی استاندارد)
+                      </p>
+                    </div>
+                    <TrendingUp className="w-8 h-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-950 dark:to-slate-950 border-gray-200 dark:border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                        🗃️ مجموع بدهی ذخیره شده
+                      </p>
+                      <p className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                        {formatCurrency(summary.totalStoredDebt)}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        (در ستون بدهی جدول)
+                      </p>
+                    </div>
+                    <Info className="w-8 h-8 text-gray-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={`bg-gradient-to-r border-2 ${
+                summary.debtDifferenceAmount && summary.debtDifferenceAmount > 1000 
+                  ? 'from-red-50 to-pink-50 dark:from-red-950 dark:to-pink-950 border-red-300 dark:border-red-700'
+                  : 'from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border-green-300 dark:border-green-700'
+              }`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm font-medium ${
+                        summary.debtDifferenceAmount && summary.debtDifferenceAmount > 1000 
+                          ? 'text-red-700 dark:text-red-300' 
+                          : 'text-green-700 dark:text-green-300'
+                      }`}>
+                        {summary.debtDifferenceAmount && summary.debtDifferenceAmount > 1000 ? '⚠️' : '✅'} اختلاف کل
+                      </p>
+                      <p className={`text-xl font-bold ${
+                        summary.debtDifferenceAmount && summary.debtDifferenceAmount > 1000 
+                          ? 'text-red-800 dark:text-red-200' 
+                          : 'text-green-800 dark:text-green-200'
+                      }`}>
+                        {formatCurrency(summary.debtDifferenceAmount || 0)}
+                      </p>
+                      <p className={`text-xs ${
+                        summary.debtDifferenceAmount && summary.debtDifferenceAmount > 1000 
+                          ? 'text-red-600 dark:text-red-400' 
+                          : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {summary.debtDifferenceAmount && summary.debtDifferenceAmount > 1000 
+                          ? 'نیاز به اصلاح دارد' 
+                          : 'مطابقت کامل دارد'}
+                      </p>
+                    </div>
+                    {summary.debtDifferenceAmount && summary.debtDifferenceAmount > 1000 ? (
+                      <AlertTriangle className="w-8 h-8 text-red-600" />
+                    ) : (
+                      <CheckCircle className="w-8 h-8 text-green-600" />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       )}
 
