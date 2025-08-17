@@ -9,7 +9,7 @@ import { unifiedFinancialEngine } from '../services/unified-financial-engine.js'
 import { db } from '../db.js';
 import { representatives } from '../../shared/schema.js';
 import { sql } from 'drizzle-orm';
-import { eq } from 'drizzle-orm'; // Import eq for where clause
+import { eq, desc } from 'drizzle-orm'; // ✅ SHERLOCK v32.0: Added desc import
 import { invoices } from '../../shared/schema.js'; // Assuming invoices schema is available
 import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
 import { storage } from '../storage.js';
@@ -799,7 +799,17 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
   try {
     const { representativeIds } = req.body;
 
-    // ✅ SHERLOCK v32.0: Enhanced validation
+    // ✅ SHERLOCK v32.0: Enhanced validation with better error handling
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: "درخواست نامعتبر است",
+        details: "Request body is required"
+      });
+    }
+
+    const { representativeIds } = req.body;
+
     if (!representativeIds) {
       return res.status(400).json({
         success: false,
@@ -1296,7 +1306,7 @@ router.get('/overdue-analysis', requireAuth, async (req, res) => {
     .where(sql`invoices.status IN ('unpaid', 'overdue')`)
     .groupBy(invoices.representativeId, representatives.name, representatives.code)
     .having(sql`SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END) > 0`)
-    .orderBy(desc(sql`SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END)`));
+    .orderBy(sql`SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END) DESC`);
 
     // Calculate totals
     const [totals] = await db.select({
