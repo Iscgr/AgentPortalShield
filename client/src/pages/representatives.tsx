@@ -1268,7 +1268,7 @@ export default function Representatives() {
       />
 
       {/* Edit Invoice Dialog - Using External Component */}
-      {selectedInvoice && selectedRep && isInvoiceEditOpen && (
+      {selectedInvoice && selectedRep && (
         <InvoiceEditDialog
           invoice={selectedInvoice}
           representativeCode={selectedRep.code}
