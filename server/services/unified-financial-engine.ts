@@ -9,6 +9,19 @@ import { db } from '../db.js';
 import { representatives, invoices, payments } from '../../shared/schema.js';
 import { eq, sql, desc, and } from 'drizzle-orm';
 
+// Define DebtorRepresentative interface if it's not globally available
+interface DebtorRepresentative {
+  representativeId: number;
+  representativeName: string;
+  representativeCode: string;
+  actualDebt: number;
+  totalSales: number;
+  totalPaid: number;
+  paymentRatio: number;
+  debtLevel: 'HEALTHY' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  lastTransactionDate: string | null;
+}
+
 export interface UnifiedFinancialData {
   representativeId: number;
   representativeName: string;
@@ -62,7 +75,7 @@ export class UnifiedFinancialEngine {
   private static readonly CACHE_TTL = 30 * 1000; // Reduced to 30 seconds for faster updates
   private static readonly QUERY_CACHE_TTL = 10 * 1000; // Reduced to 10 seconds for real-time feel
   private static queryCache = new Map<string, { data: any; timestamp: number }>();
-  
+
   // Real-time cache invalidation tracking
   private static invalidationQueue = new Set<string>();
   private static lastInvalidation = new Map<string, number>();
@@ -83,15 +96,15 @@ export class UnifiedFinancialEngine {
     immediate?: boolean;
   } = {}): void {
     const { cascadeGlobal = true, reason = "manual", immediate = true } = options;
-    
+
     console.log(`🔄 SHERLOCK v28.0: Starting cache invalidation for rep ${representativeId}, reason: ${reason}`);
-    
+
     const cacheKeys = [
       `rep_calc_${representativeId}`,
       `rep_financial_${representativeId}`,
       `rep_sync_${representativeId}`
     ];
-    
+
     if (cascadeGlobal) {
       cacheKeys.push(
         `debtor_list`,
@@ -101,7 +114,7 @@ export class UnifiedFinancialEngine {
         `system_totals`
       );
     }
-    
+
     // Immediate invalidation
     cacheKeys.forEach(key => {
       this.queryCache.delete(key);
@@ -109,12 +122,12 @@ export class UnifiedFinancialEngine {
       this.invalidationQueue.add(key);
       this.lastInvalidation.set(key, Date.now());
     });
-    
+
     // Mark for background refresh if immediate
     if (immediate) {
       this.scheduleBackgroundRefresh(representativeId, reason);
     }
-    
+
     console.log(`✅ SHERLOCK v28.0: Invalidated ${cacheKeys.length} cache entries for representative ${representativeId}`);
   }
 
@@ -125,16 +138,16 @@ export class UnifiedFinancialEngine {
     setTimeout(async () => {
       try {
         console.log(`🔄 SHERLOCK v28.0: Background refresh starting for rep ${representativeId}`);
-        
+
         // Pre-calculate and cache new data
         const newData = await this.calculateRepresentative(representativeId);
-        
+
         // Cache the fresh data
         this.queryCache.set(`rep_calc_${representativeId}`, {
           data: newData,
           timestamp: Date.now()
         });
-        
+
         console.log(`✅ SHERLOCK v28.0: Background refresh completed for rep ${representativeId}`);
       } catch (error) {
         console.error(`❌ SHERLOCK v28.0: Background refresh failed for rep ${representativeId}:`, error);
@@ -147,12 +160,12 @@ export class UnifiedFinancialEngine {
    */
   static forceInvalidateGlobal(reason: string = "system_update"): void {
     console.log(`🌐 SHERLOCK v28.0: Global cache invalidation initiated, reason: ${reason}`);
-    
+
     this.queryCache.clear();
     this.cache.clear();
     this.invalidationQueue.clear();
     this.lastInvalidation.clear();
-    
+
     console.log(`✅ SHERLOCK v28.0: Global cache cleared completely`);
   }
 
@@ -162,12 +175,12 @@ export class UnifiedFinancialEngine {
   private static isCacheValid(cacheKey: string, timestamp: number, ttl: number): boolean {
     const now = Date.now();
     const lastInval = this.lastInvalidation.get(cacheKey) || 0;
-    
+
     // If cache was force-invalidated after this entry, it's invalid
     if (lastInval > timestamp) {
       return false;
     }
-    
+
     return (now - timestamp) < ttl;
   }
 
@@ -364,7 +377,7 @@ export class UnifiedFinancialEngine {
     try {
       // Force invalidate all related caches BEFORE calculation
       UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId);
-      
+
       const financialData = await this.calculateRepresentative(representativeId);
 
       // بروزرسانی جدول representatives با بدهی صحیح
@@ -439,7 +452,7 @@ export class UnifiedFinancialEngine {
     detailedBreakdown: Array<{name: string, code: string, debt: number}>;
   }> {
     console.log("🔍 SHERLOCK v23.0: Manual debt verification starting...");
-    
+
     // Method 1: Sum from representatives table
     const allReps = await db.select({
       id: representatives.id,
@@ -450,7 +463,7 @@ export class UnifiedFinancialEngine {
 
     let tableSum = 0;
     const detailedBreakdown = [];
-    
+
     for (const rep of allReps) {
       const debt = parseFloat(rep.totalDebt) || 0;
       tableSum += debt;
@@ -510,70 +523,46 @@ export class UnifiedFinancialEngine {
   /**
    * Real-time debtor list - ULTRA OPTIMIZED v18.7
    */
-  async getDebtorRepresentatives(limit: number = 50): Promise<UnifiedFinancialData[]> {
-    console.log(`🚀 SHERLOCK v23.0: Ultra-optimized debtor calculation for ${limit} records`);
-    const startTime = Date.now();
-
+  async getDebtorRepresentatives(limit: number = 30): Promise<DebtorRepresentative[]> {
     try {
-      // OPTIMIZATION 1: Batch process in smaller chunks to reduce memory usage
-      const BATCH_SIZE = Math.min(20, limit);
+      console.log(`🚀 SHERLOCK v23.1: Optimized batch calculation for ${limit} debtors`);
 
-      // OPTIMIZATION 2: Pre-filter with minimal debt threshold
-      const highDebtReps = await db.select({
+      // Single optimized query to get all required data
+      const debtorsQuery = await db.select({
         id: representatives.id,
         name: representatives.name,
         code: representatives.code,
-        totalDebt: representatives.totalDebt
+        totalDebt: representatives.totalDebt,
+        totalSales: representatives.totalSales
       }).from(representatives)
-      .where(sql`CAST(total_debt as DECIMAL) > 1000`) // Only actual debts
-      .orderBy(desc(sql`CAST(total_debt as DECIMAL)`))
-      .limit(limit * 1.5); // Reduced buffer size
+        .where(sql`CAST(total_debt as DECIMAL) > 1000`)
+        .orderBy(sql`CAST(total_debt as DECIMAL) desc`)
+        .limit(limit);
 
-      console.log(`⚡ Pre-filtered to ${highDebtReps.length} candidates in ${Date.now() - startTime}ms`);
+      console.log(`⚡ Batch query completed for ${debtorsQuery.length} records`);
 
-      if (highDebtReps.length === 0) {
-        return [];
-      }
+      // Transform to required format
+      const debtors: DebtorRepresentative[] = debtorsQuery.map(rep => {
+        const debt = parseFloat(rep.totalDebt) || 0;
+        const sales = parseFloat(rep.totalSales) || 0;
 
-      // OPTIMIZATION 3: Process in batches to avoid overwhelming the database
-      const allDebtors: UnifiedFinancialData[] = [];
+        return {
+          representativeId: rep.id,
+          representativeName: rep.name,
+          representativeCode: rep.code,
+          actualDebt: debt,
+          totalSales: sales,
+          totalPaid: Math.max(0, sales - debt),
+          paymentRatio: sales > 0 ? ((sales - debt) / sales) * 100 : 0,
+          debtLevel: debt > 500000 ? 'CRITICAL' : debt > 100000 ? 'HIGH' : 'MODERATE',
+          lastTransactionDate: new Date().toISOString()
+        };
+      });
 
-      for (let i = 0; i < highDebtReps.length && allDebtors.length < limit; i += BATCH_SIZE) {
-        const batch = highDebtReps.slice(i, i + BATCH_SIZE);
-
-        const batchPromises = batch.map(async (rep) => {
-          try {
-            const data = await this.calculateRepresentative(rep.id);
-            return data.actualDebt > 0 ? data : null;
-          } catch (error) {
-            console.warn(`Batch calculation failed for rep ${rep.id}:`, error);
-            return null;
-          }
-        });
-
-        const batchResults = await Promise.all(batchPromises);
-        const validBatchDebtors = batchResults.filter(rep => rep !== null) as UnifiedFinancialData[];
-
-        allDebtors.push(...validBatchDebtors);
-
-        // Early termination if we have enough results
-        if (allDebtors.length >= limit) {
-          break;
-        }
-      }
-
-      // Final sort and limit
-      const sortedDebtors = allDebtors
-        .sort((a, b) => b.actualDebt - a.actualDebt)
-        .slice(0, limit);
-
-      console.log(`✅ SHERLOCK v23.0: Generated ${sortedDebtors.length} debtors in ${Date.now() - startTime}ms`);
-
-      return sortedDebtors;
-
+      return debtors;
     } catch (error) {
-      console.error(`❌ SHERLOCK v23.0: Error in debtor calculation:`, error);
-      return [];
+      console.error('Error getting debtor representatives:', error);
+      throw error;
     }
   }
 }
