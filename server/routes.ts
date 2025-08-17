@@ -2,8 +2,8 @@
 import express from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from './db';
-import { invoices } from './schema';
-import { authMiddleware, requireAuth } from './middleware/auth';
+import { invoices } from '../shared/schema';
+import { authMiddleware, requireAuth } from './middleware/unified-auth';
 import { storage } from './storage';
 import { unifiedFinancialEngine } from './financial-engine';
 import { createInvoice, createInvoiceSchema } from './invoice';
