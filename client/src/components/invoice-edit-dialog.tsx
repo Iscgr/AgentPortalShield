@@ -191,7 +191,7 @@ export default function InvoiceEditDialog({
 
       // ✅ SHERLOCK v28.0: COMPREHENSIVE CACHE INVALIDATION WITH VERIFICATION
       console.log(`🔄 SHERLOCK v28.0: Starting comprehensive cache invalidation for invoice ${invoice.id}`);
-      
+
       await Promise.all([
         // Invoice-specific data
         queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/usage-details`] }),
@@ -278,7 +278,7 @@ export default function InvoiceEditDialog({
         const postValidation = await apiRequest('/api/unified-financial/validate-consistency', {
           method: 'POST'
         });
-        
+
         if (!postValidation.validation.isValid) {
           console.warn('⚠️ Post-edit validation found inconsistencies:', postValidation.validation.summary);
           toast({
@@ -487,7 +487,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         const preValidation = await apiRequest('/api/unified-financial/validate-consistency', {
           method: 'POST'
         });
-        
+
         if (!preValidation.validation.isValid) {
           toast({
             title: "هشدار ثبات مالی",
@@ -808,15 +808,25 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                   </Button>
                 </div>
                 <div className="flex gap-2 items-center">
-                  {/* SHERLOCK v1.0: Enhanced amount display with change indicator */}
-                  <div className="text-sm text-gray-600 flex flex-col items-end">
-                    <div>مجموع فعلی: {calculatedAmount.toLocaleString()} تومان</div>
-                    {calculatedAmount !== originalAmount && (
-                      <div className={`text-xs font-medium ${calculatedAmount > originalAmount ? 'text-green-600' : 'text-red-600'}`}>
-                        {calculatedAmount > originalAmount ? '↗️' : '↘️'} تغییر: {Math.abs(calculatedAmount - originalAmount).toLocaleString()} تومان
-                      </div>
-                    )}
+                  {/* ✅ SHERLOCK v28.1: ENHANCED AMOUNT DISPLAY WITH REAL-TIME VALIDATION */}
+              <div className="text-sm text-gray-600 flex flex-col items-end border-l-4 border-blue-200 pl-3">
+                <div className="font-semibold text-gray-800">مجموع فعلی: {calculatedAmount.toLocaleString()} تومان</div>
+                <div className="text-xs text-gray-500">مبلغ اصلی: {originalAmount.toLocaleString()} تومان</div>
+                {calculatedAmount !== originalAmount && (
+                  <div className={`text-sm font-bold px-2 py-1 rounded-md mt-1 ${
+                    calculatedAmount > originalAmount 
+                      ? 'text-green-700 bg-green-100' 
+                      : 'text-red-700 bg-red-100'
+                  }`}>
+                    {calculatedAmount > originalAmount ? '📈 افزایش' : '📉 کاهش'}: {Math.abs(calculatedAmount - originalAmount).toLocaleString()} تومان
                   </div>
+                )}
+                {calculatedAmount === originalAmount && editMode && (
+                  <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1">
+                    ✓ بدون تغییر مبلغ
+                  </div>
+                )}
+              </div>
                   <Button
                     onClick={saveChanges}
                     disabled={isProcessing || !sessionHealthy}

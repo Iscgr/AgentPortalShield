@@ -1979,7 +1979,9 @@ export class DatabaseStorage implements IStorage {
             })
             .returning();
 
-          // Update invoice amount and usage data
+          // ✅ SHERLOCK v28.1: COMPREHENSIVE INVOICE UPDATE WITH AMOUNT SYNCHRONIZATION
+          console.log(`💰 SHERLOCK v28.1: Updating invoice ${editData.invoiceId} from ${editData.originalAmount} to ${editData.editedAmount}`);
+
           await db.update(invoices)
             .set({
               amount: editData.editedAmount.toString(),
@@ -1988,7 +1990,8 @@ export class DatabaseStorage implements IStorage {
             })
             .where(eq(invoices.id, editData.invoiceId));
 
-          console.log(`💰 SHERLOCK v12.1: Invoice ${editData.invoiceId} amount updated from ${editData.originalAmount} to ${editData.editedAmount}`);
+          console.log(`✅ SHERLOCK v28.1: Invoice ${editData.invoiceId} amount updated to ${editData.editedAmount}`);
+
 
           // ✅ SHERLOCK v28.0: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
           console.log(`🔄 SHERLOCK v28.0: Starting comprehensive financial sync for representative ${invoice.representativeId}`);

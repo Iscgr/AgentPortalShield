@@ -1208,4 +1208,75 @@ router.get('/monitoring-status', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * ✅ SHERLOCK v28.1: Invoice Amount Verification
+ * GET /api/unified-financial/verify-invoice-amount/:invoiceId
+ */
+router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) => {
+  try {
+    const invoiceId = parseInt(req.params.invoiceId);
+    
+    if (isNaN(invoiceId)) {
+      return res.status(400).json({
+        success: false,
+        error: "شناسه فاکتور نامعتبر است"
+      });
+    }
+
+    // Get invoice from database
+    const [invoice] = await db.select({
+      id: invoices.id,
+      amount: invoices.amount,
+      usageData: invoices.usageData,
+      representativeId: invoices.representativeId
+    }).from(invoices).where(eq(invoices.id, invoiceId));
+
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        error: "فاکتور یافت نشد"
+      });
+    }
+
+    // Verify amount matches usage data
+    let calculatedAmount = 0;
+    if (invoice.usageData && typeof invoice.usageData === 'object') {
+      const usageData = invoice.usageData as any;
+      if (usageData.records && Array.isArray(usageData.records)) {
+        calculatedAmount = usageData.records.reduce((sum: number, record: any) => {
+          return sum + (parseFloat(record.amount) || 0);
+        }, 0);
+      } else if (usageData.usage_amount) {
+        calculatedAmount = parseFloat(usageData.usage_amount) || 0;
+      }
+    }
+
+    const storedAmount = parseFloat(invoice.amount);
+    const difference = Math.abs(storedAmount - calculatedAmount);
+    const isConsistent = difference < 1;
+
+    res.json({
+      success: true,
+      verification: {
+        invoiceId,
+        storedAmount,
+        calculatedAmount,
+        difference,
+        isConsistent,
+        message: isConsistent 
+          ? "✅ مبلغ فاکتور با جزئیات مطابقت دارد" 
+          : `⚠️ عدم تطابق ${difference.toLocaleString()} تومان`
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error verifying invoice amount:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در تایید مبلغ فاکتور"
+    });
+  }
+});
+
 export default router;
