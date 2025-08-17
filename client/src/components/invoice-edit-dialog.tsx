@@ -36,6 +36,7 @@ interface Invoice {
   issueDate: string;
   status: string;
   usageData?: any;
+  representativeId?: string;
 }
 
 interface InvoiceEditDialogProps {
@@ -220,7 +221,7 @@ export default function InvoiceEditDialog({
       // ✅ ENHANCED: Force immediate refetch of usage details
       setTimeout(async () => {
         try {
-          await queryClient.refetchQueries({ 
+          await queryClient.refetchQueries({
             queryKey: [`/api/invoices/${invoice.id}/usage-details`],
             type: 'active'
           });
@@ -365,7 +366,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       }));
 
       const initialAmount = calculateTotalAmount(records);
-      
+
       // ✅ Set states in proper order
       setEditableRecords(records);
       setOriginalAmount(parseFloat(invoice.amount));
@@ -413,12 +414,12 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       const updated = [...prev, newRecord];
       const newAmount = calculateTotalAmount(updated);
       console.log(`🧮 SHERLOCK v31.0: ATOMIC calculation after adding: ${newAmount} تومان`);
-      
+
       // ✅ ATOMIC: Immediate sync within same render cycle
       requestAnimationFrame(() => {
         setCalculatedAmount(newAmount);
       });
-      
+
       return updated;
     });
   };
@@ -426,32 +427,32 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
   // ✅ SHERLOCK v32.0: ENHANCED ATOMIC REAL-TIME CALCULATION WITH GUARANTEED SYNCHRONIZATION
   const updateRecord = (id: string, field: keyof EditableUsageRecord, value: any) => {
     console.log(`🔄 SHERLOCK v32.0: ATOMIC UPDATE - record ${id}, field: ${field}, value: ${value}`);
-    
+
     // ✅ ATOMIC STATE UPDATE: Update both records and calculated amount in single operation
     setEditableRecords(prev => {
       const updatedRecords = prev.map(record => {
         if (record.id === id) {
           const updated = { ...record, [field]: value, isModified: !record.isNew };
-          
+
           // ✅ CRITICAL: Enhanced validation for amount field
           if (field === 'amount') {
             const numericValue = parseFloat(value) || 0;
             console.log(`💰 ATOMIC: Amount updated for record ${id}: ${record.amount} → ${numericValue}`);
             updated.amount = numericValue;
           }
-          
+
           return updated;
         }
         return record;
       });
-      
+
       // ✅ ATOMIC: Calculate new total IMMEDIATELY within same state update
       const newTotalAmount = calculateTotalAmount(updatedRecords);
       console.log(`🧮 ATOMIC: Real-time calculation result: ${newTotalAmount} تومان`);
-      
+
       // ✅ ENHANCED: Immediate synchronous update (no requestAnimationFrame delay)
       setCalculatedAmount(newTotalAmount);
-      
+
       return updatedRecords;
     });
   };
@@ -478,15 +479,15 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         }
         return record;
       });
-      
+
       const newAmount = calculateTotalAmount(updated);
       console.log(`🧮 SHERLOCK v31.0: ATOMIC calculation after delete: ${newAmount} تومان`);
-      
+
       // ✅ ATOMIC: Force immediate sync
       requestAnimationFrame(() => {
         setCalculatedAmount(newAmount);
       });
-      
+
       return updated;
     });
   };
@@ -502,15 +503,15 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         }
         return record;
       });
-      
+
       const newAmount = calculateTotalAmount(updated);
       console.log(`🧮 SHERLOCK v31.0: ATOMIC calculation after restore: ${newAmount} تومان`);
-      
+
       // ✅ ATOMIC: Force immediate sync
       requestAnimationFrame(() => {
         setCalculatedAmount(newAmount);
       });
-      
+
       return updated;
     });
   };
@@ -567,13 +568,13 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     if (Math.abs(finalCalculatedAmount - calculatedAmount) > 0.1) {
       console.warn(`⚠️ SHERLOCK v28.2: Amount mismatch detected - Recalculating: ${calculatedAmount} vs ${finalCalculatedAmount}`);
       setCalculatedAmount(finalCalculatedAmount);
-      
+
       toast({
         title: "🔄 محاسبه مجدد",
         description: `مبلغ به ${finalCalculatedAmount.toLocaleString()} تومان اصلاح شد`,
         variant: "default"
       });
-      
+
       // Allow user to see the recalculated amount
       return;
     }
@@ -634,39 +635,43 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       return;
     }
 
-    // ✅ SHERLOCK v32.0: COMPLETE USAGE DATA REPLACEMENT WITH ENHANCED PERSISTENCE
-    const editData = {
-      invoiceId: invoice.id,
-      representativeCode: representativeCode,
-      originalUsageData: (usageDetails as any)?.usageData || {},
-      
-      // ✅ CRITICAL: Complete replacement of usage data structure
-      completeUsageDataReplacement: {
-        type: 'complete_replacement',
-        description: `فاکتور ویرایش شده - ${editReason}`,
-        records: activeRecords.map(record => ({
-          admin_username: record.admin_username,
-          event_timestamp: record.event_timestamp,
-          event_type: record.event_type,
-          description: record.description,
-          amount: record.amount.toString(),
-          persistenceId: record.id,
-          isNew: record.isNew || false,
-          isModified: record.isModified || false
-        })),
-        totalRecords: activeRecords.length,
-        usage_amount: calculatedAmount,
-        editTimestamp: new Date().toISOString(),
-        editedBy: currentUsername,
-        preserveStructure: true,
-        calculationMethod: 'ATOMIC_REAL_TIME_v32',
-        verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0),
-        
-        // ✅ ENHANCED: Force complete data structure replacement
-        replaceOriginalData: true,
-        maintainFinancialIntegrity: true
-      },
-      
+    // ✅ HEPHAESTUS v1.4: COMPLETE USAGE DATA REPLACEMENT WITH ENHANCED PERSISTENCE
+      const editData = {
+        invoiceId: invoice.id,
+        representativeCode: representativeCode,
+        originalUsageData: (usageDetails as any)?.usageData || {},
+
+        // ✅ CRITICAL: Complete replacement of usage data structure
+        completeUsageDataReplacement: {
+          type: 'complete_replacement',
+          description: `فاکتور ویرایش شده - ${editReason}`,
+          records: activeRecords.map(record => ({
+            admin_username: record.admin_username,
+            event_timestamp: record.event_timestamp,
+            event_type: record.event_type,
+            description: record.description,
+            amount: record.amount.toString(),
+            persistenceId: `persist_${record.id}_${Date.now()}`,
+            isNew: record.isNew || false,
+            isModified: record.isModified || false,
+            quantity: 1,
+            unitPrice: record.amount,
+            name: record.description
+          })),
+          totalRecords: activeRecords.length,
+          usage_amount: calculatedAmount,
+          editTimestamp: new Date().toISOString(),
+          editedBy: currentUsername,
+          preserveStructure: true,
+          calculationMethod: 'HEPHAESTUS_ATOMIC_v1.4',
+          verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0),
+
+          // ✅ ENHANCED: Force complete data structure replacement
+          replaceOriginalData: true,
+          maintainFinancialIntegrity: true,
+          forceDataPersistence: true
+        },
+
       // ✅ BACKWARD COMPATIBILITY: Keep existing structure
       editedUsageData: {
         type: 'edited',
@@ -689,7 +694,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         calculationMethod: 'ATOMIC_REAL_TIME_v32',
         verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0)
       },
-      
+
       editType: 'COMPLETE_USAGE_REPLACEMENT',
       editReason: editReason,
       originalAmount: parseFloat(invoice.amount),
@@ -697,7 +702,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       editedBy: currentUsername,
       requiresFinancialSync: Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01,
       amountDifference: calculatedAmount - parseFloat(invoice.amount),
-      
+
       // ✅ ENHANCED: Complete record state preservation with validation
       detailedRecords: activeRecords.map(record => ({
         ...record,
@@ -710,7 +715,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
           isDeleted: record.isDeleted
         }
       })),
-      
+
       recordsMetadata: {
         addedRecords: editableRecords.filter(r => r.isNew && !r.isDeleted).length,
         modifiedRecords: editableRecords.filter(r => r.isModified && !r.isDeleted).length,
@@ -718,7 +723,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         totalActiveRecords: activeRecords.length,
         totalAmount: calculatedAmount,
         verificationPassed: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01,
-        
+
         // ✅ CRITICAL: Enhanced validation flags
         requiresCompleteReplacement: true,
         dataIntegrityValidated: true,
@@ -976,22 +981,22 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
               {/* ✅ SHERLOCK v29.0: ENHANCED REAL-TIME DISPLAY WITH BETTER FEEDBACK */}
               <div className="text-sm text-gray-600 flex flex-col items-end border-l-4 border-blue-200 pl-3 bg-gray-50 p-3 rounded-md">
                 <div className="font-bold text-lg text-gray-800 mb-1">
-                  مجموع فعلی: 
+                  مجموع فعلی:
                   <span className={`ml-2 transition-all duration-300 ${
-                    calculatedAmount !== parseFloat(invoice.amount) 
-                      ? 'text-blue-600 font-extrabold animate-pulse' 
+                    calculatedAmount !== parseFloat(invoice.amount)
+                      ? 'text-blue-600 font-extrabold animate-pulse'
                       : 'text-gray-800'
                   }`}>
                     {calculatedAmount.toLocaleString()} تومان
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 mb-2">مبلغ اصلی: {originalAmount.toLocaleString()} تومان</div>
-                
+
                 {/* ✅ Enhanced difference indicator */}
                 {calculatedAmount !== originalAmount && (
                   <div className={`text-sm font-bold px-3 py-2 rounded-lg mt-1 transition-all duration-500 shadow-sm ${
-                    calculatedAmount > originalAmount 
-                      ? 'text-green-700 bg-green-100 border border-green-300 shadow-green-200' 
+                    calculatedAmount > originalAmount
+                      ? 'text-green-700 bg-green-100 border border-green-300 shadow-green-200'
                       : 'text-red-700 bg-red-100 border border-red-300 shadow-red-200'
                   }`}>
                     {calculatedAmount > originalAmount ? '📈 افزایش' : '📉 کاهش'}: {Math.abs(calculatedAmount - originalAmount).toLocaleString()} تومان
@@ -1000,13 +1005,13 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                     </div>
                   </div>
                 )}
-                
+
                 {calculatedAmount === originalAmount && editMode && (
                   <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1 border border-blue-200">
                     ✓ بدون تغییر مبلغ - آماده ذخیره
                   </div>
                 )}
-                
+
                 {/* ✅ Enhanced calculation status with visual indicator */}
                 <div className="text-xs text-gray-400 mt-1 italic flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>

@@ -1979,12 +1979,12 @@ export class DatabaseStorage implements IStorage {
             })
             .returning();
 
-          // ✅ SHERLOCK v28.1: COMPREHENSIVE INVOICE UPDATE WITH AMOUNT SYNCHRONIZATION
-          console.log(`💰 SHERLOCK v28.1: Updating invoice ${editData.invoiceId} from ${editData.originalAmount} to ${editData.editedAmount}`);
+          // ✅ HEPHAESTUS v1.4: COMPREHENSIVE INVOICE UPDATE WITH AMOUNT SYNCHRONIZATION
+          console.log(`💰 HEPHAESTUS v1.4: Updating invoice ${editData.invoiceId} from ${editData.originalAmount} to ${editData.editedAmount}`);
 
-          // ---- START OF MODIFIED CODE ----
-          // Process usage data and get metadata for logging
-          let newUsageData = editData.editedUsageData;
+          // ---- ENHANCED DATA PROCESSING ----
+          // Process usage data with complete replacement support
+          let newUsageData = editData.completeUsageDataReplacement || editData.editedUsageData;
           let recordsMetadata = {
             totalActiveRecords: 0,
             verificationPassed: false,
@@ -1993,14 +1993,28 @@ export class DatabaseStorage implements IStorage {
 
           if (newUsageData && typeof newUsageData === 'object' && newUsageData.records && Array.isArray(newUsageData.records)) {
             recordsMetadata.totalActiveRecords = newUsageData.records.length;
-            // Basic validation: Ensure all records have required fields and amounts are positive
+            
+            // Enhanced validation for new data structure
             recordsMetadata.verificationPassed = newUsageData.records.every(record =>
-              record.name && record.quantity >= 0 && record.unitPrice >= 0 && record.amount >= 0
+              record.description && 
+              record.amount >= 0 && 
+              record.admin_username &&
+              record.persistenceId
             );
-            // Deep check for data integrity (e.g., amount = quantity * unitPrice)
+            
+            // Enhanced integrity validation
             recordsMetadata.dataIntegrityValidated = newUsageData.records.every(record =>
-              Math.abs(record.amount - (record.quantity * record.unitPrice)) < 0.01 // Allow for floating point inaccuracies
+              parseFloat(record.amount) > 0 && record.description.trim().length > 0
             );
+            
+            // ✅ CRITICAL: Transform records to ensure consistency
+            newUsageData.records = newUsageData.records.map(record => ({
+              ...record,
+              amount: parseFloat(record.amount).toString(),
+              quantity: record.quantity || 1,
+              unitPrice: record.unitPrice || parseFloat(record.amount),
+              name: record.name || record.description
+            }));
           }
 
           // Update invoice with new amount and processed usage data
