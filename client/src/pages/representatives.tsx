@@ -156,7 +156,7 @@ interface Invoice {
   invoiceNumber: string;
   amount: string;
   issueDate: string;
-  dueDate: string;
+  dueDate?: string;
   status: string;
   sentToTelegram: boolean;
   telegramSentAt?: string;
@@ -167,7 +167,7 @@ interface Payment {
   id: number;
   amount: string;
   paymentDate: string;
-  description: string;
+  description?: string;
   isAllocated: boolean;
   invoiceId?: number;
 }
@@ -1128,7 +1128,7 @@ export default function Representatives() {
                                         setIsInvoiceEditOpen(true);
                                       }}
                                       title="ویرایش جزئیات فاکتور - همگام‌سازی کامل مالی"
-                                      className="bg-blue-50 text-blue-600"
+                                      className="bg-green-50 text-green-600"
                                     >
                                       <Edit3 className="w-4 h-4" />
                                     </Button>
