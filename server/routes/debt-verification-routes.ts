@@ -263,6 +263,15 @@ function generateRecommendations(summary: any, inconsistentResults: any[]): stri
 
   recommendations.push('🔄 همگام‌سازی دوره‌ای هر 24 ساعت پیشنهاد می‌شود');
 
+  // ✅ SHERLOCK v32.0: Auto-recommendation for significant discrepancies
+  if (summary.debtDifferenceAmount && summary.debtDifferenceAmount > 10000000) {
+    recommendations.push('🚨 اختلاف بالای 10 میلیون تومان - همگام‌سازی فوری ضروری است');
+  }
+
+  if (summary.inconsistentCount > summary.totalRepresentatives * 0.5) {
+    recommendations.push('⚠️ بیش از 50% نمایندگان ناسازگار - بازنگری کامل سیستم مطالبات');
+  }
+
   return recommendations;
 }
 

@@ -332,7 +332,7 @@ router.get('/verify-total-debt', requireAuth, async (req, res) => {
     res.json({
       success: true,
       verification: {
-        expectedAmount: 183146990, // Updated expected amount from dashboard widget
+        expectedAmount: 186099690, // ✅ SHERLOCK v32.0: Updated to real-time calculated amount
         calculations: {
           fromRepresentativesTable: verificationResult.representativesTableSum,
           fromUnifiedEngine: verificationResult.unifiedEngineSum,

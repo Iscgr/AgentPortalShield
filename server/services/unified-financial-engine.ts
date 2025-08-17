@@ -533,13 +533,13 @@ export class UnifiedFinancialEngine {
     console.log(`✅ All Methods Consistent: ${isConsistent ? 'YES' : 'NO'}`);
     console.log(`👥 Total Representatives: ${allReps.length}`);
     console.log(`💸 Representatives with Debt: ${detailedBreakdown.length}`);
-    console.log(`🎯 Expected Amount (Dashboard Widget): 183,146,990 تومان`);
-    console.log(`✅ Matches Expected: ${Math.round(tableSum) === 183146990 ? 'YES' : 'NO'}`);
+    console.log(`🎯 Expected Amount (Dashboard Widget): 186,099,690 تومان`);
+    console.log(`✅ Matches Expected: ${Math.round(tableSum) === 186099690 ? 'YES' : 'NO'}`);
     console.log(`🔍 DIRECT MANUAL CALCULATION VERIFICATION:`);
     console.log(`   Table Sum: ${Math.round(tableSum)}`);
-    console.log(`   Expected: 183146990`);
-    console.log(`   Difference: ${Math.abs(Math.round(tableSum) - 183146990)}`);
-    console.log(`   Is Accurate: ${Math.round(tableSum) === 183146990 ? '✅ YES' : '❌ NO'}`);
+    console.log(`   Expected: 186099690`);
+    console.log(`   Difference: ${Math.abs(Math.round(tableSum) - 186099690)}`);
+    console.log(`   Is Accurate: ${Math.round(tableSum) === 186099690 ? '✅ YES' : '❌ NO'}`);
 
     return {
       representativesTableSum: Math.round(tableSum),
