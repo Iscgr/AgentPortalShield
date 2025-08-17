@@ -39,10 +39,10 @@ export class XAIGrokEngine {
       baseURL: "https://api.x.ai/v1",
       apiKey: process.env.XAI_API_KEY || "dummy-key"
     });
-    
+
     this.isConfigured = !!process.env.XAI_API_KEY;
     this.storage = storage;
-    
+
     if (!this.isConfigured) {
       console.warn('XAI Grok Engine: API key not configured, using pattern-based fallback');
     } else {
@@ -73,9 +73,9 @@ export class XAIGrokEngine {
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
       if (!this.isConfigured) {
-        return { 
-          success: false, 
-          message: 'کلید API تنظیم نشده است' 
+        return {
+          success: false,
+          message: 'کلید API تنظیم نشده است'
         };
       }
 
@@ -86,21 +86,21 @@ export class XAIGrokEngine {
       });
 
       if (response.choices[0]?.message?.content) {
-        return { 
-          success: true, 
-          message: 'اتصال به Grok AI برقرار شد' 
+        return {
+          success: true,
+          message: 'اتصال به Grok AI برقرار شد'
         };
       }
 
-      return { 
-        success: false, 
-        message: 'پاسخ نامعتبر از API' 
+      return {
+        success: false,
+        message: 'پاسخ نامعتبر از API'
       };
     } catch (error: any) {
       console.error('Grok API test failed:', error);
-      return { 
-        success: false, 
-        message: `خطا در اتصال: ${error.message}` 
+      return {
+        success: false,
+        message: `خطا در اتصال: ${error.message}`
       };
     }
   }
@@ -174,7 +174,7 @@ export class XAIGrokEngine {
 پاسخ را در قالب JSON با این فیلدها ارائه ده:
 {
   "communicationStyle": "formal|friendly|respectful|direct",
-  "culturalSensitivity": "high|medium|low", 
+  "culturalSensitivity": "high|medium|low",
   "businessApproach": "traditional|modern|mixed",
   "relationshipPriority": 1-10,
   "timeOrientation": "punctual|flexible|relaxed",
@@ -199,7 +199,7 @@ export class XAIGrokEngine {
 
   // Generate task recommendation using AI (🔥 NOW WITH REAL CONFIG INTEGRATION)
   async generateTaskRecommendation(
-    representative: Representative, 
+    representative: Representative,
     culturalProfile: PersianCulturalAnalysis
   ): Promise<TaskRecommendation> {
     if (!this.isConfigured) {
@@ -210,11 +210,11 @@ export class XAIGrokEngine {
       // 🔥 GET ACTUAL BEHAVIOR AND CULTURAL CONFIGS
       const behaviorConfig = await this.getAIConfig('BEHAVIOR');
       const culturalConfig = await this.getAIConfig('PERSIAN_CULTURAL');
-      
+
       const creativityLevel = parseFloat(behaviorConfig.creativityLevel || '0.6');
       const proactivityLevel = parseFloat(behaviorConfig.proactivityLevel || '0.8');
       const formality = culturalConfig.languageFormality || 'RESPECTFUL';
-      
+
       const prompt = `
 تولید وظیفه هوشمند برای نماینده تجاری (خلاقیت: ${Math.round(creativityLevel * 100)}%, فعالیت: ${Math.round(proactivityLevel * 100)}%):
 
@@ -259,19 +259,19 @@ ${creativityLevel > 0.6 ? 'از ایده‌های خلاقانه و نوآورا
       return this.validateTaskRecommendation(recommendation);
     } catch (error) {
       console.error('Task generation failed, using pattern-based fallback:', error);
-      
+
       // Ensure representative is not undefined
       const safeRep = representative || { id: 1, name: 'نماینده عمومی', totalDebt: '0', totalSales: '0', isActive: true } as Representative;
       const safeCulturalProfile = culturalProfile || this.getPatternBasedCulturalAnalysis(safeRep);
-      
+
       return this.getPatternBasedTaskRecommendation(safeRep, safeCulturalProfile);
     }
   }
 
   // Analyze task completion quality
   async analyzeTaskCompletion(
-    task: any, 
-    outcome: string, 
+    task: any,
+    outcome: string,
     notes: string
   ): Promise<{ qualityScore: number; feedback: string; improvements: string[] }> {
     if (!this.isConfigured) {
@@ -316,11 +316,10 @@ ${creativityLevel > 0.6 ? 'از ایده‌های خلاقانه و نوآورا
 
     try {
       const culturalPrompt = `
-شما یک متخصص روان‌شناسی تجاری هستید که در فرهنگ کسب‌وکار ایران تخصص دارید.
-
-اطلاعات نماینده:
-نام: ${representative.name || 'نماینده'}
-شهر: ${representative.city || 'نامشخص'}
+شما یک دستیار هوشمند فارسی با درک عمیق از فرهنگ ایرانی هستید.
+حساسیت فرهنگی: ${Math.round(0.95 * 100)}%
+حساسیت مذهبی: ${Math.round(0.90 * 100)}%
+سبک ارتباط: محترمانه
 
 درخواست: ${prompt}
 
@@ -363,7 +362,7 @@ ${creativityLevel > 0.6 ? 'از ایده‌های خلاقانه و نوآورا
 
   // Generate cultural response with Persian context (NOW WITH REAL CONFIG)
   async generateCulturalResponse(
-    prompt: string, 
+    prompt: string,
     options: { temperature?: number; maxTokens?: number } = {}
   ): Promise<string> {
     if (!this.isConfigured) {
@@ -376,7 +375,7 @@ ${creativityLevel > 0.6 ? 'از ایده‌های خلاقانه و نوآورا
       const culturalSensitivity = parseFloat(config.culturalSensitivity || '0.95');
       const religiousSensitivity = parseFloat(config.religiousSensitivity || '0.90');
       const formality = config.languageFormality || 'RESPECTFUL';
-      
+
       // Build culturally-aware prompt based on actual settings
       let formalityInstruction = '';
       switch (formality) {
@@ -424,7 +423,7 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
       apiKey: apiKey
     });
     this.isConfigured = !!apiKey;
-    
+
     // Update environment variable for persistence
     process.env.XAI_API_KEY = apiKey;
   }
@@ -432,7 +431,7 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
   // Financial data analysis using Grok
   async analyzeFinancialData(
     totalRevenue: number,
-    totalDebt: number, 
+    totalDebt: number,
     activeReps: number,
     overdueInvoices: number
   ): Promise<any> {
@@ -458,7 +457,7 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
 
 📊 آمار مالی:
 - درآمد کل: ${totalRevenue.toLocaleString('fa-IR')} ریال
-- بدهی کل: ${totalDebt.toLocaleString('fa-IR')} ریال  
+- بدهی کل: ${totalDebt.toLocaleString('fa-IR')} ریال
 - نمایندگان فعال: ${activeReps}
 - فاکتورهای معوقه: ${overdueInvoices}
 
@@ -516,7 +515,7 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
   private getPatternBasedCulturalAnalysis(rep: Representative): PersianCulturalAnalysis {
     const debtRatio = parseFloat(rep.totalDebt || "0") / Math.max(parseFloat(rep.totalSales || "1"), 1);
     const isHighPerformer = parseFloat(rep.totalSales || "0") > 50000000; // 50M Rial threshold
-    
+
     return {
       communicationStyle: debtRatio > 0.3 ? 'formal' : 'friendly',
       culturalSensitivity: debtRatio > 0.5 ? 'high' : 'medium',
@@ -528,17 +527,17 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
   }
 
   private getPatternBasedTaskRecommendation(
-    rep: Representative, 
+    rep: Representative,
     cultural: PersianCulturalAnalysis
   ): TaskRecommendation {
     // Handle undefined representative safely
     if (!rep) {
       rep = { id: 1, name: 'نماینده عمومی', totalDebt: '0', totalSales: '0' } as Representative;
     }
-    
+
     const debtAmount = parseFloat((rep?.totalDebt || "0").toString());
     const salesAmount = parseFloat((rep?.totalSales || "0").toString());
-    
+
     if (debtAmount > 10000000) { // 10M Rial
       return {
         taskType: 'DEBT_COLLECTION',
@@ -556,7 +555,7 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
         xpReward: Math.min(100, Math.round(debtAmount / 1000000))
       };
     }
-    
+
     if (salesAmount < 5000000) { // Low sales
       return {
         taskType: 'RELATIONSHIP_BUILDING',
@@ -574,7 +573,7 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
         xpReward: 40
       };
     }
-    
+
     return {
       taskType: 'FOLLOW_UP',
       priority: 'MEDIUM',
@@ -594,13 +593,13 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
 
   private getPatternBasedCompletionAnalysis(outcome: string, notes: string): any {
     const successKeywords = ['موفق', 'خوب', 'مثبت', 'راضی', 'تمام'];
-    const isSuccessful = successKeywords.some(keyword => 
+    const isSuccessful = successKeywords.some(keyword =>
       outcome.includes(keyword) || notes.includes(keyword)
     );
-    
+
     return {
       qualityScore: isSuccessful ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 50,
-      feedback: isSuccessful 
+      feedback: isSuccessful
         ? 'عملکرد مناسبی داشتید. ادامه دهید.'
         : 'می‌توانید در آینده بهتر عمل کنید.',
       improvements: [
@@ -613,14 +612,14 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
 
   private validateCulturalAnalysis(data: any): PersianCulturalAnalysis {
     return {
-      communicationStyle: ['formal', 'friendly', 'respectful', 'direct'].includes(data.communicationStyle) 
+      communicationStyle: ['formal', 'friendly', 'respectful', 'direct'].includes(data.communicationStyle)
         ? data.communicationStyle : 'respectful',
-      culturalSensitivity: ['high', 'medium', 'low'].includes(data.culturalSensitivity) 
+      culturalSensitivity: ['high', 'medium', 'low'].includes(data.culturalSensitivity)
         ? data.culturalSensitivity : 'medium',
-      businessApproach: ['traditional', 'modern', 'mixed'].includes(data.businessApproach) 
+      businessApproach: ['traditional', 'modern', 'mixed'].includes(data.businessApproach)
         ? data.businessApproach : 'mixed',
       relationshipPriority: Math.min(10, Math.max(1, data.relationshipPriority || 5)),
-      timeOrientation: ['punctual', 'flexible', 'relaxed'].includes(data.timeOrientation) 
+      timeOrientation: ['punctual', 'flexible', 'relaxed'].includes(data.timeOrientation)
         ? data.timeOrientation : 'flexible',
       trustLevel: Math.min(10, Math.max(1, data.trustLevel || 5))
     };
@@ -629,14 +628,14 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
   private validateTaskRecommendation(data: any): TaskRecommendation {
     const validTaskTypes = ['FOLLOW_UP', 'DEBT_COLLECTION', 'RELATIONSHIP_BUILDING', 'PERFORMANCE_CHECK'];
     const validPriorities = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
-    
+
     return {
       taskType: validTaskTypes.includes(data.taskType) ? data.taskType : 'FOLLOW_UP',
       priority: validPriorities.includes(data.priority) ? data.priority : 'MEDIUM',
       title: data.title || 'وظیفه عمومی',
       description: data.description || 'شرح وظیفه',
       expectedOutcome: data.expectedOutcome || 'نتیجه مورد انتظار',
-      culturalConsiderations: Array.isArray(data.culturalConsiderations) 
+      culturalConsiderations: Array.isArray(data.culturalConsiderations)
         ? data.culturalConsiderations : ['رعایت ادب فارسی'],
       estimatedDifficulty: Math.min(5, Math.max(1, data.estimatedDifficulty || 2)),
       aiConfidence: Math.min(100, Math.max(1, data.aiConfidence || 75)),
@@ -657,14 +656,14 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
 
     try {
       const { representative, invoices = [], payments = [] } = data;
-      
+
       const prompt = `
 شما یک روانشناس تجاری متخصص هستید. لطفا پروفایل روانشناختی کاملی برای این نماینده تجاری ایجاد کنید:
 
 اطلاعات نماینده:
 - نام: ${representative.name}
 - بدهی کل: ${representative.totalDebt || '0'} ریال
-- فروش کل: ${representative.totalSales || '0'} ریال  
+- فروش کل: ${representative.totalSales || '0'} ریال
 - وضعیت: ${representative.isActive ? 'فعال' : 'غیرفعال'}
 - تعداد فاکتورها: ${invoices.length}
 - تعداد پرداخت‌ها: ${payments.length}
@@ -711,7 +710,7 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
         communicationStyle: "respectful",
         trustLevel: "medium",
         businessAptitude: "good",
-        riskProfile: "moderate", 
+        riskProfile: "moderate",
         culturalAdaptation: "با احترام به فرهنگ ایرانی و رعایت ادب در گفتگو",
         strengths: ["همکاری مناسب", "پتانسیل رشد"],
         challenges: ["نیاز به پیگیری بیشتر", "بهبود ارتباطات"],
@@ -723,13 +722,13 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
     };
   }
 
-  // SHERLOCK v1.0 CRITICAL FIX - Add missing generateCulturalInsights with proper signature  
+  // SHERLOCK v1.0 CRITICAL FIX - Add missing generateCulturalInsights with proper signature
   async generateCulturalInsights(data: {
     representative: Representative;
     context?: string;
   }): Promise<any> {
     const { representative, context = "business_relationship_management" } = data;
-    
+
     if (!this.isConfigured) {
       return this.getFallbackCulturalInsightsData(representative);
     }
@@ -759,13 +758,18 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
         model: "grok-2-1212",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
-        max_tokens: 400,
-        temperature: 0.7
+        max_tokens: 2000
       });
 
-      return JSON.parse(response.choices[0]?.message?.content || '{}');
+      const analysisText = response.choices[0]?.message?.content;
+      if (!analysisText) {
+        throw new Error('No response from XAI Grok');
+      }
+
+      return JSON.parse(analysisText);
+
     } catch (error) {
-      console.error('Cultural insights generation failed:', error);
+      console.error('XAI Grok cultural insights error:', error);
       return this.getFallbackCulturalInsightsData(representative);
     }
   }
@@ -793,65 +797,68 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
 
   // SHERLOCK v1.0 CRITICAL FIX - Add missing analyzeFinancialData method
   async analyzeFinancialData(
-    totalRevenue: number,
-    totalDebt: number,
-    activeRepresentatives: number,
-    overdueInvoices: number
+    financialData: any,
+    context: string = "financial_analysis"
   ): Promise<any> {
     if (!this.isConfigured) {
-      return this.getFallbackFinancialAnalysis(totalRevenue, totalDebt, activeRepresentatives, overdueInvoices);
+      return this.getFallbackFinancialAnalysis(financialData);
     }
 
     try {
       const prompt = `
-شما یک تحلیلگر مالی متخصص هستید. لطفا تحلیل کاملی از وضعیت مالی شرکت ارائه دهید:
+شما یک تحلیلگر مالی متخصص هستید. لطفا این داده‌های مالی را تحلیل کنید:
 
-داده‌های مالی:
-- درآمد کل: ${totalRevenue.toLocaleString()} ریال
-- بدهی کل: ${totalDebt.toLocaleString()} ریال  
-- نمایندگان فعال: ${activeRepresentatives} نفر
-- فاکتورهای معوقه: ${overdueInvoices} عدد
+داده‌های مالی: ${JSON.stringify(financialData, null, 2)}
+زمینه تحلیل: ${context}
 
-لطفا تحلیل مالی در قالب JSON ارائه دهید:
+لطفا تحلیل مالی را در قالب JSON ارائه دهید:
 {
-  "overallHealth": "excellent|good|fair|poor",
+  "type": "financial_analysis",
+  "summary": "خلاصه وضعیت مالی",
   "riskLevel": "low|medium|high|critical",
-  "debtToRevenueRatio": "نسبت بدهی به درآمد",
-  "keyInsights": ["بینش کلیدی 1", "بینش کلیدی 2"],
+  "trends": ["روند 1", "روند 2"],
   "recommendations": ["توصیه 1", "توصیه 2"],
-  "priorityActions": ["اقدام اولویت‌دار 1", "اقدام اولویت‌دار 2"],
-  "score": 1-100,
+  "alerts": ["هشدار 1", "هشدار 2"],
+  "cashFlowAnalysis": "تحلیل جریان نقدی",
+  "creditRisk": "ارزیابی ریسک اعتباری",
   "confidence": 1-100
 }
 `;
 
       const response = await this.client.chat.completions.create({
-        model: "grok-2-1212", 
+        model: "grok-2-1212",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
-        max_tokens: 600,
-        temperature: 0.6
+        max_tokens: 2000
       });
 
-      return JSON.parse(response.choices[0]?.message?.content || '{}');
+      const analysisText = response.choices[0]?.message?.content;
+      if (!analysisText) {
+        throw new Error('No response from XAI Grok');
+      }
+
+      return JSON.parse(analysisText);
+
     } catch (error) {
-      console.error('Financial analysis failed:', error);
-      return this.getFallbackFinancialAnalysis(totalRevenue, totalDebt, activeRepresentatives, overdueInvoices);
+      console.error('XAI Grok financial analysis error:', error);
+      return this.getFallbackFinancialAnalysis(financialData);
     }
   }
 
   private getFallbackFinancialAnalysis(
-    totalRevenue: number, 
-    totalDebt: number, 
-    activeRepresentatives: number, 
-    overdueInvoices: number
+    financialData: any
   ): any {
+    const totalRevenue = financialData?.totalRevenue || 0;
+    const totalDebt = financialData?.totalDebt || 0;
+    const activeRepresentatives = financialData?.activeRepresentatives || 0;
+    const overdueInvoices = financialData?.overdueInvoices || 0;
+
     const debtRatio = totalRevenue > 0 ? (totalDebt / totalRevenue) : 0;
-    
+
     let healthScore = 70;
     let riskLevel = "medium";
     let overallHealth = "fair";
-    
+
     if (debtRatio < 0.2) {
       healthScore = 85;
       riskLevel = "low";
@@ -868,10 +875,10 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
     }
 
     return {
-      overallHealth,
+      type: "financial_analysis",
+      summary: `وضعیت مالی شرکت: ${overallHealth}`,
       riskLevel,
-      debtToRevenueRatio: `${(debtRatio * 100).toFixed(1)}%`,
-      keyInsights: [
+      trends: [
         `نسبت بدهی به درآمد: ${(debtRatio * 100).toFixed(1)}%`,
         `میانگین فاکتور معوقه به ازای هر نماینده: ${(overdueInvoices / Math.max(activeRepresentatives, 1)).toFixed(1)}`
       ],
@@ -880,10 +887,9 @@ ${config.culturalMetaphors ? 'از استعاره‌های فرهنگی ایرا
         "بهبود فرآیند وصول مطالبات",
         "تقویت روابط با نمایندگان"
       ],
-      priorityActions: [
-        "تماس با نمایندگان دارای بدهی بالا",
-        "بررسی و بهینه‌سازی شرایط پرداخت"
-      ],
+      alerts: [],
+      cashFlowAnalysis: "نیاز به بررسی دقیق‌تر جریان نقدی",
+      creditRisk: `ریسک اعتباری ${riskLevel} ارزیابی می‌شود.`,
       score: healthScore,
       confidence: 80
     };
