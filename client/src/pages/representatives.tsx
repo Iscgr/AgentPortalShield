@@ -1123,25 +1123,12 @@ export default function Representatives() {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => {
-                                        console.log('🔧 Internal edit clicked:', invoice);
+                                        console.log('🔧 Invoice edit clicked:', invoice);
                                         setSelectedInvoice(invoice);
                                         setIsInvoiceEditOpen(true);
                                       }}
-                                      title="ویرایش جزئیات فاکتور (مسیر داخلی)"
+                                      title="ویرایش جزئیات فاکتور - همگام‌سازی کامل مالی"
                                       className="bg-blue-50 text-blue-600"
-                                    >
-                                      <Settings className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        console.log('🔧 External edit clicked:', invoice);
-                                        setSelectedInvoice(invoice);
-                                        setIsInvoiceEditOpen(true);
-                                      }}
-                                      title="ویرایش جزئیات فاکتور (مسیر خارجی)"
-                                      className="bg-green-50 text-green-600"
                                     >
                                       <Edit3 className="w-4 h-4" />
                                     </Button>
