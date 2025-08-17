@@ -231,7 +231,7 @@ export default function Representatives() {
     queryFn: () => apiRequest("/api/representatives"),
     select: (response: any) => {
       console.log('🔍 SHERLOCK v26.1: Representatives response:', response);
-      
+
       // Handle different response structures
       if (Array.isArray(response)) {
         console.log(`✅ Found ${response.length} representatives (direct array)`);
@@ -245,7 +245,7 @@ export default function Representatives() {
         console.log(`✅ Found ${response.data.length} representatives (success response)`);
         return response.data;
       }
-      
+
       console.warn('⚠️ Unexpected response format:', typeof response, response);
       return [];
     },

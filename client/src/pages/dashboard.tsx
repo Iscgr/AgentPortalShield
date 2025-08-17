@@ -15,6 +15,7 @@ import AiChat from "@/components/ai-chat";
 import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DashboardData {
   totalRevenue: number;
@@ -177,7 +178,7 @@ export default function Dashboard() {
     queryFn: () => apiRequest("/api/unified-statistics/global"),
     select: (response: any) => {
       console.log('📊 SHERLOCK v26.1: Dashboard data received:', response);
-      
+
       // Handle different response structures
       if (response.success && response.data) {
         return response.data;
@@ -199,10 +200,48 @@ export default function Dashboard() {
   // SHERLOCK v1.0: Financial health data
   const { data: financialHealth, isLoading: healthLoading } = useQuery<FinancialHealthData>({
     queryKey: ["/api/unified-financial/health"],
+    queryFn: async () => await apiRequest("/api/unified-financial/health"),
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchInterval: 15 * 60 * 1000, // Refresh every 15 minutes
   });
 
+  // Activity Logs Query
+  const { data: activityLogs = [], isLoading: isLoadingActivityLogs } = useQuery({
+    queryKey: ["/api/activity-logs"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("/api/activity-logs");
+        return Array.isArray(response) ? response : [];
+      } catch (error) {
+        console.warn("Activity logs not available:", error);
+        return [];
+      }
+    },
+    enabled: true,
+    staleTime: 30000,
+  });
+
+  // Financial Summary Query
+  const { data: financialSummary, isLoading: isLoadingFinancial } = useQuery({
+    queryKey: ["/api/unified-financial/batch-calculate"],
+    queryFn: async () => {
+      const response = await apiRequest("/api/unified-financial/batch-calculate");
+      return response;
+    },
+    enabled: true,
+    staleTime: 60000,
+  });
+
+  // Representatives Query  
+  const { data: representativesData, isLoading: isLoadingReps } = useQuery({
+    queryKey: ["/api/representatives"],
+    queryFn: async () => {
+      const response = await apiRequest("/api/representatives");
+      return response;
+    },
+    enabled: true,
+    staleTime: 30000,
+  });
 
   console.log('🔍 SHERLOCK v26.1: Dashboard render state:', { 
     isLoading, 
