@@ -1,7 +1,7 @@
 
 
-import { pool, db } from './server/db.js';
-import { representatives } from './shared/schema.js';
+import { pool, db } from './server/db.ts';
+import { representatives } from './shared/schema.ts';
 import { eq, and, sql } from 'drizzle-orm';
 
 async function calculateDirectDebtFromRepresentativesTable() {
