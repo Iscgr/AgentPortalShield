@@ -1,332 +1,143 @@
-
 #!/usr/bin/env node
 
 /**
- * 🔍 SHERLOCK v28.0: سیستم تست جامع ویرایش فاکتور
- * اجرا: node system-validation-test.js
+ * SHERLOCK v28.0: COMPREHENSIVE SYSTEM VALIDATION TEST
+ * تست جامع سیستم پس از اصلاحات
  */
 
-const colors = {
-  green: '\x1b[32m',
-  red: '\x1b[31m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  reset: '\x1b[0m',
-  bold: '\x1b[1m'
-};
+const baseUrl = 'https://127.0.0.1:8080';
 
-const log = {
-  info: (msg) => console.log(`${colors.blue}ℹ️  ${msg}${colors.reset}`),
-  success: (msg) => console.log(`${colors.green}✅ ${msg}${colors.reset}`),
-  error: (msg) => console.log(`${colors.red}❌ ${msg}${colors.reset}`),
-  warning: (msg) => console.log(`${colors.yellow}⚠️  ${msg}${colors.reset}`),
-  header: (msg) => console.log(`${colors.bold}${colors.blue}\n🎯 ${msg}${colors.reset}`)
-};
+async function runComprehensiveTest() {
+  console.log('🚀 SHERLOCK v28.0: Starting comprehensive system validation...\n');
 
-class SystemValidator {
-  constructor() {
-    this.testResults = {
-      passed: 0,
-      failed: 0,
-      warnings: 0,
-      total: 0
+  const results = {
+    passed: 0,
+    failed: 0,
+    warnings: 0,
+    tests: []
+  };
+
+  // Test 1: Financial Consistency Validation
+  try {
+    console.log('📊 Test 1: Financial Consistency Validation');
+    const response = await fetch(`${baseUrl}/api/unified-financial/validate-consistency`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ Financial consistency check: ${data.validation.isValid ? 'PASSED' : 'CORRECTED'}`);
+      console.log(`📈 Inconsistencies found: ${data.validation.summary.inconsistentCount}`);
+      console.log(`🔧 Corrections applied: ${data.validation.corrections.length}`);
+      results.passed++;
+    } else {
+      console.log('❌ Financial consistency validation failed');
+      results.failed++;
+    }
+  } catch (error) {
+    console.log('❌ Financial consistency test error:', error.message);
+    results.failed++;
+  }
+
+  // Test 2: Monitoring Status
+  try {
+    console.log('\n📡 Test 2: Financial Monitoring Status');
+    const response = await fetch(`${baseUrl}/api/unified-financial/monitoring-status`, {
+      credentials: 'include'
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ Monitoring status: ${data.monitoring.isActive ? 'ACTIVE' : 'INACTIVE'}`);
+      console.log(`📊 System health: ${data.systemHealth}`);
+      results.passed++;
+    } else {
+      console.log('❌ Monitoring status check failed');
+      results.failed++;
+    }
+  } catch (error) {
+    console.log('❌ Monitoring status test error:', error.message);
+    results.failed++;
+  }
+
+  // Test 3: Invoice Edit Chain Validation
+  try {
+    console.log('\n🔗 Test 3: Invoice Edit Chain Validation');
+    const testData = {
+      invoiceId: 1,
+      representativeCode: 'test',
+      amountChange: 1000,
+      reason: 'test_validation'
     };
-  }
 
-  async runTest(testName, testFn) {
-    this.testResults.total++;
-    try {
-      log.info(`Testing: ${testName}`);
-      const result = await testFn();
-      
-      if (result === true) {
-        this.testResults.passed++;
-        log.success(`${testName}`);
-      } else if (result === 'warning') {
-        this.testResults.warnings++;
-        log.warning(`${testName} - نیاز به توجه`);
-      } else {
-        this.testResults.failed++;
-        log.error(`${testName} - Failed`);
-      }
-    } catch (error) {
-      this.testResults.failed++;
-      log.error(`${testName} - Error: ${error.message}`);
-    }
-  }
+    const response = await fetch(`${baseUrl}/api/unified-financial/representative/test/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testData),
+      credentials: 'include'
+    });
 
-  // Test 1: بررسی ساختار فایل‌ها
-  async testFileStructure() {
-    const fs = require('fs').promises;
-    const requiredFiles = [
-      'server/routes.ts',
-      'server/storage.ts', 
-      'server/services/unified-financial-engine.ts',
-      'client/src/components/invoice-edit-dialog.tsx',
-      'server/routes/unified-financial-routes.ts'
-    ];
-
-    for (const file of requiredFiles) {
-      try {
-        await fs.access(file);
-      } catch {
-        throw new Error(`Required file missing: ${file}`);
-      }
-    }
-    return true;
-  }
-
-  // Test 2: بررسی API Endpoints
-  async testApiEndpoints() {
-    const fs = require('fs').promises;
-    
-    try {
-      const routesContent = await fs.readFile('server/routes.ts', 'utf8');
-      
-      const requiredEndpoints = [
-        '/api/invoices/edit',
-        'executeAtomicInvoiceEdit',
-        'updateRepresentativeFinancials'
-      ];
-
-      for (const endpoint of requiredEndpoints) {
-        if (!routesContent.includes(endpoint)) {
-          throw new Error(`Missing endpoint: ${endpoint}`);
-        }
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`API endpoint validation failed: ${error.message}`);
-    }
-  }
-
-  // Test 3: بررسی Financial Engine
-  async testFinancialEngine() {
-    const fs = require('fs').promises;
-    
-    try {
-      const engineContent = await fs.readFile('server/services/unified-financial-engine.ts', 'utf8');
-      
-      const requiredMethods = [
-        'calculateRepresentative',
-        'syncRepresentativeDebt',
-        'forceInvalidateRepresentative',
-        'calculateGlobalSummary'
-      ];
-
-      for (const method of requiredMethods) {
-        if (!engineContent.includes(method)) {
-          throw new Error(`Missing method: ${method}`);
-        }
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`Financial engine validation failed: ${error.message}`);
-    }
-  }
-
-  // Test 4: بررسی UI Component
-  async testUIComponent() {
-    const fs = require('fs').promises;
-    
-    try {
-      const uiContent = await fs.readFile('client/src/components/invoice-edit-dialog.tsx', 'utf8');
-      
-      const requiredFeatures = [
-        'editMutation',
-        'calculateTotalAmount',
-        'sessionHealthy',
-        'SHERLOCK v28.0',
-        'invalidateQueries'
-      ];
-
-      for (const feature of requiredFeatures) {
-        if (!uiContent.includes(feature)) {
-          throw new Error(`Missing UI feature: ${feature}`);
-        }
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`UI component validation failed: ${error.message}`);
-    }
-  }
-
-  // Test 5: بررسی Database Schema
-  async testDatabaseSchema() {
-    const fs = require('fs').promises;
-    
-    try {
-      const storageContent = await fs.readFile('server/storage.ts', 'utf8');
-      
-      const requiredMethods = [
-        'updateInvoice',
-        'createInvoiceEdit', 
-        'executeAtomicInvoiceEdit',
-        'updateRepresentativeFinancials'
-      ];
-
-      for (const method of requiredMethods) {
-        if (!storageContent.includes(method)) {
-          throw new Error(`Missing storage method: ${method}`);
-        }
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`Database schema validation failed: ${error.message}`);
-    }
-  }
-
-  // Test 6: بررسی Error Handling
-  async testErrorHandling() {
-    const fs = require('fs').promises;
-    
-    try {
-      const routesContent = await fs.readFile('server/routes.ts', 'utf8');
-      
-      const errorHandlingFeatures = [
-        'try {',
-        'catch',
-        'error handling',
-        'validation',
-        'session validation'
-      ];
-
-      let foundFeatures = 0;
-      for (const feature of errorHandlingFeatures) {
-        if (routesContent.includes(feature)) {
-          foundFeatures++;
-        }
-      }
-
-      if (foundFeatures < 3) {
-        return 'warning';
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`Error handling validation failed: ${error.message}`);
-    }
-  }
-
-  // Test 7: بررسی Security Measures
-  async testSecurityMeasures() {
-    const fs = require('fs').promises;
-    
-    try {
-      const routesContent = await fs.readFile('server/routes.ts', 'utf8');
-      
-      const securityFeatures = [
-        'authMiddleware',
-        'session validation',
-        'authenticated',
-        'permission'
-      ];
-
-      let foundFeatures = 0;
-      for (const feature of securityFeatures) {
-        if (routesContent.includes(feature)) {
-          foundFeatures++;
-        }
-      }
-
-      if (foundFeatures < 2) {
-        throw new Error('Insufficient security measures');
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`Security validation failed: ${error.message}`);
-    }
-  }
-
-  // Test 8: بررسی Performance Optimizations
-  async testPerformanceOptimizations() {
-    const fs = require('fs').promises;
-    
-    try {
-      const engineContent = await fs.readFile('server/services/unified-financial-engine.ts', 'utf8');
-      
-      const performanceFeatures = [
-        'cache',
-        'invalidate',
-        'CACHE_TTL',
-        'background',
-        'batch'
-      ];
-
-      let foundFeatures = 0;
-      for (const feature of performanceFeatures) {
-        if (engineContent.includes(feature)) {
-          foundFeatures++;
-        }
-      }
-
-      if (foundFeatures < 3) {
-        return 'warning';
-      }
-      return true;
-    } catch (error) {
-      throw new Error(`Performance validation failed: ${error.message}`);
-    }
-  }
-
-  // اجرای تمام تست‌ها
-  async runAllTests() {
-    log.header('SHERLOCK v28.0: شروع تست جامع سیستم');
-    
-    await this.runTest('File Structure Integrity', () => this.testFileStructure());
-    await this.runTest('API Endpoints Validation', () => this.testApiEndpoints());
-    await this.runTest('Financial Engine Validation', () => this.testFinancialEngine());
-    await this.runTest('UI Component Validation', () => this.testUIComponent());
-    await this.runTest('Database Schema Validation', () => this.testDatabaseSchema());
-    await this.runTest('Error Handling Validation', () => this.testErrorHandling());
-    await this.runTest('Security Measures Validation', () => this.testSecurityMeasures());
-    await this.runTest('Performance Optimizations', () => this.testPerformanceOptimizations());
-
-    this.generateReport();
-  }
-
-  generateReport() {
-    log.header('گزارش نهایی تست سیستم');
-    
-    console.log(`📊 تعداد کل تست‌ها: ${this.testResults.total}`);
-    console.log(`${colors.green}✅ موفق: ${this.testResults.passed}${colors.reset}`);
-    console.log(`${colors.red}❌ ناموفق: ${this.testResults.failed}${colors.reset}`);
-    console.log(`${colors.yellow}⚠️  هشدار: ${this.testResults.warnings}${colors.reset}`);
-
-    const successRate = ((this.testResults.passed + this.testResults.warnings) / this.testResults.total * 100).toFixed(1);
-    const qualityScore = (this.testResults.passed / this.testResults.total * 100).toFixed(1);
-
-    console.log(`\n📈 نرخ موفقیت: ${successRate}%`);
-    console.log(`🏆 امتیاز کیفی: ${qualityScore}%`);
-
-    if (this.testResults.failed === 0) {
-      log.success('\n🎉 سیستم آماده استفاده در محیط پروداکشن است!');
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Invoice edit chain validation passed');
+      console.log(`📊 Financial sync duration: ${data.data.syncDuration}ms`);
+      results.passed++;
     } else {
-      log.error(`\n🚨 ${this.testResults.failed} مورد نیاز به بررسی دارد`);
+      console.log('❌ Invoice edit chain validation failed');
+      results.failed++;
     }
-
-    // تعیین وضعیت نهایی
-    let finalStatus = 'UNKNOWN';
-    if (this.testResults.failed === 0 && this.testResults.warnings <= 1) {
-      finalStatus = 'PRODUCTION READY ✅';
-    } else if (this.testResults.failed <= 1) {
-      finalStatus = 'NEEDS MINOR FIXES ⚠️';
-    } else {
-      finalStatus = 'NEEDS MAJOR FIXES ❌';
-    }
-
-    console.log(`\n🎯 وضعیت نهایی: ${finalStatus}`);
-    console.log(`📅 تاریخ تست: ${new Date().toLocaleString('fa-IR')}`);
+  } catch (error) {
+    console.log('❌ Invoice edit chain test error:', error.message);
+    results.failed++;
   }
+
+  // Test 4: System Integrity
+  try {
+    console.log('\n🔍 Test 4: System Integrity Validation');
+    const response = await fetch(`${baseUrl}/api/unified-financial/validate-system-integrity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ triggerReason: 'comprehensive_test' }),
+      credentials: 'include'
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ System integrity: ${data.validation.systemHealth}`);
+      console.log(`🧪 Tests passed: ${data.validation.validationTests.filter(t => t.status === 'PASS').length}/${data.validation.validationTests.length}`);
+      console.log(`⚠️ Warnings: ${data.validation.warnings.length}`);
+      console.log(`❌ Errors: ${data.validation.errors.length}`);
+      results.passed++;
+    } else {
+      console.log('❌ System integrity validation failed');
+      results.failed++;
+    }
+  } catch (error) {
+    console.log('❌ System integrity test error:', error.message);
+    results.failed++;
+  }
+
+  // Final Results
+  console.log('\n📋 COMPREHENSIVE TEST RESULTS:');
+  console.log(`✅ Passed: ${results.passed}`);
+  console.log(`❌ Failed: ${results.failed}`);
+  console.log(`⚠️ Warnings: ${results.warnings}`);
+
+  const successRate = (results.passed / (results.passed + results.failed)) * 100;
+  console.log(`📊 Success Rate: ${successRate.toFixed(1)}%`);
+
+  if (successRate >= 100) {
+    console.log('\n🎉 SYSTEM FULLY VALIDATED - READY FOR PRODUCTION');
+  } else if (successRate >= 75) {
+    console.log('\n✅ SYSTEM MOSTLY STABLE - MINOR ISSUES TO ADDRESS');
+  } else {
+    console.log('\n⚠️ SYSTEM NEEDS ATTENTION - CRITICAL ISSUES FOUND');
+  }
+
+  return results;
 }
 
-// اجرای تست‌ها
-async function main() {
-  const validator = new SystemValidator();
-  await validator.runAllTests();
-}
-
-if (require.main === module) {
-  main().catch(console.error);
-}
-
-module.exports = SystemValidator;
+// Run the test
+runComprehensiveTest().catch(console.error);

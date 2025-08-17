@@ -741,12 +741,6 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
   }
 });
 
-export default router;
-
-// Named export function for integration
-export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
-  app.use('/api/unified-financial', router);
-}
 /**
  * ✅ SHERLOCK v27.0: Batch financial calculation for multiple representatives
  * POST /api/unified-financial/batch-calculate
@@ -1080,6 +1074,126 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: "خطا در اعتبارسنجی اتمیک سیستم"
+    });
+  }
+});
+
+// Named export function for integration
+export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
+  app.use('/api/unified-financial', router);
+}
+
+/**
+ * ✅ SHERLOCK v28.0: Financial Consistency Validation
+ * POST /api/unified-financial/validate-consistency
+ */
+router.post('/validate-consistency', requireAuth, async (req, res) => {
+  try {
+    console.log('🔍 SHERLOCK v28.0: Financial consistency validation requested');
+
+    const { FinancialConsistencyEngine } = await import('../services/financial-consistency-engine.js');
+    const validationResult = await FinancialConsistencyEngine.validateFinancialConsistency();
+
+    console.log(`✅ SHERLOCK v28.0: Validation completed - ${validationResult.summary.inconsistentCount} inconsistencies found`);
+
+    res.json({
+      success: true,
+      validation: validationResult,
+      recommendation: validationResult.isValid ? 
+        "✅ سیستم مالی ثبات کامل دارد" : 
+        `⚠️ ${validationResult.summary.inconsistentCount} ناسازگاری یافت شد و اصلاح شد`,
+      nextValidation: new Date(Date.now() + (6 * 60 * 60 * 1000)).toISOString() // 6 hours
+    });
+
+  } catch (error) {
+    console.error('❌ Financial consistency validation error:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در اعتبارسنجی ثبات مالی",
+      details: error.message
+    });
+  }
+});
+
+/**
+ * ✅ SHERLOCK v28.0: System-wide Financial Correction
+ * POST /api/unified-financial/perform-system-correction
+ */
+router.post('/perform-system-correction', requireAuth, async (req, res) => {
+  try {
+    console.log('🔧 SHERLOCK v28.0: System-wide correction requested');
+
+    const { FinancialConsistencyEngine } = await import('../services/financial-consistency-engine.js');
+    const correctionResult = await FinancialConsistencyEngine.performSystemCorrection();
+
+    console.log(`✅ SHERLOCK v28.0: System correction completed - ${correctionResult.corrections} corrections made`);
+
+    res.json({
+      success: correctionResult.success,
+      corrections: correctionResult.corrections,
+      errors: correctionResult.errors,
+      duration: correctionResult.duration,
+      message: correctionResult.success ? 
+        `✅ سیستم اصلاح شد - ${correctionResult.corrections} اصلاحیه اعمال شد` :
+        "⚠️ هیچ اصلاحیه‌ای لازم نبود یا خطا رخ داد",
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ System correction error:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در اصلاح سیستم مالی",
+      details: error.message
+    });
+  }
+});
+
+/**
+ * ✅ SHERLOCK v28.0: Financial Monitoring Control
+ * POST /api/unified-financial/start-monitoring
+ */
+router.post('/start-monitoring', requireAuth, async (req, res) => {
+  try {
+    const { intervalMinutes = 30 } = req.body;
+    
+    const { financialMonitoringService } = await import('../services/financial-monitoring-service.js');
+    financialMonitoringService.startMonitoring(intervalMinutes);
+    
+    res.json({
+      success: true,
+      message: `📊 نظارت مالی با فاصله ${intervalMinutes} دقیقه شروع شد`,
+      status: financialMonitoringService.getMonitoringStatus(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "خطا در شروع نظارت مالی",
+      details: error.message
+    });
+  }
+});
+
+/**
+ * ✅ SHERLOCK v28.0: Financial Monitoring Status
+ * GET /api/unified-financial/monitoring-status
+ */
+router.get('/monitoring-status', requireAuth, async (req, res) => {
+  try {
+    const { financialMonitoringService } = await import('../services/financial-monitoring-service.js');
+    const status = financialMonitoringService.getMonitoringStatus();
+    
+    res.json({
+      success: true,
+      monitoring: status,
+      systemHealth: status.isActive ? "MONITORED" : "UNMONITORED",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "خطا در دریافت وضعیت نظارت"
     });
   }
 });

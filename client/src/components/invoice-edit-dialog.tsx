@@ -272,6 +272,25 @@ export default function InvoiceEditDialog({
         }
       }
 
+      // ✅ SHERLOCK v28.0: Post-edit consistency validation
+      try {
+        console.log('🔍 Running post-edit consistency validation...');
+        const postValidation = await apiRequest('/api/unified-financial/validate-consistency', {
+          method: 'POST'
+        });
+        
+        if (!postValidation.validation.isValid) {
+          console.warn('⚠️ Post-edit validation found inconsistencies:', postValidation.validation.summary);
+          toast({
+            title: "اعلان اصلاح خودکار",
+            description: `${postValidation.validation.summary.inconsistentCount} ناسازگاری شناسایی و اصلاح شد`,
+            variant: "default"
+          });
+        }
+      } catch (validationError) {
+        console.warn('Post-edit validation failed (non-critical):', validationError);
+      }
+
       setIsProcessing(false);
       setEditMode(false);
       setIsOpen(false);
@@ -459,6 +478,27 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         variant: "destructive"
       });
       return;
+    }
+
+    // ✅ SHERLOCK v28.0: Pre-save financial consistency check
+    if (Math.abs(calculatedAmount - originalAmount) > 50000) {
+      try {
+        console.log('🔍 Large amount change detected, validating financial consistency...');
+        const preValidation = await apiRequest('/api/unified-financial/validate-consistency', {
+          method: 'POST'
+        });
+        
+        if (!preValidation.validation.isValid) {
+          toast({
+            title: "هشدار ثبات مالی",
+            description: "سیستم مالی ناسازگاری دارد. لطفاً ابتدا اصلاح کنید.",
+            variant: "destructive"
+          });
+          return;
+        }
+      } catch (error) {
+        console.warn('Pre-validation failed, continuing with edit:', error);
+      }
     }
 
     if (!sessionHealthy) {
