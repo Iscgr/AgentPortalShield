@@ -31,8 +31,8 @@ import workspaceRouter from './routes/workspace-routes';
 
 export function registerRoutes(app: express.Application) {
   
-  // Default route
-  app.get("/", (req, res) => {
+  // API status route - moved to /api/status to avoid conflicts with frontend
+  app.get("/api/status", (req, res) => {
     res.send("SHERLOCK v28.0 API is running!");
   });
 
