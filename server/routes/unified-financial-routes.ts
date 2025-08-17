@@ -741,11 +741,12 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
   }
 });
 
+export default router;
+
 // Named export function for integration
 export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
   app.use('/api/unified-financial', router);
 }
-
 /**
  * ✅ SHERLOCK v27.0: Batch financial calculation for multiple representatives
  * POST /api/unified-financial/batch-calculate
@@ -1082,4 +1083,4 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
   }
 });
 
-// ✅ Single export default at the end of file
+export default router;
