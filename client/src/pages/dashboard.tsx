@@ -187,15 +187,15 @@ function ActivityItem({ activity }: { activity: any }) {
   );
 }
 
-// ✅ SHERLOCK v32.0: Enhanced Overdue Invoices Widget - Fixed and Optimized
+// ✅ SHERLOCK v32.0: Enhanced Overdue Invoices Widget - Fixed with Proper Endpoint
 const OverdueInvoicesCard = () => {
-  const { data: debtorData, isLoading: debtorLoading, error: debtorError } = useQuery({
-    queryKey: ["/api/unified-financial/debtors"],
+  const { data: overdueData, isLoading: debtorLoading, error: debtorError } = useQuery({
+    queryKey: ["/api/unified-financial/overdue-analysis"],
     queryFn: async () => {
-      console.log('🔍 SHERLOCK v32.0: Fetching overdue debtors for dashboard widget...');
-      return apiRequest("/api/unified-financial/debtors?limit=50");
+      console.log('🔍 SHERLOCK v32.0: Fetching accurate overdue analysis for dashboard widget...');
+      return apiRequest("/api/unified-financial/overdue-analysis");
     },
-    select: (response: any) => response?.data || response || [],
+    select: (response: any) => response?.data || response || {},
     staleTime: 30000,
     refetchInterval: 45000
   });
@@ -217,7 +217,7 @@ const OverdueInvoicesCard = () => {
     );
   }
 
-  if (debtorError || !debtorData) {
+  if (debtorError || !overdueData) {
     console.error('🔍 SHERLOCK v32.0: Error in overdue invoices widget:', debtorError);
     return (
       <Card>
@@ -241,62 +241,45 @@ const OverdueInvoicesCard = () => {
     );
   }
 
-  console.log('🔍 SHERLOCK v32.0: Processing debtor data for overdue widget:', {
-    totalDebtors: Array.isArray(debtorData) ? debtorData.length : 0,
-    dataStructure: debtorData?.[0] || 'No data'
+  console.log('🔍 SHERLOCK v32.0: Processing overdue analysis data for widget:', {
+    overdueAmount: overdueData?.totals?.totalOverdueAmount || 0,
+    overdueCount: overdueData?.representatives?.length || 0,
+    dataStructure: overdueData?.totals || 'No totals data'
   });
 
-  // ✅ SHERLOCK v32.0: Enhanced filtering for truly overdue debtors
-  const overdueDebtors = Array.isArray(debtorData) 
-    ? debtorData.filter(debtor => {
-        const debt = debtor.actualDebt || debtor.debt || debtor.totalDebt || 0;
-        const level = debtor.debtLevel || 'UNKNOWN';
+  // ✅ SHERLOCK v32.0: Use accurate overdue data from dedicated endpoint
+  const overdueRepresentatives = overdueData?.representatives || [];
+  const totalOverdueAmount = overdueData?.totals?.totalOverdueAmount || 0;
+  const overdueInvoicesCount = overdueData?.totals?.overdueInvoicesCount || 0;
 
-        // Consider as overdue if:
-        // 1. Debt level is HIGH or CRITICAL
-        // 2. Debt amount is over 3 million Toman (significant amount)
-        // 3. Payment ratio is very low (less than 50%)
-        return (
-          level === 'HIGH' || 
-          level === 'CRITICAL' ||
-          debt > 3000000 ||
-          (debtor.paymentRatio !== undefined && debtor.paymentRatio < 0.5)
-        );
-      })
-    : [];
-
-  const totalOverdueAmount = overdueDebtors.reduce((sum, debtor) => {
-    const debt = debtor.actualDebt || debtor.debt || debtor.totalDebt || 0;
-    return sum + debt;
-  }, 0);
-
-  const criticalDebtors = overdueDebtors.filter(d => 
-    d.debtLevel === 'CRITICAL' || (d.actualDebt || 0) > 10000000
+  const criticalDebtors = overdueRepresentatives.filter(rep => 
+    rep.overdueAmount > 10000000
   );
 
   console.log('🔍 SHERLOCK v32.0: Overdue analysis complete:', {
-    totalOverdue: overdueDebtors.length,
+    totalOverdue: overdueRepresentatives.length,
     criticalCount: criticalDebtors.length,
-    totalAmount: totalOverdueAmount
+    totalAmount: totalOverdueAmount,
+    correctedAmount: `${totalOverdueAmount.toLocaleString()} تومان (اصلاح شده)`
   });
 
   return (
-    <Card className={overdueDebtors.length > 10 ? "border-red-200 bg-red-50" : ""}>
+    <Card className={overdueRepresentatives.length > 10 ? "border-red-200 bg-red-50" : ""}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">مطالبات معوق</CardTitle>
         <AlertTriangle className={`h-4 w-4 ${
           criticalDebtors.length > 0 ? 'text-red-500' : 
-          overdueDebtors.length > 5 ? 'text-orange-500' : 
+          overdueRepresentatives.length > 5 ? 'text-orange-500' : 
           'text-muted-foreground'
         }`} />
       </CardHeader>
       <CardContent>
         <div className={`text-2xl font-bold ${
           criticalDebtors.length > 0 ? 'text-red-600' : 
-          overdueDebtors.length > 5 ? 'text-orange-600' : 
-          overdueDebtors.length > 0 ? 'text-yellow-600' : 'text-green-600'
+          overdueRepresentatives.length > 5 ? 'text-orange-600' : 
+          overdueRepresentatives.length > 0 ? 'text-yellow-600' : 'text-green-600'
         }`}>
-          {toPersianDigits(overdueDebtors.length.toString())}
+          {toPersianDigits(overdueInvoicesCount.toString())}
         </div>
         <p className="text-xs text-muted-foreground">
           مجموع: {formatCurrency(totalOverdueAmount)}
@@ -311,15 +294,15 @@ const OverdueInvoicesCard = () => {
         )}
 
         <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
-          {overdueDebtors.slice(0, 4).map((debtor, index) => {
-            const debt = debtor.actualDebt || debtor.debt || debtor.totalDebt || 0;
-            const isCritical = debtor.debtLevel === 'CRITICAL' || debt > 10000000;
+          {overdueRepresentatives.slice(0, 4).map((rep, index) => {
+            const debt = rep.overdueAmount || 0;
+            const isCritical = debt > 10000000;
 
             return (
-              <div key={debtor.id || index} className="flex justify-between text-xs">
+              <div key={rep.representativeId || index} className="flex justify-between text-xs">
                 <span className="truncate flex items-center">
                   {isCritical && <span className="w-2 h-2 bg-red-500 rounded-full mr-1"></span>}
-                  {debtor.name || debtor.representativeName}
+                  {rep.representativeName}
                 </span>
                 <span className={`font-mono ${isCritical ? 'text-red-700 font-bold' : 'text-red-600'}`}>
                   {formatCurrency(debt)}
@@ -327,14 +310,14 @@ const OverdueInvoicesCard = () => {
               </div>
             );
           })}
-          {overdueDebtors.length > 4 && (
+          {overdueRepresentatives.length > 4 && (
             <div className="text-xs text-gray-500 text-center pt-1 border-t">
-              و {toPersianDigits((overdueDebtors.length - 4).toString())} مورد دیگر...
+              و {toPersianDigits((overdueRepresentatives.length - 4).toString())} مورد دیگر...
             </div>
           )}
         </div>
 
-        {overdueDebtors.length === 0 && (
+        {overdueRepresentatives.length === 0 && (
           <div className="text-center mt-2">
             <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
               ✅ بدون مطالبات معوق
