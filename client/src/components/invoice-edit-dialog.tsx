@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Edit3, Plus, Trash2, Save, AlertTriangle, History, DollarSign, Clock, User, Calendar, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/auth-context";
+import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 import { useCrmAuth } from "@/hooks/use-crm-auth";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -68,12 +68,11 @@ export default function InvoiceEditDialog({
   const queryClient = useQueryClient();
 
   // SHERLOCK v1.0: UNIFIED AUTHENTICATION SYSTEM
-  const adminAuth = useAuth();
-  const crmAuth = useCrmAuth();
+  const unifiedAuth = useUnifiedAuth();
 
   // Determine authentication status
-  const isAuthenticated = adminAuth.isAuthenticated || crmAuth.isAuthenticated;
-  const currentUser = adminAuth.isAuthenticated ? adminAuth.user : crmAuth.user;
+  const isAuthenticated = unifiedAuth.isAuthenticated;
+  const currentUser = unifiedAuth.user;
   const currentUsername = currentUser?.username || 'unknown';
 
   // Authentication check with proper error handling
@@ -108,7 +107,7 @@ export default function InvoiceEditDialog({
   // Session health check function
   const checkSessionHealth = async () => {
     try {
-      const endpoint = adminAuth.isAuthenticated ? '/api/auth/check' : '/api/crm/auth/user';
+      const endpoint = unifiedAuth.userType === 'ADMIN' ? '/api/auth/check' : '/api/crm/auth/user';
       const response = await fetch(endpoint, {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
