@@ -80,6 +80,11 @@ export class UnifiedFinancialEngine {
   private static invalidationQueue = new Set<string>();
   private static lastInvalidation = new Map<string, number>();
 
+  // Query rate limiting to prevent database overload
+  private static queryQueue = new Map<string, Promise<any>>();
+  private static lastQueryTime = new Map<string, number>();
+  private static readonly MIN_QUERY_INTERVAL = 100; // Minimum 100ms between identical queries
+
   // Placeholder for storage access, assuming it's initialized elsewhere or will be injected
   private storage: any; // Replace 'any' with the actual storage type if available
 
@@ -185,6 +190,46 @@ export class UnifiedFinancialEngine {
   }
 
   /**
+   * ✅ SHERLOCK v28.1: Query rate limiting to prevent database overload
+   */
+  private static async rateLimit(queryKey: string, queryFn: () => Promise<any>): Promise<any> {
+    // Check if there's already a pending query for this key
+    const existingQuery = this.queryQueue.get(queryKey);
+    if (existingQuery) {
+      return existingQuery;
+    }
+
+    // Check if we need to throttle this query
+    const lastQuery = this.lastQueryTime.get(queryKey) || 0;
+    const now = Date.now();
+    
+    if (now - lastQuery < this.MIN_QUERY_INTERVAL) {
+      // Return cached result if available
+      const cached = this.queryCache.get(queryKey);
+      if (cached && this.isCacheValid(queryKey, cached.timestamp, this.QUERY_CACHE_TTL)) {
+        return cached.data;
+      }
+    }
+
+    // Execute the query
+    const queryPromise = queryFn();
+    this.queryQueue.set(queryKey, queryPromise);
+    this.lastQueryTime.set(queryKey, now);
+
+    try {
+      const result = await queryPromise;
+      // Cache the result
+      this.queryCache.set(queryKey, {
+        data: result,
+        timestamp: now
+      });
+      return result;
+    } finally {
+      this.queryQueue.delete(queryKey);
+    }
+  }
+
+  /**
    * ✅ SHERLOCK v23.0: محاسبه صحیح مالی نماینده طبق تعاریف استاندارد
    */
   async calculateRepresentative(representativeId: number): Promise<UnifiedFinancialData> {
@@ -276,19 +321,24 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ SHERLOCK v23.0: محاسبه صحیح آمار کلی سیستم
+   * ✅ SHERLOCK v28.1: محاسبه بهینه آمار کلی سیستم با کاهش تعداد کوئری
    */
   async calculateGlobalSummary(): Promise<GlobalFinancialSummary> {
-    console.log("🧮 UNIFIED FINANCIAL ENGINE v23.0: Calculating corrected global summary...");
+    console.log("🧮 UNIFIED FINANCIAL ENGINE v28.1: Optimized global summary calculation...");
 
-    // Count representatives
-    const repCounts = await db.select({
-      total: sql<number>`COUNT(*)`,
-      active: sql<number>`SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END)`
-    }).from(representatives);
+    // Single optimized query for all representative stats
+    const [repStats, systemSales, systemPaid] = await Promise.all([
+      // Get all representative counts and debt distribution in one query
+      db.select({
+        total: sql<number>`COUNT(*)`,
+        active: sql<number>`SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END)`,
+        healthy: sql<number>`SUM(CASE WHEN CAST(total_debt as DECIMAL) = 0 THEN 1 ELSE 0 END)`,
+        moderate: sql<number>`SUM(CASE WHEN CAST(total_debt as DECIMAL) > 0 AND CAST(total_debt as DECIMAL) <= 100000 THEN 1 ELSE 0 END)`,
+        high: sql<number>`SUM(CASE WHEN CAST(total_debt as DECIMAL) > 100000 AND CAST(total_debt as DECIMAL) <= 500000 THEN 1 ELSE 0 END)`,
+        critical: sql<number>`SUM(CASE WHEN CAST(total_debt as DECIMAL) > 500000 THEN 1 ELSE 0 END)`,
+        totalSystemDebt: sql<number>`COALESCE(SUM(CAST(total_debt as DECIMAL)), 0)`
+      }).from(representatives),
 
-    // ✅ محاسبه صحیح آمار کلی سیستم
-    const [systemSales, systemPaid] = await Promise.all([
       // فروش کل سیستم = مجموع کل فاکتورهای صادر شده
       db.select({
         totalSystemSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
@@ -302,44 +352,33 @@ export class UnifiedFinancialEngine {
 
     const totalSystemSales = systemSales[0].totalSystemSales;
     const totalSystemPaid = systemPaid[0].totalSystemPaid;
-    const totalSystemDebt = Math.max(0, totalSystemSales - totalSystemPaid); // بدهی کل سیستم
-
-    // Simple debt distribution count based on standard debt calculation
-    const allRepsWithDebt = await this.calculateAllRepresentativesDebt();
-
-    let healthy = 0, moderate = 0, high = 0, critical = 0;
-
-    allRepsWithDebt.forEach(rep => {
-      const debt = rep.actualDebt;
-      if (debt === 0) healthy++;
-      else if (debt <= 100000) moderate++;
-      else if (debt <= 500000) high++;
-      else critical++;
-    });
+    const totalSystemDebt = repStats[0].totalSystemDebt; // Use cached debt from representatives table
 
     const systemAccuracy = 100; // Guaranteed by real-time calculations
 
     // Determine data integrity
     let dataIntegrity: 'EXCELLENT' | 'GOOD' | 'NEEDS_ATTENTION';
-    const criticalRatio = repCounts[0].total > 0 ? (critical / repCounts[0].total) * 100 : 0;
+    const criticalRatio = repStats[0].total > 0 ? (repStats[0].critical / repStats[0].total) * 100 : 0;
 
     if (criticalRatio < 10) dataIntegrity = 'EXCELLENT';
     else if (criticalRatio < 25) dataIntegrity = 'GOOD';
     else dataIntegrity = 'NEEDS_ATTENTION';
 
+    console.log(`✅ SHERLOCK v28.1: Optimized calculation completed - ${repStats[0].total} reps, ${Math.round(totalSystemDebt).toLocaleString()} debt`);
+
     return {
-      totalRepresentatives: repCounts[0].total,
-      activeRepresentatives: repCounts[0].active,
+      totalRepresentatives: repStats[0].total,
+      activeRepresentatives: repStats[0].active,
 
       // ✅ آمار صحیح سیستم
       totalSystemSales,
       totalSystemPaid,
       totalSystemDebt,
 
-      healthyReps: healthy,
-      moderateReps: moderate,
-      highRiskReps: high,
-      criticalReps: critical,
+      healthyReps: repStats[0].healthy,
+      moderateReps: repStats[0].moderate,
+      highRiskReps: repStats[0].high,
+      criticalReps: repStats[0].critical,
 
       systemAccuracy,
       lastCalculationTime: new Date().toISOString(),
@@ -521,27 +560,28 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * Real-time debtor list - ULTRA OPTIMIZED v18.7
+   * Real-time debtor list - ULTRA OPTIMIZED v28.1 - Reduced query load
    */
   async getDebtorRepresentatives(limit: number = 30): Promise<DebtorRepresentative[]> {
     try {
-      console.log(`🚀 SHERLOCK v23.1: Optimized batch calculation for ${limit} debtors`);
+      console.log(`🚀 SHERLOCK v28.1: Ultra-optimized batch calculation for ${limit} debtors`);
 
-      // Single optimized query to get all required data
+      // Single optimized query to get all required data without individual calculations
       const debtorsQuery = await db.select({
         id: representatives.id,
         name: representatives.name,
         code: representatives.code,
         totalDebt: representatives.totalDebt,
-        totalSales: representatives.totalSales
+        totalSales: representatives.totalSales,
+        updatedAt: representatives.updatedAt
       }).from(representatives)
         .where(sql`CAST(total_debt as DECIMAL) > 1000`)
         .orderBy(sql`CAST(total_debt as DECIMAL) desc`)
         .limit(limit);
 
-      console.log(`⚡ Batch query completed for ${debtorsQuery.length} records`);
+      console.log(`⚡ Ultra-fast batch query completed for ${debtorsQuery.length} records`);
 
-      // Transform to required format
+      // Transform to required format using cached data
       const debtors: DebtorRepresentative[] = debtorsQuery.map(rep => {
         const debt = parseFloat(rep.totalDebt) || 0;
         const sales = parseFloat(rep.totalSales) || 0;
@@ -555,7 +595,7 @@ export class UnifiedFinancialEngine {
           totalPaid: Math.max(0, sales - debt),
           paymentRatio: sales > 0 ? ((sales - debt) / sales) * 100 : 0,
           debtLevel: debt > 500000 ? 'CRITICAL' : debt > 100000 ? 'HIGH' : 'MODERATE',
-          lastTransactionDate: new Date().toISOString()
+          lastTransactionDate: rep.updatedAt?.toISOString() || new Date().toISOString()
         };
       });
 
