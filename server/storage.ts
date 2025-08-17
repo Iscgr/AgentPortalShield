@@ -1609,15 +1609,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoiceEditHistory(invoiceId: number): Promise<InvoiceEdit[]> {
-    return await withDatabaseRetry(
-      () => db.select().from(invoiceEdits)
-        .where(and(
-          eq(invoiceEdits.invoiceId, invoiceId),
-          eq(invoiceEdits.isActive, true)
-        ))
-        .orderBy(desc(invoiceEdits.createdAt)),
-      'getInvoiceEditHistory'
-    );
+    try {
+      const editHistory = await db.select({
+        id: invoiceEdits.id,
+        editType: invoiceEdits.editType,
+        editReason: invoiceEdits.editReason,
+        originalAmount: invoiceEdits.originalAmount,
+        editedAmount: invoiceEdits.editedAmount,
+        editedBy: invoiceEdits.editedBy,
+        createdAt: invoiceEdits.createdAt,
+        transactionId: invoiceEdits.transactionId
+      })
+      .from(invoiceEdits)
+      .where(eq(invoiceEdits.invoiceId, invoiceId))
+      .orderBy(desc(invoiceEdits.createdAt));
+
+      return editHistory.map(edit => ({
+        ...edit,
+        amountChange: edit.editedAmount ? 
+          (parseFloat(edit.editedAmount.toString()) - parseFloat(edit.originalAmount?.toString() || '0')) : 0,
+        createdAt: edit.createdAt?.toISOString()
+      }));
+    } catch (error) {
+      console.error('Error fetching invoice edit history:', error);
+      return [];
+    }
   }
 
   async updateRepresentativeDebt(invoiceId: number, originalAmount: number, editedAmount: number): Promise<void> {
@@ -1992,7 +2008,7 @@ export class DatabaseStorage implements IStorage {
 
           // ENHANCED: Complete financial synchronization
           await this.updateRepresentativeFinancials(invoice.representativeId);
-          
+
           // SHERLOCK v1.0: Force unified financial engine synchronization
           try {
             const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine');

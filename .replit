@@ -48,5 +48,22 @@ mode = "sequential"
 task = "shell.exec"
 args = "npm run dev"
 
+[[workflows.workflow]]
+name = "Deploy Invoice Edit System"
+author = 45267462
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run deploy"
+
 [agent]
 integrations = ["javascript_auth_all_persistance==1.0.0", "javascript_database==1.0.0", "javascript_xai==1.0.0"]
