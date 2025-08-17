@@ -16,7 +16,8 @@ import {
   Trash2,
   AlertTriangle,
   RotateCcw,
-  Database
+  Database,
+  SendToBack
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,9 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { toPersianDigits } from "@/lib/persian-date";
+import { FinancialIntegrityDashboard } from '../components/financial-integrity-dashboard';
+import { BatchRollbackManager } from '../components/batch-rollback-manager';
+import { UnifiedAuthContext } from '../contexts/unified-auth-context';
 
 const telegramSettingsSchema = z.object({
   botToken: z.string().min(1, "توکن ربات الزامی است"),
@@ -111,15 +115,15 @@ export default function Settings() {
   const { data: telegramBotToken } = useQuery({
     queryKey: ["/api/settings/telegram_bot_token"]
   });
-  
+
   const { data: telegramChatId } = useQuery({
     queryKey: ["/api/settings/telegram_chat_id"]
   });
-  
+
   const { data: telegramTemplate } = useQuery({
     queryKey: ["/api/settings/telegram_template"]
   });
-  
+
 
 
   // Fetch invoice template settings
@@ -147,15 +151,15 @@ export default function Settings() {
   const { data: portalTitle } = useQuery({
     queryKey: ["/api/settings/portal_title"]
   });
-  
+
   const { data: portalDescription } = useQuery({
     queryKey: ["/api/settings/portal_description"]
   });
-  
+
   const { data: showOwnerName } = useQuery({
     queryKey: ["/api/settings/portal_show_owner_name"]
   });
-  
+
   const { data: showDetailedUsage } = useQuery({
     queryKey: ["/api/settings/portal_show_detailed_usage"]
   });
@@ -237,7 +241,7 @@ export default function Settings() {
     if ((telegramBotToken as any)?.value) telegramForm.setValue('botToken', (telegramBotToken as any).value);
     if ((telegramChatId as any)?.value) telegramForm.setValue('chatId', (telegramChatId as any).value);
     if ((telegramTemplate as any)?.value) telegramForm.setValue('template', (telegramTemplate as any).value);
-    
+
     // Update invoice template form with settings values
     if ((showUsageDetails as any)?.value !== undefined) {
       invoiceTemplateForm.setValue('showUsageDetails', (showUsageDetails as any).value === 'true');
@@ -254,7 +258,7 @@ export default function Settings() {
     if ((showAdminUsername as any)?.value !== undefined) {
       invoiceTemplateForm.setValue('showAdminUsername', (showAdminUsername as any).value === 'true');
     }
-    
+
     // Update portal form
     if ((portalTitle as any)?.value) portalForm.setValue('portalTitle', (portalTitle as any).value);
     if ((portalDescription as any)?.value) portalForm.setValue('portalDescription', (portalDescription as any).value);
@@ -345,10 +349,10 @@ export default function Settings() {
         data: { apiKey: data.xaiApiKey }
       });
       const result = response;
-      
+
       await updateSettingMutation.mutateAsync({ key: 'ai_auto_analysis', value: data.enableAutoAnalysis.toString() });
       await updateSettingMutation.mutateAsync({ key: 'ai_analysis_frequency', value: data.analysisFrequency });
-      
+
       toast({
         title: "تنظیمات xAI Grok ذخیره شد",
         description: result.message,
@@ -450,7 +454,7 @@ export default function Settings() {
 
   const onDataResetSubmit = async (data: DataResetData) => {
     const selectedItems = Object.entries(data).filter(([key, value]) => value).map(([key]) => key);
-    
+
     if (selectedItems.length === 0) {
       toast({
         title: "هیچ موردی انتخاب نشده",
@@ -473,7 +477,7 @@ export default function Settings() {
             تنظیمات سیستم، یکپارچگی‌ها و پیکربندی
           </p>
         </div>
-        
+
         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
           نسخه ۱.۰.۰
         </Badge>
@@ -540,7 +544,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={telegramForm.control}
                       name="chatId"
@@ -557,7 +561,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="flex items-center space-x-4 space-x-reverse pt-4">
                       <Button 
                         type="submit" 
@@ -566,7 +570,7 @@ export default function Settings() {
                         <Save className="w-4 h-4 mr-2" />
                         {updateSettingMutation.isPending ? "در حال ذخیره..." : "ذخیره تنظیمات"}
                       </Button>
-                      
+
                       <Button 
                         type="button" 
                         variant="outline"
@@ -616,7 +620,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="pt-4">
                       <Button 
                         type="submit" 
@@ -662,7 +666,7 @@ export default function Settings() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={portalForm.control}
                     name="portalDescription"
@@ -683,7 +687,7 @@ export default function Settings() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={portalForm.control}
@@ -705,7 +709,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={portalForm.control}
                       name="showDetailedUsage"
@@ -727,7 +731,7 @@ export default function Settings() {
                       )}
                     />
                   </div>
-                  
+
                   <FormField
                     control={portalForm.control}
                     name="customCss"
@@ -757,7 +761,7 @@ export default function Settings() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <div className="pt-4">
                     <Button 
                       type="submit" 
@@ -771,7 +775,7 @@ export default function Settings() {
               </Form>
             </CardContent>
           </Card>
-          
+
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>پیش‌نمایش پرتال</CardTitle>
@@ -834,7 +838,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={invoiceTemplateForm.control}
                       name="invoiceFooter"
@@ -851,7 +855,7 @@ export default function Settings() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={invoiceTemplateForm.control}
                       name="showUsageDetails"
@@ -1063,7 +1067,7 @@ export default function Settings() {
                       {testGrokConnectionMutation.isPending ? "در حال تست..." : "تست اتصال"}
                     </Button>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
@@ -1087,7 +1091,7 @@ export default function Settings() {
                         )}
                       />
                     </div>
-                    
+
                     <FormField
                       control={aiForm.control}
                       name="analysisFrequency"
@@ -1441,7 +1445,7 @@ export default function Settings() {
                               </AlertDialogTitle>
                               <AlertDialogDescription>
                                 آیا از حذف اطلاعات انتخاب‌شده اطمینان دارید؟ این عملیات غیرقابل برگشت است و تمام داده‌های مرتبط حذف خواهد شد.
-                                
+
                                 <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                                   <p className="text-sm font-medium text-red-800 dark:text-red-200">
                                     موارد انتخاب‌شده:

@@ -335,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SHERLOCK v27.0: Redirect to unified financial engine
       const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
       const debtors = await unifiedFinancialEngine.getDebtorRepresentatives(10);
-      
+
       const dashboardData = {
         totalRevenue: globalSummary.totalSystemPaid.toString(),
         totalDebt: globalSummary.totalSystemDebt.toString(),
@@ -345,7 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSalesPartners: 0, // محاسبه جداگانه
         recentActivities: []
       };
-      
+
       res.json(dashboardData);
     } catch (error) {
       res.status(500).json({ error: "خطا در دریافت اطلاعات داشبورد" });
@@ -2139,7 +2139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sessionId = req.sessionID;
     const userId = (req.session as any)?.userId || (req.session as any)?.crmUserId;
     const username = (req.session as any)?.username || (req.session as any)?.crmUsername || 'unknown';
-    
+
     debug.info('Invoice Edit Request Started', {
       sessionId,
       userId,
@@ -2199,7 +2199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 💾 SHERLOCK v12.0: ATOMIC EDIT TRANSACTION WITH SESSION VALIDATION
       debug.info('Creating Edit Record', { invoiceId, editedBy });
-      
+
       // Pre-edit session health check
       const preEditSessionState = {
         sessionId,
@@ -2209,9 +2209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cookieMaxAge: req.session?.cookie?.maxAge,
         timestamp: new Date().toISOString()
       };
-      
+
       debug.info('Pre-Edit Session State', preEditSessionState);
-      
+
       // Create an invoice edit record for audit
       const editRecord = await storage.createInvoiceEdit({
         invoiceId,
@@ -2224,12 +2224,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         editedBy,
         timestamp: new Date()
       });
-      
+
       debug.success('Edit Record Created', { editRecordId: editRecord.id });
 
       // Execute atomic transaction for invoice editing
       const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       debug.info('Starting Invoice Update Transaction', { transactionId });
 
       // Update the invoice
@@ -2238,7 +2238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         usageData: editedUsageData,
         editedAt: new Date()
       });
-      
+
       debug.success('Invoice Updated Successfully', { invoiceId, newAmount: editedAmount });
 
       // ✅ SHERLOCK v24.1: Automatic financial synchronization after invoice edit
@@ -2272,13 +2272,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cookieMaxAge: req.session?.cookie?.maxAge,
         timestamp: new Date().toISOString()
       };
-      
+
       debug.info('Post-Edit Session State', postEditSessionState);
-      
+
       const sessionIntact = preEditSessionState.hasSession === postEditSessionState.hasSession &&
                             preEditSessionState.authenticated === postEditSessionState.authenticated &&
                             preEditSessionState.crmAuthenticated === postEditSessionState.crmAuthenticated;
-      
+
       debug.info('Session Integrity Check', {
         sessionIntact,
         preEdit: preEditSessionState,
@@ -2315,7 +2315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           crmAuthenticated: (req.session as any)?.crmAuthenticated
         }
       });
-      
+
       res.status(500).json({
         error: 'خطا در ویرایش فاکتور',
         details: error.message,
