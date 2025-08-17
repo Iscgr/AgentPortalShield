@@ -15,7 +15,7 @@ import AiChat from "@/components/ai-chat";
 import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiRequest } from "@/lib/axios";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DashboardData {
   totalRevenue: number;
