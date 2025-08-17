@@ -68,7 +68,7 @@ export class UnifiedFinancialEngine {
   private static readonly CACHE_TTL = 30 * 1000; // Reduced to 30 seconds for faster updates
   private static readonly QUERY_CACHE_TTL = 10 * 1000; // Reduced to 10 seconds for real-time feel
   private static queryCache = new Map<string, { data: any; timestamp: number }>();
-  
+
   // Real-time cache invalidation tracking
   private static invalidationQueue = new Set<string>();
   private static lastInvalidation = new Map<string, number>();
@@ -89,15 +89,15 @@ export class UnifiedFinancialEngine {
     immediate?: boolean;
   } = {}): void {
     const { cascadeGlobal = true, reason = "manual", immediate = true } = options;
-    
+
     console.log(`🔄 SHERLOCK v28.0: Starting cache invalidation for rep ${representativeId}, reason: ${reason}`);
-    
+
     const cacheKeys = [
       `rep_calc_${representativeId}`,
       `rep_financial_${representativeId}`,
       `rep_sync_${representativeId}`
     ];
-    
+
     if (cascadeGlobal) {
       cacheKeys.push(
         `debtor_list`,
@@ -107,7 +107,7 @@ export class UnifiedFinancialEngine {
         `system_totals`
       );
     }
-    
+
     // Immediate invalidation
     cacheKeys.forEach(key => {
       this.queryCache.delete(key);
@@ -115,12 +115,12 @@ export class UnifiedFinancialEngine {
       this.invalidationQueue.add(key);
       this.lastInvalidation.set(key, Date.now());
     });
-    
+
     // Mark for background refresh if immediate
     if (immediate) {
       this.scheduleBackgroundRefresh(representativeId, reason);
     }
-    
+
     console.log(`✅ SHERLOCK v28.0: Invalidated ${cacheKeys.length} cache entries for representative ${representativeId}`);
   }
 
@@ -131,17 +131,17 @@ export class UnifiedFinancialEngine {
     setTimeout(async () => {
       try {
         console.log(`🔄 SHERLOCK v32.0: Background refresh starting for rep ${representativeId}`);
-        
+
         // ✅ SHERLOCK v32.0: FIX - Use static instance for calculation
         const engine = new UnifiedFinancialEngine(null);
         const newData = await engine.calculateRepresentative(representativeId);
-        
+
         // Cache the fresh data
         this.queryCache.set(`rep_calc_${representativeId}`, {
           data: newData,
           timestamp: Date.now()
         });
-        
+
         console.log(`✅ SHERLOCK v32.0: Background refresh completed for rep ${representativeId}`);
       } catch (error) {
         console.error(`❌ SHERLOCK v32.0: Background refresh failed for rep ${representativeId}:`, error);
@@ -154,12 +154,12 @@ export class UnifiedFinancialEngine {
    */
   static forceInvalidateGlobal(reason: string = "system_update"): void {
     console.log(`🌐 SHERLOCK v28.0: Global cache invalidation initiated, reason: ${reason}`);
-    
+
     this.queryCache.clear();
     this.cache.clear();
     this.invalidationQueue.clear();
     this.lastInvalidation.clear();
-    
+
     console.log(`✅ SHERLOCK v28.0: Global cache cleared completely`);
   }
 
@@ -169,12 +169,12 @@ export class UnifiedFinancialEngine {
   private static isCacheValid(cacheKey: string, timestamp: number, ttl: number): boolean {
     const now = Date.now();
     const lastInval = this.lastInvalidation.get(cacheKey) || 0;
-    
+
     // If cache was force-invalidated after this entry, it's invalid
     if (lastInval > timestamp) {
       return false;
     }
-    
+
     return (now - timestamp) < ttl;
   }
 
@@ -385,7 +385,7 @@ export class UnifiedFinancialEngine {
     try {
       // Force invalidate all related caches BEFORE calculation
       UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId);
-      
+
       const financialData = await this.calculateRepresentative(representativeId);
 
       // بروزرسانی جدول representatives با بدهی صحیح
@@ -428,7 +428,7 @@ export class UnifiedFinancialEngine {
     const BATCH_SIZE = 10;
     for (let i = 0; i < allReps.length; i += BATCH_SIZE) {
       const batch = allReps.slice(i, i + BATCH_SIZE);
-      
+
       const batchPromises = batch.map(async (rep) => {
         try {
           await this.syncRepresentativeDebt(rep.id);
@@ -482,7 +482,7 @@ export class UnifiedFinancialEngine {
     detailedBreakdown: Array<{name: string, code: string, debt: number}>;
   }> {
     console.log("🔍 SHERLOCK v23.0: Manual debt verification starting...");
-    
+
     // Method 1: Sum from representatives table
     const allReps = await db.select({
       id: representatives.id,
@@ -493,7 +493,7 @@ export class UnifiedFinancialEngine {
 
     let tableSum = 0;
     const detailedBreakdown = [];
-    
+
     for (const rep of allReps) {
       const debt = parseFloat(rep.totalDebt) || 0;
       tableSum += debt;

@@ -119,7 +119,7 @@ router.get('/debtors', requireAuth, async (req, res) => {
     }
 
     console.log(`🚀 SHERLOCK v18.7: Fresh calculation for ${limit} debtors`);
-    
+
     // Fetch representatives that might have debt
     const candidates = await db.select({
       id: representatives.id,
@@ -817,7 +817,7 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
 
     // Handle both direct array and object with representativeIds
     let representativeIds;
-    
+
     if (Array.isArray(req.body)) {
       representativeIds = req.body;
       console.log('🔍 SHERLOCK v32.1: Direct array format detected');
@@ -871,14 +871,14 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
           console.warn(`⚠️ Invalid representative ID at index ${index}: ${id}`);
           return { error: `Invalid ID: ${id}`, index };
         }
-        
+
         const result = await Promise.race([
           unifiedFinancialEngine.calculateRepresentative(numericId),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Calculation timeout')), 10000)
           )
         ]);
-        
+
         return { data: result, id: numericId, index };
       } catch (error) {
         console.warn(`⚠️ Batch calculation failed for representative ${id} at index ${index}:`, error.message);
@@ -887,7 +887,7 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
     });
 
     const results = await Promise.all(calculationPromises);
-    
+
     const validResults = results.filter(r => r.data).map(r => r.data);
     const errors = results.filter(r => r.error);
 

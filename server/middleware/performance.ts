@@ -8,10 +8,22 @@ export function performanceMonitoringMiddleware(req: Request, res: Response, nex
   const isBatchOperation = req.url?.includes('batch-calculate') || 
                           (req.body && Array.isArray(req.body.representativeIds) && req.body.representativeIds.length > 10);
 
-  // Override res.json to log response time
+  // Track error responses
   const originalJson = res.json;
+  let hasError = false;
+
+  // Override res.json to log response time and errors
   res.json = function(body: any) {
     const duration = Date.now() - startTime;
+    
+    // Check for error responses
+    if (res.statusCode >= 400) {
+      hasError = true;
+      console.error(`❌ SHERLOCK v32.1: Error response ${res.statusCode} for ${req.method} ${req.url} in ${duration}ms`);
+      if (body?.error) {
+        console.error(`❌ Error details:`, body.error);
+      }
+    }
 
     // Dynamic thresholds based on endpoint type
     let threshold = 200;

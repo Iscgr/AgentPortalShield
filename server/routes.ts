@@ -345,12 +345,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard API - Redirected to Unified System
+  // Dashboard API - Optimized Performance
   app.get("/api/dashboard", authMiddleware, async (req, res) => {
     try {
-      // SHERLOCK v27.0: Redirect to unified financial engine
-      const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
-      const debtors = await unifiedFinancialEngine.getDebtorRepresentatives(10);
+      const startTime = Date.now();
+      console.log('🏠 SHERLOCK v32.1: Dashboard optimization - starting');
+
+      // Parallel execution for better performance
+      const [globalSummary, debtors] = await Promise.all([
+        unifiedFinancialEngine.calculateGlobalSummary(),
+        unifiedFinancialEngine.getDebtorRepresentatives(5) // Reduce to 5 for faster response
+      ]);
 
       const dashboardData = {
         totalRevenue: globalSummary.totalSystemPaid.toString(),
@@ -362,8 +367,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recentActivities: []
       };
 
+      const duration = Date.now() - startTime;
+      console.log(`✅ SHERLOCK v32.1: Dashboard optimized - ${duration}ms`);
+
       res.json(dashboardData);
     } catch (error) {
+      console.error('❌ Dashboard error:', error);
       res.status(500).json({ error: "خطا در دریافت اطلاعات داشبورد" });
     }
   });
