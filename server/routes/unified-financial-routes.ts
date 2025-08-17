@@ -791,8 +791,6 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
 });
 
 /**
-
-/**
  * ✅ SHERLOCK v28.0: Comprehensive System Integrity Validation
  * POST /api/unified-financial/validate-system-integrity
  */
@@ -964,6 +962,7 @@ router.post('/validate-system-integrity', requireAuth, async (req, res) => {
   }
 });
 
+ /**
  * ✅ SHERLOCK v27.0: Atomic System Validation
  * GET /api/unified-financial/atomic-validation
  */
