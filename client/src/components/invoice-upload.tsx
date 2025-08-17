@@ -149,6 +149,14 @@ export default function InvoiceUpload() {
         formData.append('customInvoiceDate', customInvoiceDate);
       }
       
+      // Add standardized parameters with default values
+      formData.append('batchName', `Upload-${file.name}-${Date.now()}`);
+      formData.append('description', `فایل آپلود شده: ${file.name}`);
+      
+      // Add optional period parameters (can be empty for basic functionality)
+      formData.append('periodStart', '');
+      formData.append('periodEnd', '');
+      
       console.log('Uploading file:', file.name, 'Size:', file.size);
       console.log('Invoice date mode:', invoiceDateMode, 'Custom date:', customInvoiceDate);
       
@@ -165,7 +173,7 @@ export default function InvoiceUpload() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 minutes timeout
       
-      const response = await fetch('/api/invoices/generate', {
+      const response = await fetch('/api/invoices/generate-standard', {
         method: 'POST',
         body: formData,
         credentials: 'include', // Include cookies for authentication
@@ -176,10 +184,25 @@ export default function InvoiceUpload() {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'خطا در آپلود فایل');
+        console.error('خطا در پردازش فایل:', errorData);
+        throw new Error(errorData.error || errorData.message || 'خطا در پردازش فایل');
       }
       
-      return response.json();
+      const responseData = await response.json();
+      
+      // Convert standardized response to legacy format for compatibility
+      if (responseData.success && responseData.data) {
+        return {
+          success: true,
+          created: responseData.data.createdInvoices || 0,
+          invalid: 0, // invalid records are filtered out in the new system
+          invoices: [], // invoices list will be loaded separately
+          invalidRecords: [],
+          newRepresentatives: responseData.data.newRepresentatives || 0
+        };
+      }
+      
+      return responseData;
     },
     onSuccess: (data: UploadResult) => {
       // پاک کردن interval
