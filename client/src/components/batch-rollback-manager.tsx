@@ -16,6 +16,7 @@ import { AlertTriangle, Trash2, Eye, CheckCircle, RotateCcw, Calendar } from 'lu
 import { formatForCRM } from '../lib/currency-formatter';
 import { useToast } from '../hooks/use-toast';
 import { apiRequest } from '../lib/queryClient';
+import { toEnglishDigits } from '../lib/persian-date';
 
 interface RollbackPreview {
   invoices: Array<{
@@ -44,14 +45,14 @@ export function BatchRollbackManager() {
   // دریافت پیش‌نمایش فاکتورهای قابل حذف
   const { data: previewData, isLoading: previewLoading, refetch: refetchPreview } = useQuery({
     queryKey: ['rollback-preview', targetDate],
-    queryFn: () => apiRequest(`/api/batch-rollback/preview/${encodeURIComponent(targetDate)}`),
+    queryFn: () => apiRequest(`/api/batch-rollback/preview/${encodeURIComponent(toEnglishDigits(targetDate))}`),
     enabled: false,
     retry: 1
   });
 
   // تست حذف دسته‌جمعی
   const testRollbackMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/batch-rollback/test/${encodeURIComponent(targetDate)}`, {
+    mutationFn: () => apiRequest(`/api/batch-rollback/test/${encodeURIComponent(toEnglishDigits(targetDate))}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     }),
@@ -74,11 +75,12 @@ export function BatchRollbackManager() {
     },
     onError: (error: any) => {
       console.error('SHERLOCK v32.0: Test rollback error:', error);
+      const errorMessage = error?.message || error?.response?.data?.error || 'خطا در اتصال به سرور';
       toast({
         title: "❌ خطا در تست",
-        description: error.message.includes('HTML instead of JSON') 
+        description: errorMessage.includes('HTML instead of JSON') 
           ? 'خطا در اتصال به سرور - مسیرهای API غیرفعال هستند'
-          : error.message || 'خطا در اتصال به سرور',
+          : errorMessage,
         variant: "destructive"
       });
     }
@@ -86,12 +88,12 @@ export function BatchRollbackManager() {
 
   // اجرای واقعی حذف
   const executeRollbackMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/batch-rollback/execute/${encodeURIComponent(targetDate)}`, {
+    mutationFn: () => apiRequest(`/api/batch-rollback/execute/${encodeURIComponent(toEnglishDigits(targetDate))}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         confirmDelete: true,
-        userConfirmation: `DELETE_INVOICES_${targetDate}`
+        userConfirmation: `DELETE_INVOICES_${toEnglishDigits(targetDate)}`
       })
     }),
     onSuccess: (data) => {
