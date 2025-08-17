@@ -2186,14 +2186,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recordCount: editedUsageData?.records?.length || 0
       });
 
-      // Validate input
-      if (!invoiceId || !editedUsageData || !editedBy) {
-        debug.error('Validation Failed - Missing Required Data', {
-          invoiceId: !!invoiceId,
-          editedUsageData: !!editedUsageData,
-          editedBy: !!editedBy
+      // ✅ SHERLOCK v32.1: Enhanced validation with detailed logging
+      const validationErrors = [];
+      
+      if (!invoiceId) validationErrors.push("invoiceId مفقود است");
+      if (!editedUsageData) validationErrors.push("editedUsageData مفقود است");
+      if (!editedBy) validationErrors.push("editedBy مفقود است");
+      if (!editReason || !editReason.trim()) validationErrors.push("editReason مفقود یا خالی است");
+      
+      debug.info('Validation Check', {
+        invoiceId: !!invoiceId,
+        editedUsageData: !!editedUsageData,
+        editedBy: !!editedBy,
+        editReason: !!editReason,
+        requestBodyKeys: Object.keys(req.body),
+        editedUsageDataStructure: editedUsageData ? {
+          hasRecords: !!(editedUsageData as any)?.records,
+          recordsCount: (editedUsageData as any)?.records?.length || 0,
+          hasUsageAmount: !!(editedUsageData as any)?.usage_amount
+        } : null
+      });
+
+      if (validationErrors.length > 0) {
+        debug.error('Validation Failed', {
+          errors: validationErrors,
+          receivedData: {
+            invoiceId,
+            editedBy,
+            editReason,
+            hasEditedUsageData: !!editedUsageData,
+            editedUsageDataKeys: editedUsageData ? Object.keys(editedUsageData) : []
+          }
         });
-        return res.status(400).json({ error: "اطلاعات ضروری برای ویرایش فاکتور کامل نیست" });
+        return res.status(400).json({ 
+          error: "اطلاعات ضروری برای ویرایش فاکتور کامل نیست",
+          details: validationErrors,
+          missingFields: validationErrors
+        });
       }
 
       // Validate amounts

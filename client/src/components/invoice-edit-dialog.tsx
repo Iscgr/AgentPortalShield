@@ -697,17 +697,52 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       return;
     }
 
-    // ✅ HEPHAESTUS v1.4: COMPLETE USAGE DATA REPLACEMENT WITH ENHANCED PERSISTENCE
+    // ✅ SHERLOCK v32.1: CRITICAL FIX - Ensure all required fields are present
       const editData = {
+        // ✅ CRITICAL: Primary required fields
         invoiceId: invoice.id,
+        editedBy: currentUsername,
+        editReason: editReason,
+        
+        // ✅ CRITICAL: Usage data structure
+        editedUsageData: {
+          type: 'edited',
+          description: `فاکتور ویرایش شده - ${editReason}`,
+          records: activeRecords.map(record => ({
+            id: record.id,
+            admin_username: record.admin_username,
+            event_timestamp: record.event_timestamp,
+            event_type: record.event_type,
+            description: record.description,
+            amount: record.amount.toString(),
+            persistenceId: `persist_${record.id}_${Date.now()}`,
+            isNew: record.isNew || false,
+            isModified: record.isModified || false
+          })),
+          totalRecords: activeRecords.length,
+          usage_amount: calculatedAmount,
+          editTimestamp: new Date().toISOString(),
+          editedBy: currentUsername,
+          preserveStructure: true,
+          calculationMethod: 'SHERLOCK_v32.1_CRITICAL_FIX',
+          verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0)
+        },
+
+        // ✅ Additional required fields
         representativeCode: representativeCode,
         originalUsageData: (usageDetails as any)?.usageData || {},
+        editType: 'COMPLETE_USAGE_REPLACEMENT',
+        originalAmount: parseFloat(invoice.amount),
+        editedAmount: calculatedAmount,
+        requiresFinancialSync: Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01,
+        amountDifference: calculatedAmount - parseFloat(invoice.amount),
 
-        // ✅ CRITICAL: Complete replacement of usage data structure
+        // ✅ ENHANCED: Complete data structure replacement
         completeUsageDataReplacement: {
           type: 'complete_replacement',
           description: `فاکتور ویرایش شده - ${editReason}`,
           records: activeRecords.map(record => ({
+            id: record.id,
             admin_username: record.admin_username,
             event_timestamp: record.event_timestamp,
             event_type: record.event_type,
@@ -725,75 +760,65 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
           editTimestamp: new Date().toISOString(),
           editedBy: currentUsername,
           preserveStructure: true,
-          calculationMethod: 'HEPHAESTUS_ATOMIC_v1.4',
+          calculationMethod: 'SHERLOCK_v32.1_CRITICAL_FIX',
           verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0),
-
-          // ✅ ENHANCED: Force complete data structure replacement
           replaceOriginalData: true,
           maintainFinancialIntegrity: true,
           forceDataPersistence: true
         },
 
-      // ✅ BACKWARD COMPATIBILITY: Keep existing structure
-      editedUsageData: {
-        type: 'edited',
-        description: `فاکتور ویرایش شده - ${editReason}`,
-        records: activeRecords.map(record => ({
-          admin_username: record.admin_username,
-          event_timestamp: record.event_timestamp,
-          event_type: record.event_type,
-          description: record.description,
-          amount: record.amount.toString(),
-          persistenceId: record.id,
-          isNew: record.isNew || false,
-          isModified: record.isModified || false
-        })),
-        totalRecords: activeRecords.length,
-        usage_amount: calculatedAmount,
-        editTimestamp: new Date().toISOString(),
-        editedBy: currentUsername,
-        preserveStructure: true,
-        calculationMethod: 'ATOMIC_REAL_TIME_v32',
-        verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0)
-      },
-
-      editType: 'COMPLETE_USAGE_REPLACEMENT',
-      editReason: editReason,
-      originalAmount: parseFloat(invoice.amount),
-      editedAmount: calculatedAmount,
-      editedBy: currentUsername,
-      requiresFinancialSync: Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01,
-      amountDifference: calculatedAmount - parseFloat(invoice.amount),
-
-      // ✅ ENHANCED: Complete record state preservation with validation
-      detailedRecords: activeRecords.map(record => ({
-        ...record,
-        persistenceId: `${record.id}_${Date.now()}`,
-        saveTimestamp: new Date().toISOString(),
-        calculatedAmount: record.amount,
-        recordState: {
-          isNew: record.isNew,
-          isModified: record.isModified,
-          isDeleted: record.isDeleted
+        // ✅ Metadata for validation
+        recordsMetadata: {
+          addedRecords: editableRecords.filter(r => r.isNew && !r.isDeleted).length,
+          modifiedRecords: editableRecords.filter(r => r.isModified && !r.isDeleted).length,
+          deletedRecords: editableRecords.filter(r => r.isDeleted).length,
+          totalActiveRecords: activeRecords.length,
+          totalAmount: calculatedAmount,
+          verificationPassed: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01,
+          requiresCompleteReplacement: true,
+          dataIntegrityValidated: true,
+          calculationAccurate: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01
         }
-      })),
-
-      recordsMetadata: {
-        addedRecords: editableRecords.filter(r => r.isNew && !r.isDeleted).length,
-        modifiedRecords: editableRecords.filter(r => r.isModified && !r.isDeleted).length,
-        deletedRecords: editableRecords.filter(r => r.isDeleted).length,
-        totalActiveRecords: activeRecords.length,
-        totalAmount: calculatedAmount,
-        verificationPassed: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01,
-
-        // ✅ CRITICAL: Enhanced validation flags
-        requiresCompleteReplacement: true,
-        dataIntegrityValidated: true,
-        calculationAccurate: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01
-      }
     };
 
-    console.log(`💰 SHERLOCK v1.0: Invoice edit initiated - Amount change: ${editData.amountDifference} تومان`);
+    // ✅ SHERLOCK v32.1: Comprehensive debug logging before save
+    console.log(`💰 SHERLOCK v32.1: Invoice edit initiated - Amount change: ${editData.amountDifference} تومان`);
+    console.log('📋 SHERLOCK v32.1: Complete edit data structure:', {
+      invoiceId: editData.invoiceId,
+      editedBy: editData.editedBy,
+      editReason: editData.editReason,
+      hasEditedUsageData: !!editData.editedUsageData,
+      activeRecordsCount: activeRecords.length,
+      calculatedAmount: calculatedAmount,
+      originalAmount: parseFloat(invoice.amount),
+      amountDifference: editData.amountDifference,
+      sessionHealthy: sessionHealthy,
+      currentUsername: currentUsername,
+      editDataKeys: Object.keys(editData),
+      editedUsageDataKeys: editData.editedUsageData ? Object.keys(editData.editedUsageData) : []
+    });
+
+    // ✅ SHERLOCK v32.1: Validate edit data structure before sending
+    const validationChecks = {
+      hasInvoiceId: !!editData.invoiceId,
+      hasEditedBy: !!editData.editedBy && editData.editedBy.trim().length > 0,
+      hasEditReason: !!editData.editReason && editData.editReason.trim().length > 0,
+      hasEditedUsageData: !!editData.editedUsageData,
+      hasRecords: !!(editData.editedUsageData?.records && editData.editedUsageData.records.length > 0),
+      recordsValid: editData.editedUsageData?.records?.every((r: any) => r.description && r.amount > 0) || false
+    };
+
+    console.log('🔍 SHERLOCK v32.1: Pre-send validation:', validationChecks);
+
+    if (!validationChecks.hasInvoiceId || !validationChecks.hasEditedBy || !validationChecks.hasEditReason || !validationChecks.hasEditedUsageData) {
+      toast({
+        title: "خطای اعتبارسنجی کلاینت",
+        description: "داده‌های ضروری کامل نیست. لطفاً دوباره تلاش کنید.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     editMutation.mutate(editData);
   };
 
