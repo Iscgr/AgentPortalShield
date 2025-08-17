@@ -82,7 +82,7 @@ export interface RecentActivity {
 
 // ========== UNIFIED STATISTICS ENGINE ========== 
 
-class UnifiedStatisticsEngine {
+export class UnifiedStatisticsEngine {
   // Enhanced cache for performance optimization with separate cache keys
   private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
   private static readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes for better performance

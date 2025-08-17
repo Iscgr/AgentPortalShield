@@ -1,4 +1,4 @@
-import { 
+import {
   representatives, salesPartners, invoices, payments, activityLogs, settings, adminUsers, invoiceEdits,
   financialTransactions, dataIntegrityConstraints, invoiceBatches, crmUsers, telegramSendHistory,
   aiConfiguration,
@@ -521,21 +521,33 @@ export class DatabaseStorage implements IStorage {
           .orderBy(desc(invoices.createdAt));
 
         return result.map(row => ({
-          ...row, // Spread all invoice fields
+          id: row.id,
+          invoiceNumber: row.invoiceNumber,
+          representativeId: row.representativeId,
+          batchId: row.batchId,
+          amount: row.amount,
+          issueDate: row.issueDate,
+          dueDate: row.dueDate,
+          status: row.status,
+          usageData: row.usageData,
+          sentToTelegram: row.sentToTelegram,
+          telegramSentAt: row.telegramSentAt,
+          telegramSendCount: row.telegramSendCount,
+          createdAt: row.createdAt,
           batch: row.batchName ? {
             id: row.batchId!,
             batchName: row.batchName,
             batchCode: row.batchCode!,
             periodStart: row.periodStart!,
             periodEnd: row.periodEnd!,
-            description: null, // Placeholder, actual description might not be selected
+            description: null,
             status: row.batchStatus!,
-            totalInvoices: null, // Placeholder
-            totalAmount: null, // Placeholder
-            uploadedBy: '', // Placeholder
-            uploadedFileName: null, // Placeholder
-            createdAt: null, // Placeholder
-            completedAt: null // Placeholder
+            totalInvoices: null,
+            totalAmount: null,
+            uploadedBy: '',
+            uploadedFileName: null,
+            createdAt: null,
+            completedAt: null
           } : undefined
         }));
       },
@@ -708,10 +720,10 @@ export class DatabaseStorage implements IStorage {
   async calculateInvoicePaymentStatus(invoiceId: number): Promise<string> {
     try {
       // Get invoice amount
-      const invoice = await db.select({ 
-        id: invoices.id, 
+      const invoice = await db.select({
+        id: invoices.id,
         amount: invoices.amount,
-        dueDate: invoices.dueDate 
+        dueDate: invoices.dueDate
       })
         .from(invoices)
         .where(eq(invoices.id, invoiceId))
@@ -727,7 +739,7 @@ export class DatabaseStorage implements IStorage {
         .from(payments)
         .where(eq(payments.invoiceId, invoiceId));
 
-      const totalPaid = paymentResults.reduce((sum, payment) => 
+      const totalPaid = paymentResults.reduce((sum, payment) =>
         sum + parseFloat(payment.amount), 0);
 
       // Calculate status based on payment coverage
@@ -769,9 +781,9 @@ export class DatabaseStorage implements IStorage {
 
     await db
       .update(invoices)
-      .set({ 
-        sentToTelegram: true, 
-        telegramSentAt: new Date() 
+      .set({
+        sentToTelegram: true,
+        telegramSentAt: new Date()
       })
       .where(whereClause);
 
@@ -806,10 +818,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markInvoicesAsSentToTelegramWithHistory(
-    invoiceIds: number[], 
-    sentBy: string, 
-    botToken?: string, 
-    chatId?: string, 
+    invoiceIds: number[],
+    sentBy: string,
+    botToken?: string,
+    chatId?: string,
     template?: string
   ): Promise<void> {
     return await withDatabaseRetry(
@@ -823,8 +835,8 @@ export class DatabaseStorage implements IStorage {
         // Update invoices with send info
         await db
           .update(invoices)
-          .set({ 
-            sentToTelegram: true, 
+          .set({
+            sentToTelegram: true,
             telegramSentAt: new Date(),
             telegramSendCount: sql`${invoices.telegramSendCount} + 1`
           })
@@ -864,11 +876,11 @@ export class DatabaseStorage implements IStorage {
         await this.createActivityLog({
           type: "telegram_sent",
           description,
-          metadata: { 
-            invoiceIds, 
-            firstSendCount, 
+          metadata: {
+            invoiceIds,
+            firstSendCount,
             resendCount,
-            sentBy 
+            sentBy
           }
         });
       },
@@ -1008,8 +1020,8 @@ export class DatabaseStorage implements IStorage {
 
       // Calculate standardized total revenue = Sum of ALLOCATED payments only
       const [totalRevenueResult] = await db
-        .select({ 
-          totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)` 
+        .select({
+          totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
         })
         .from(payments);
 
@@ -1164,7 +1176,7 @@ export class DatabaseStorage implements IStorage {
     }, 'getBatchBasedActiveRepresentatives');
   }
 
-  // SHERLOCK v17.8 - UPGRADED: Financial Integrity Engine - Standardized Debt Calculation  
+  // SHERLOCK v17.8 - UPGRADED: Financial Integrity Engine - Standardized Debt Calculation
   async getDebtorRepresentatives(): Promise<Array<{
     id: number;
     name: string;
@@ -1302,7 +1314,7 @@ export class DatabaseStorage implements IStorage {
         const passwordHash = await bcrypt.hash(password, 12);
         await db
           .update(adminUsers)
-          .set({ 
+          .set({
             passwordHash,
             isActive: true,
             role: 'SUPER_ADMIN'
@@ -1388,7 +1400,7 @@ export class DatabaseStorage implements IStorage {
         const passwordHash = await bcrypt.hash(password, 12);
         await db
           .update(crmUsers)
-          .set({ 
+          .set({
             passwordHash,
             isActive: true,
             role: 'CRM_MANAGER'
@@ -1597,31 +1609,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoiceEditHistory(invoiceId: number): Promise<InvoiceEdit[]> {
-    try {
-      const editHistory = await db.select({
-        id: invoiceEdits.id,
-        editType: invoiceEdits.editType,
-        editReason: invoiceEdits.editReason,
-        originalAmount: invoiceEdits.originalAmount,
-        editedAmount: invoiceEdits.editedAmount,
-        editedBy: invoiceEdits.editedBy,
-        createdAt: invoiceEdits.createdAt,
-        transactionId: invoiceEdits.transactionId
-      })
-      .from(invoiceEdits)
-      .where(eq(invoiceEdits.invoiceId, invoiceId))
-      .orderBy(desc(invoiceEdits.createdAt));
-
-      return editHistory.map(edit => ({
-        ...edit,
-        amountChange: edit.editedAmount ? 
-          (parseFloat(edit.editedAmount.toString()) - parseFloat(edit.originalAmount?.toString() || '0')) : 0,
-        createdAt: edit.createdAt?.toISOString()
-      }));
-    } catch (error) {
-      console.error('Error fetching invoice edit history:', error);
-      return [];
-    }
+    return await withDatabaseRetry(
+      () => db.select().from(invoiceEdits)
+        .where(and(
+          eq(invoiceEdits.invoiceId, invoiceId),
+          eq(invoiceEdits.isActive, true)
+        ))
+        .orderBy(desc(invoiceEdits.createdAt)),
+      'getInvoiceEditHistory'
+    );
   }
 
   async updateRepresentativeDebt(invoiceId: number, originalAmount: number, editedAmount: number): Promise<void> {
@@ -1743,7 +1739,7 @@ export class DatabaseStorage implements IStorage {
               .where(eq(invoices.id, rollbackData.invoiceId));
 
             await db.update(representatives)
-              .set({ 
+              .set({
                 totalDebt: rollbackData.originalRepresentativeDebt,
                 updatedAt: new Date()
               })
@@ -1782,7 +1778,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async validateConstraints(entityType: string, entityId: number): Promise<{isValid: boolean, violations: any[]}> {
+  async validateConstraints(entityType: string, entityId: number): Promise<{ isValid: boolean, violations: any[] }> {
     return await withDatabaseRetry(
       async () => {
         const constraints = await db.select()
@@ -1880,7 +1876,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ====== FINANCIAL RECONCILIATION ======
-  async reconcileFinancialData(): Promise<{success: boolean, message: string}> {
+  async reconcileFinancialData(): Promise<{ success: boolean, message: string }> {
     return await withDatabaseRetry(
       async () => {
         // Simple reconciliation - check for any pending transactions
@@ -1910,7 +1906,7 @@ export class DatabaseStorage implements IStorage {
     editedBy: string;
     originalAmount: number;
     editedAmount: number;
-  }): Promise<{transactionId: string, editId: number, success: boolean}> {
+  }): Promise<{ transactionId: string, editId: number, success: boolean }> {
 
     // Generate unique transaction ID with high precision timestamp
     const uniqueTimestamp = Date.now() + Math.random() * 1000;
@@ -1983,7 +1979,9 @@ export class DatabaseStorage implements IStorage {
             })
             .returning();
 
-          // Update invoice amount and usage data
+          // ✅ SHERLOCK v28.1: COMPREHENSIVE INVOICE UPDATE WITH AMOUNT SYNCHRONIZATION
+          console.log(`💰 SHERLOCK v28.1: Updating invoice ${editData.invoiceId} from ${editData.originalAmount} to ${editData.editedAmount}`);
+
           await db.update(invoices)
             .set({
               amount: editData.editedAmount.toString(),
@@ -1992,19 +1990,37 @@ export class DatabaseStorage implements IStorage {
             })
             .where(eq(invoices.id, editData.invoiceId));
 
-          console.log(`💰 SHERLOCK v12.1: Invoice ${editData.invoiceId} amount updated from ${editData.originalAmount} to ${editData.editedAmount}`);
+          console.log(`✅ SHERLOCK v28.1: Invoice ${editData.invoiceId} amount updated to ${editData.editedAmount}`);
 
-          // ENHANCED: Complete financial synchronization
+
+          // ✅ SHERLOCK v28.0: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
+          console.log(`🔄 SHERLOCK v28.0: Starting comprehensive financial sync for representative ${invoice.representativeId}`);
+
+          // 1. Force cache invalidation BEFORE any calculations
+          try {
+            const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+            UnifiedFinancialEngine.forceInvalidateRepresentative(invoice.representativeId, {
+              cascadeGlobal: true,
+              reason: 'invoice_edit',
+              immediate: true
+            });
+            console.log(`✅ SHERLOCK v28.0: Cache invalidated for representative ${invoice.representativeId}`);
+          } catch (cacheError) {
+            console.error('❌ Cache invalidation failed:', cacheError);
+          }
+
+          // 2. Update representative financials with real-time calculation
           await this.updateRepresentativeFinancials(invoice.representativeId);
 
-          // SHERLOCK v1.0: Force unified financial engine synchronization
+          // 3. Force recalculation and sync via unified engine
           try {
-            const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine');
-            UnifiedFinancialEngine.forceInvalidateRepresentative(invoice.representativeId);
-            console.log(`🔄 SHERLOCK v12.1: Force invalidated financial cache for representative ${invoice.representativeId}`);
-          } catch (cacheError) {
-            console.warn('⚠️ Cache invalidation warning (non-critical):', cacheError);
+            const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+            await unifiedFinancialEngine.syncRepresentativeDebt(invoice.representativeId);
+            console.log(`💰 SHERLOCK v28.0: Representative debt synchronized`);
+          } catch (syncError) {
+            console.error('❌ Financial sync failed:', syncError);
           }
+
 
           // SHERLOCK v1.0: Update payment status based on new amount
           try {
@@ -2089,9 +2105,9 @@ export class DatabaseStorage implements IStorage {
         // ✅ SHERLOCK v22.1: Update payment allocation
         const [updatedPayment] = await db
           .update(payments)
-          .set({ 
+          .set({
             invoiceId: invoiceId,
-            isAllocated: true 
+            isAllocated: true
           })
           .where(eq(payments.id, paymentId))
           .returning();
@@ -2108,7 +2124,7 @@ export class DatabaseStorage implements IStorage {
   async autoAllocatePayments(representativeId: number): Promise<{
     allocated: number;
     totalAmount: string;
-    details: Array<{paymentId: number; invoiceId: number; amount: string}>;
+    details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
   }> {
     return await withDatabaseRetry(
       async () => {
@@ -2140,7 +2156,7 @@ export class DatabaseStorage implements IStorage {
 
         let allocated = 0;
         let totalAmount = 0;
-        const details: Array<{paymentId: number; invoiceId: number; amount: string}> = [];
+        const details: Array<{ paymentId: number; invoiceId: number; amount: string }> = [];
 
         // Simple FIFO allocation strategy
         for (const payment of unallocatedPayments) {
@@ -2156,7 +2172,7 @@ export class DatabaseStorage implements IStorage {
                 )
               );
 
-            const paidAmount = existingPayments.reduce((sum, p) => 
+            const paidAmount = existingPayments.reduce((sum, p) =>
               sum + parseFloat(p.amount), 0);
             const remainingAmount = parseFloat(invoice.amount) - paidAmount;
 
@@ -2249,9 +2265,9 @@ export class DatabaseStorage implements IStorage {
         const allocatedPayments = allPayments.filter(p => p.isAllocated);
         const unallocatedPayments = allPayments.filter(p => !p.isAllocated);
 
-        const totalPaidAmount = allocatedPayments.reduce((sum, p) => 
+        const totalPaidAmount = allocatedPayments.reduce((sum, p) =>
           sum + parseFloat(p.amount), 0);
-        const totalUnallocatedAmount = unallocatedPayments.reduce((sum, p) => 
+        const totalUnallocatedAmount = unallocatedPayments.reduce((sum, p) =>
           sum + parseFloat(p.amount), 0);
 
         return {
@@ -2266,7 +2282,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  // SHERLOCK v18.4 - DEPRECATED: Use UNIFIED Financial Engine directly  
+  // SHERLOCK v18.4 - DEPRECATED: Use UNIFIED Financial Engine directly
   // This method is now deprecated. Use: unifiedFinancialEngine.calculateRepresentative()
   // Kept for backward compatibility only
   async reconcileRepresentativeFinancials(representativeId: number): Promise<{
@@ -2359,7 +2375,7 @@ export class DatabaseStorage implements IStorage {
       async () => {
         // Create clean object without timestamp fields that cause issues
         const cleanConfig = Object.fromEntries(
-          Object.entries(config).filter(([key]) => 
+          Object.entries(config).filter(([key]) =>
             !['createdAt', 'updatedAt', 'id'].includes(key)
           )
         );
@@ -2503,8 +2519,8 @@ export class DatabaseStorage implements IStorage {
     return await withDatabaseRetry(
       async () => {
         const totalPayments = await db.select({ count: sql<number>`count(*)` }).from(payments);
-        const totalAmount = await db.select({ 
-          total: sql<string>`coalesce(sum(amount), '0')` 
+        const totalAmount = await db.select({
+          total: sql<string>`coalesce(sum(amount), '0')`
         }).from(payments);
         const allocatedCount = await db.select({ count: sql<number>`count(*)` }).from(payments).where(eq(payments.isAllocated, true));
 

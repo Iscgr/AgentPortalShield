@@ -15,7 +15,6 @@ import AiChat from "@/components/ai-chat";
 import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { Skeleton } from "@/components/ui/skeleton";
-import { apiRequest } from "@/lib/queryClient";
 
 interface DashboardData {
   totalRevenue: number;
@@ -173,23 +172,9 @@ function ActivityItem({ activity }: { activity: any }) {
 }
 
 export default function Dashboard() {
-  const { data: dashboardData, isLoading, error } = useQuery<DashboardData>({
+  const { data: dashboardData, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/unified-statistics/global"],
-    queryFn: () => apiRequest("/api/unified-statistics/global"),
-    select: (response: any) => {
-      console.log('📊 SHERLOCK v26.1: Dashboard data received:', response);
-
-      // Handle different response structures
-      if (response.success && response.data) {
-        return response.data;
-      } else if (response.data) {
-        return response.data;
-      } else {
-        return response;
-      }
-    },
-    retry: 3,
-    retryDelay: 1000
+    select: (data: any) => data.data // Extract data from unified response structure
   });
 
   const { data: telegramConfig } = useQuery({
@@ -200,72 +185,14 @@ export default function Dashboard() {
   // SHERLOCK v1.0: Financial health data
   const { data: financialHealth, isLoading: healthLoading } = useQuery<FinancialHealthData>({
     queryKey: ["/api/unified-financial/health"],
-    queryFn: async () => await apiRequest("/api/unified-financial/health"),
     staleTime: 10 * 60 * 1000, // 10 minutes
     refetchInterval: 15 * 60 * 1000, // Refresh every 15 minutes
   });
 
-  // Activity Logs Query
-  const { data: activityLogs = [], isLoading: isLoadingActivityLogs } = useQuery({
-    queryKey: ["/api/activity-logs"],
-    queryFn: async () => {
-      try {
-        const response = await apiRequest("/api/activity-logs");
-        console.log('📋 Activity logs response:', response);
-        
-        // Handle different response structures
-        if (response && response.success && Array.isArray(response.data)) {
-          return response.data;
-        } else if (Array.isArray(response)) {
-          return response;
-        } else {
-          console.warn('Unexpected activity logs format:', response);
-          return [];
-        }
-      } catch (error) {
-        console.warn("Activity logs not available:", error);
-        return [];
-      }
-    },
-    enabled: true,
-    staleTime: 30000,
-  });
-
-  // Financial Summary Query
-  const { data: financialSummary, isLoading: isLoadingFinancial } = useQuery({
-    queryKey: ["/api/unified-financial/batch-calculate"],
-    queryFn: async () => {
-      const response = await apiRequest("/api/unified-financial/batch-calculate");
-      return response;
-    },
-    enabled: true,
-    staleTime: 60000,
-  });
-
-  // Representatives Query  
-  const { data: representativesData, isLoading: isLoadingReps } = useQuery({
-    queryKey: ["/api/representatives"],
-    queryFn: async () => {
-      const response = await apiRequest("/api/representatives");
-      return response;
-    },
-    enabled: true,
-    staleTime: 30000,
-  });
-
-  console.log('🔍 SHERLOCK v26.1: Dashboard render state:', { 
-    isLoading, 
-    hasError: !!error, 
-    hasData: !!dashboardData,
-    dataKeys: dashboardData ? Object.keys(dashboardData) : []
-  });
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <p className="text-blue-800">🔄 در حال بارگذاری اطلاعات داشبورد...</p>
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -281,41 +208,10 @@ export default function Dashboard() {
     );
   }
 
-  if (error) {
-    console.error('❌ Dashboard error:', error);
-    return (
-      <div className="text-center py-12">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
-          <h3 className="text-red-800 font-semibold mb-2">❌ خطا در بارگذاری داده‌ها</h3>
-          <p className="text-red-600 text-sm mb-4">
-            {(error as any)?.message || 'خطای ناشناخته در دریافت اطلاعات'}
-          </p>
-          <Button 
-            onClick={() => window.location.reload()} 
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            🔄 تلاش مجدد
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   if (!dashboardData) {
     return (
       <div className="text-center py-12">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md mx-auto">
-          <h3 className="text-yellow-800 font-semibold mb-2">⚠️ هیچ داده‌ای یافت نشد</h3>
-          <p className="text-yellow-600 text-sm mb-4">
-            ممکن است سیستم نیاز به راه‌اندازی اولیه داشته باشد
-          </p>
-          <Button 
-            onClick={() => window.location.reload()} 
-            className="bg-yellow-600 hover:bg-yellow-700 text-white"
-          >
-            🔄 بازخوانی صفحه
-          </Button>
-        </div>
+        <p className="text-gray-500">خطا در بارگذاری اطلاعات داشبورد</p>
       </div>
     );
   }
@@ -326,7 +222,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         <StatCard
           title="کل درآمدها"
-          value={formatCurrency(dashboardData.totalRevenue || 0)}
+          value={formatCurrency(dashboardData.totalRevenue)}
           subtitle="مبلغ پرداخت شده - تومان"
           icon={TrendingUp}
           colorClass="text-green-600"
@@ -335,7 +231,7 @@ export default function Dashboard() {
 
         <StatCard
           title="مطالبات معوق"
-          value={formatCurrency(dashboardData.totalDebt || 0)}
+          value={formatCurrency(dashboardData.totalDebt)}
           subtitle="مانده بدهی - تومان"
           icon={AlertTriangle}
           colorClass="text-red-600"
@@ -344,7 +240,7 @@ export default function Dashboard() {
 
         <StatCard
           title="نمایندگان فعال"
-          value={toPersianDigits((dashboardData.activeRepresentatives || 0).toString())}
+          value={toPersianDigits(dashboardData.activeRepresentatives.toString())}
           subtitle="آخرین آپلود فایل ریزجزئیات"
           icon={Users}
           colorClass="text-blue-600"

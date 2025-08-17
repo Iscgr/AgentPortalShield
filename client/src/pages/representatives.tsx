@@ -226,32 +226,17 @@ export default function Representatives() {
     return sortOrder === "asc" ? "⬆️" : "⬇️";
   };
 
-  const { data: representatives = [], isLoading, error } = useQuery<Representative[]>({
+  const { data: representatives = [], isLoading } = useQuery<Representative[]>({
     queryKey: ["/api/representatives"],
     queryFn: () => apiRequest("/api/representatives"),
-    select: (response: any) => {
-      console.log('🔍 SHERLOCK v26.1: Representatives response:', response);
-
-      // Handle different response structures
-      if (Array.isArray(response)) {
-        console.log(`✅ Found ${response.length} representatives (direct array)`);
-        return response;
-      }
-      if (response && Array.isArray(response.data)) {
-        console.log(`✅ Found ${response.data.length} representatives (data property)`);
-        return response.data;
-      }
-      if (response && response.success && Array.isArray(response.data)) {
-        console.log(`✅ Found ${response.data.length} representatives (success response)`);
-        return response.data;
-      }
-
-      console.warn('⚠️ Unexpected response format:', typeof response, response);
+    select: (data: any) => {
+      console.log('SHERLOCK v12.1 DEBUG: Representatives data:', data);
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.data)) return data.data;
       return [];
     },
     retry: 3,
-    retryDelay: 1000,
-    refetchOnMount: true
+    retryDelay: 1000
   });
 
   // SHERLOCK v27.0: Batch financial data fetching
@@ -682,19 +667,9 @@ export default function Representatives() {
     }
   };
 
-  console.log('🔍 SHERLOCK v26.1: Representatives page state:', { 
-    isLoading, 
-    hasError: !!error, 
-    representativesCount: representatives?.length || 0,
-    representatives: representatives?.slice(0, 3) // Show first 3 for debugging
-  });
-
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-800">🔄 در حال بارگذاری لیست نمایندگان...</p>
-        </div>
         <div className="flex justify-between items-center">
           <Skeleton className="h-8 w-40" />
           <Skeleton className="h-10 w-32" />
@@ -705,54 +680,6 @@ export default function Representatives() {
           ))}
         </div>
         <Skeleton className="h-96" />
-      </div>
-    );
-  }
-
-  if (error) {
-    console.error('❌ Representatives loading error:', error);
-    return (
-      <div className="space-y-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h3 className="text-red-800 font-semibold mb-2">❌ خطا در بارگذاری نمایندگان</h3>
-          <p className="text-red-600 text-sm mb-4">
-            {(error as any)?.message || 'خطای ناشناخته در دریافت اطلاعات نمایندگان'}
-          </p>
-          <Button 
-            onClick={() => window.location.reload()} 
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            🔄 تلاش مجدد
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!representatives || representatives.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h3 className="text-yellow-800 font-semibold mb-2">⚠️ هیچ نماینده‌ای یافت نشد</h3>
-          <p className="text-yellow-600 text-sm mb-4">
-            ممکن است نمایندگان هنوز به سیستم اضافه نشده باشند
-          </p>
-          <div className="flex gap-3">
-            <Button 
-              onClick={() => setIsCreateOpen(true)}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              <Plus className="w-4 h-4 ml-2" />
-              افزودن نماینده جدید
-            </Button>
-            <Button 
-              onClick={() => window.location.reload()} 
-              variant="outline"
-            >
-              🔄 بازخوانی صفحه
-            </Button>
-          </div>
-        </div>
       </div>
     );
   }

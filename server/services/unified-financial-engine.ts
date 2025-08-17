@@ -8,7 +8,6 @@
 import { db } from '../db.js';
 import { representatives, invoices, payments } from '../../shared/schema.js';
 import { eq, sql, desc, and } from 'drizzle-orm';
-import type { storage } from '../storage.js';
 
 export interface UnifiedFinancialData {
   representativeId: number;
