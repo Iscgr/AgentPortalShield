@@ -125,15 +125,16 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ SHERLOCK v28.0: Background refresh scheduling for immediate data availability
+   * ✅ SHERLOCK v32.0: Background refresh scheduling for immediate data availability - FIXED
    */
   private static scheduleBackgroundRefresh(representativeId: number, reason: string): void {
     setTimeout(async () => {
       try {
-        console.log(`🔄 SHERLOCK v28.0: Background refresh starting for rep ${representativeId}`);
+        console.log(`🔄 SHERLOCK v32.0: Background refresh starting for rep ${representativeId}`);
         
-        // Pre-calculate and cache new data
-        const newData = await this.calculateRepresentative(representativeId);
+        // ✅ SHERLOCK v32.0: FIX - Use static instance for calculation
+        const engine = new UnifiedFinancialEngine(null);
+        const newData = await engine.calculateRepresentative(representativeId);
         
         // Cache the fresh data
         this.queryCache.set(`rep_calc_${representativeId}`, {
@@ -141,9 +142,9 @@ export class UnifiedFinancialEngine {
           timestamp: Date.now()
         });
         
-        console.log(`✅ SHERLOCK v28.0: Background refresh completed for rep ${representativeId}`);
+        console.log(`✅ SHERLOCK v32.0: Background refresh completed for rep ${representativeId}`);
       } catch (error) {
-        console.error(`❌ SHERLOCK v28.0: Background refresh failed for rep ${representativeId}:`, error);
+        console.error(`❌ SHERLOCK v32.0: Background refresh failed for rep ${representativeId}:`, error);
       }
     }, 100); // 100ms delay for immediate background refresh
   }

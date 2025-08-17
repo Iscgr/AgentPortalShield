@@ -630,7 +630,10 @@ export default function Representatives() {
           title: "موفقیت",
           description: "همگام‌سازی تمام نمایندگان با موفقیت انجام شد"
         });
-        // Refresh the data
+        
+        // ✅ SHERLOCK v32.0: Force refresh representatives data after sync
+        await refetch();
+        console.log('🔄 SHERLOCK v32.0: Representatives data refreshed after debt sync');
         queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
         queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] });
         queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] });

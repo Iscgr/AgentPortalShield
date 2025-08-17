@@ -437,12 +437,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Representatives API - Protected
+  // ✅ SHERLOCK v32.0: Representatives management with UNIFIED FINANCIAL ENGINE
   app.get("/api/representatives", authMiddleware, async (req, res) => {
     try {
+      console.log('🔍 SHERLOCK v32.0: Fetching representatives data with unified financial calculations');
+
+      // Get base representatives data
       const representatives = await storage.getRepresentatives();
-      res.json(representatives);
+
+      // ✅ SHERLOCK v32.0: Enhanced with real-time financial calculations
+      const enhancedRepresentatives = await Promise.all(
+        representatives.map(async (rep) => {
+          try {
+            // Get real-time financial data from unified engine
+            const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
+
+            return {
+              ...rep,
+              // ✅ Override stored debt with calculated debt
+              totalDebt: financialData.actualDebt.toString(),
+              totalSales: financialData.totalSales.toString(),
+              // Additional real-time data for UI
+              financialData: {
+                actualDebt: financialData.actualDebt,
+                paymentRatio: financialData.paymentRatio,
+                debtLevel: financialData.debtLevel,
+                lastSync: financialData.calculationTimestamp
+              }
+            };
+          } catch (error) {
+            console.warn(`⚠️ SHERLOCK v32.0: Failed to calculate financial data for rep ${rep.id}:`, error);
+            // Fallback to stored data if calculation fails
+            return rep;
+          }
+        })
+      );
+
+      console.log(`✅ SHERLOCK v32.0: Enhanced ${enhancedRepresentatives.length} representatives with real-time financial data`);
+      res.json(enhancedRepresentatives);
     } catch (error) {
+      console.error('❌ SHERLOCK v32.0: Error fetching representatives with financial enhancement:', error);
       res.status(500).json({ error: "خطا در دریافت نمایندگان" });
     }
   });
@@ -2188,12 +2222,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ✅ SHERLOCK v32.1: Enhanced validation with detailed logging
       const validationErrors = [];
-      
+
       if (!invoiceId) validationErrors.push("invoiceId مفقود است");
       if (!editedUsageData) validationErrors.push("editedUsageData مفقود است");
       if (!editedBy) validationErrors.push("editedBy مفقود است");
       if (!editReason || !editReason.trim()) validationErrors.push("editReason مفقود یا خالی است");
-      
+
       debug.info('Validation Check', {
         invoiceId: !!invoiceId,
         editedUsageData: !!editedUsageData,
@@ -2218,7 +2252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             editedUsageDataKeys: editedUsageData ? Object.keys(editedUsageData) : []
           }
         });
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "اطلاعات ضروری برای ویرایش فاکتور کامل نیست",
           details: validationErrors,
           missingFields: validationErrors
