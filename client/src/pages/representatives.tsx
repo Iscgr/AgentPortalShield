@@ -1268,10 +1268,12 @@ export default function Representatives() {
       />
 
       {/* Edit Invoice Dialog - Using External Component */}
-      {selectedInvoice && selectedRep && (
+      {selectedInvoice && selectedRep && isInvoiceEditOpen && (
         <InvoiceEditDialog
           invoice={selectedInvoice}
           representativeCode={selectedRep.code}
+          isOpen={isInvoiceEditOpen}
+          onOpenChange={setIsInvoiceEditOpen}
           onEditComplete={() => {
             console.log('🔧 Edit completed, refreshing data...');
             // Refresh representative details

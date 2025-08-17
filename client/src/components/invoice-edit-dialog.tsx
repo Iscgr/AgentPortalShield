@@ -42,15 +42,22 @@ interface Invoice {
 interface InvoiceEditDialogProps {
   invoice: Invoice;
   representativeCode: string;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onEditComplete?: () => void;
 }
 
 export default function InvoiceEditDialog({
   invoice,
   representativeCode,
+  isOpen = false,
+  onOpenChange,
   onEditComplete
 }: InvoiceEditDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  // Use controlled state from parent or internal state
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const actualIsOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const setActualIsOpen = onOpenChange || setInternalIsOpen;
   const [editMode, setEditMode] = useState(false);
   const [editableRecords, setEditableRecords] = useState<EditableUsageRecord[]>([]);
   const [editReason, setEditReason] = useState("");
@@ -78,7 +85,7 @@ export default function InvoiceEditDialog({
   // Authentication check with proper error handling
   if (!isAuthenticated || !currentUser) {
     return (
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={actualIsOpen} onOpenChange={setActualIsOpen}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" disabled>
             <Edit3 className="w-4 h-4 mr-2" />
@@ -124,7 +131,7 @@ export default function InvoiceEditDialog({
 
   // Start session monitoring when dialog opens
   useEffect(() => {
-    if (isOpen && editMode) {
+    if (actualIsOpen && editMode) {
       checkSessionHealth();
 
       const interval = setInterval(() => {
@@ -137,7 +144,7 @@ export default function InvoiceEditDialog({
         if (interval) clearInterval(interval);
       };
     }
-  }, [isOpen, editMode]);
+  }, [actualIsOpen, editMode]);
 
   // Calculate total amount from records
   const calculateTotalAmount = (records: EditableUsageRecord[]) => {
@@ -149,19 +156,19 @@ export default function InvoiceEditDialog({
   // Fetch invoice usage details
   const { data: usageDetails, isLoading } = useQuery({
     queryKey: [`/api/invoices/${invoice.id}/usage-details`],
-    enabled: isOpen
+    enabled: actualIsOpen
   });
 
   // Fetch edit history
   const { data: editHistory } = useQuery({
     queryKey: [`/api/invoices/${invoice.id}/edit-history`],
-    enabled: isOpen && activeTab === "history"
+    enabled: actualIsOpen && activeTab === "history"
   });
 
   // Fetch financial transactions
   const { data: financialTransactions } = useQuery({
     queryKey: [`/api/financial/transactions`],
-    enabled: isOpen && activeTab === "transactions"
+    enabled: actualIsOpen && activeTab === "transactions"
   });
 
   // Edit mutation with enhanced error handling
@@ -307,7 +314,7 @@ export default function InvoiceEditDialog({
 
       setIsProcessing(false);
       setEditMode(false);
-      setIsOpen(false);
+      setActualIsOpen(false);
 
       if (onEditComplete) {
         onEditComplete();
@@ -381,7 +388,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
 
   // Reset initialization when dialog is closed
   useEffect(() => {
-    if (!isOpen) {
+    if (!actualIsOpen) {
       setIsInitialized(false);
       setEditMode(false);
       setEditReason("");
@@ -392,7 +399,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         setSessionCheckInterval(null);
       }
     }
-  }, [isOpen, sessionCheckInterval]);
+  }, [actualIsOpen, sessionCheckInterval]);
 
   // ✅ SHERLOCK v31.0: ATOMIC ADD RECORD with GUARANTEED SYNC
   const addNewRecord = () => {
@@ -749,7 +756,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={actualIsOpen} onOpenChange={setActualIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Edit3 className="w-4 h-4 mr-2" />
