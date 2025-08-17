@@ -1982,15 +1982,49 @@ export class DatabaseStorage implements IStorage {
           // ✅ SHERLOCK v28.1: COMPREHENSIVE INVOICE UPDATE WITH AMOUNT SYNCHRONIZATION
           console.log(`💰 SHERLOCK v28.1: Updating invoice ${editData.invoiceId} from ${editData.originalAmount} to ${editData.editedAmount}`);
 
+          // ---- START OF MODIFIED CODE ----
+          // Process usage data and get metadata for logging
+          let newUsageData = editData.editedUsageData;
+          let recordsMetadata = {
+            totalActiveRecords: 0,
+            verificationPassed: false,
+            dataIntegrityValidated: false,
+          };
+
+          if (newUsageData && typeof newUsageData === 'object' && newUsageData.records && Array.isArray(newUsageData.records)) {
+            recordsMetadata.totalActiveRecords = newUsageData.records.length;
+            // Basic validation: Ensure all records have required fields and amounts are positive
+            recordsMetadata.verificationPassed = newUsageData.records.every(record =>
+              record.name && record.quantity >= 0 && record.unitPrice >= 0 && record.amount >= 0
+            );
+            // Deep check for data integrity (e.g., amount = quantity * unitPrice)
+            recordsMetadata.dataIntegrityValidated = newUsageData.records.every(record =>
+              Math.abs(record.amount - (record.quantity * record.unitPrice)) < 0.01 // Allow for floating point inaccuracies
+            );
+          }
+
+          // Update invoice with new amount and processed usage data
           await db.update(invoices)
             .set({
               amount: editData.editedAmount.toString(),
-              usageData: editData.editedUsageData,
+              usageData: newUsageData, // Use the processed usage data
               updatedAt: new Date()
             })
             .where(eq(invoices.id, editData.invoiceId));
 
-          console.log(`✅ SHERLOCK v28.1: Invoice ${editData.invoiceId} amount updated to ${editData.editedAmount}`);
+          console.log(`✅ SHERLOCK v32.0: Invoice ${editData.invoiceId} updated with complete usage data replacement`);
+          console.log(`💰 Amount: ${editData.originalAmount} → ${editData.editedAmount}`);
+          console.log(`📊 Records: ${recordsMetadata.totalActiveRecords} active items`);
+          console.log(`🔍 Verification: ${recordsMetadata.verificationPassed ? 'PASSED' : 'FAILED'}`);
+
+          // ✅ Additional validation after update
+          if (recordsMetadata.dataIntegrityValidated) {
+            const updatedInvoice = await db.select().from(invoices).where(eq(invoices.id, editData.invoiceId));
+            if (updatedInvoice[0]?.usageData) {
+              console.log(`✅ SHERLOCK v32.0: Usage data persistence confirmed for invoice ${editData.invoiceId}`);
+            }
+          }
+          // ---- END OF MODIFIED CODE ----
 
 
           // ✅ SHERLOCK v28.0: COMPREHENSIVE FINANCIAL SYNCHRONIZATION

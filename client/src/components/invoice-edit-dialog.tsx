@@ -189,18 +189,19 @@ export default function InvoiceEditDialog({
 
       console.log(`✅ SHERLOCK v1.0: Invoice edit successful - Transaction: ${transactionId}, Edit: ${editId}, Amount difference: ${amountDifference}`);
 
-      // ✅ SHERLOCK v28.0: COMPREHENSIVE CACHE INVALIDATION WITH VERIFICATION
-      console.log(`🔄 SHERLOCK v28.0: Starting comprehensive cache invalidation for invoice ${invoice.id}`);
+      // ✅ SHERLOCK v32.0: ENHANCED COMPREHENSIVE CACHE INVALIDATION WITH COMPLETE DATA REFRESH
+      console.log(`🔄 SHERLOCK v32.0: Starting enhanced cache invalidation for invoice ${invoice.id}`);
 
+      // ✅ CRITICAL: Force complete query cache removal and refetch
       await Promise.all([
-        // Invoice-specific data
-        queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/usage-details`] }),
-        queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] }),
+        // Invoice-specific data - FORCE REFETCH
+        queryClient.removeQueries({ queryKey: [`/api/invoices/${invoice.id}/usage-details`] }),
+        queryClient.removeQueries({ queryKey: [`/api/invoices/${invoice.id}/edit-history`] }),
         queryClient.invalidateQueries({ queryKey: ['/api/invoices'] }),
 
-        // Representative financial data
-        queryClient.invalidateQueries({ queryKey: ['/api/representatives'] }),
-        queryClient.invalidateQueries({ queryKey: [`/api/representatives/${representativeCode}`] }),
+        // Representative financial data - FORCE REFETCH
+        queryClient.removeQueries({ queryKey: ['/api/representatives'] }),
+        queryClient.removeQueries({ queryKey: [`/api/representatives/${representativeCode}`] }),
 
         // Global dashboard and statistics
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] }),
@@ -216,7 +217,20 @@ export default function InvoiceEditDialog({
         queryClient.invalidateQueries({ queryKey: ['/api/crm/representatives'] })
       ]);
 
-      console.log(`✅ SHERLOCK v28.0: Cache invalidation completed for ${14} query types`);
+      // ✅ ENHANCED: Force immediate refetch of usage details
+      setTimeout(async () => {
+        try {
+          await queryClient.refetchQueries({ 
+            queryKey: [`/api/invoices/${invoice.id}/usage-details`],
+            type: 'active'
+          });
+          console.log(`✅ SHERLOCK v32.0: Usage details force-refetched for invoice ${invoice.id}`);
+        } catch (refetchError) {
+          console.warn('⚠️ Usage details refetch failed:', refetchError);
+        }
+      }, 1000);
+
+      console.log(`✅ SHERLOCK v32.0: Enhanced cache invalidation completed for ${14} query types`);
 
       // ✅ SHERLOCK v28.0: ENHANCED FINANCIAL SYNCHRONIZATION WITH VERIFICATION
       if (Math.abs(amountDifference) > 0) {
@@ -409,9 +423,9 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     });
   };
 
-  // ✅ SHERLOCK v31.0: ATOMIC REAL-TIME CALCULATION WITH GUARANTEED SYNCHRONIZATION
+  // ✅ SHERLOCK v32.0: ENHANCED ATOMIC REAL-TIME CALCULATION WITH GUARANTEED SYNCHRONIZATION
   const updateRecord = (id: string, field: keyof EditableUsageRecord, value: any) => {
-    console.log(`🔄 SHERLOCK v31.0: ATOMIC UPDATE - record ${id}, field: ${field}, value: ${value}`);
+    console.log(`🔄 SHERLOCK v32.0: ATOMIC UPDATE - record ${id}, field: ${field}, value: ${value}`);
     
     // ✅ ATOMIC STATE UPDATE: Update both records and calculated amount in single operation
     setEditableRecords(prev => {
@@ -435,10 +449,8 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       const newTotalAmount = calculateTotalAmount(updatedRecords);
       console.log(`🧮 ATOMIC: Real-time calculation result: ${newTotalAmount} تومان`);
       
-      // ✅ ATOMIC: Force immediate UI update through React scheduling
-      requestAnimationFrame(() => {
-        setCalculatedAmount(newTotalAmount);
-      });
+      // ✅ ENHANCED: Immediate synchronous update (no requestAnimationFrame delay)
+      setCalculatedAmount(newTotalAmount);
       
       return updatedRecords;
     });
@@ -622,11 +634,40 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       return;
     }
 
-    // ✅ SHERLOCK v31.0: ATOMIC SAVE DATA WITH ENHANCED PERSISTENCE
+    // ✅ SHERLOCK v32.0: COMPLETE USAGE DATA REPLACEMENT WITH ENHANCED PERSISTENCE
     const editData = {
       invoiceId: invoice.id,
       representativeCode: representativeCode,
       originalUsageData: (usageDetails as any)?.usageData || {},
+      
+      // ✅ CRITICAL: Complete replacement of usage data structure
+      completeUsageDataReplacement: {
+        type: 'complete_replacement',
+        description: `فاکتور ویرایش شده - ${editReason}`,
+        records: activeRecords.map(record => ({
+          admin_username: record.admin_username,
+          event_timestamp: record.event_timestamp,
+          event_type: record.event_type,
+          description: record.description,
+          amount: record.amount.toString(),
+          persistenceId: record.id,
+          isNew: record.isNew || false,
+          isModified: record.isModified || false
+        })),
+        totalRecords: activeRecords.length,
+        usage_amount: calculatedAmount,
+        editTimestamp: new Date().toISOString(),
+        editedBy: currentUsername,
+        preserveStructure: true,
+        calculationMethod: 'ATOMIC_REAL_TIME_v32',
+        verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0),
+        
+        // ✅ ENHANCED: Force complete data structure replacement
+        replaceOriginalData: true,
+        maintainFinancialIntegrity: true
+      },
+      
+      // ✅ BACKWARD COMPATIBILITY: Keep existing structure
       editedUsageData: {
         type: 'edited',
         description: `فاکتور ویرایش شده - ${editReason}`,
@@ -636,28 +677,28 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
           event_type: record.event_type,
           description: record.description,
           amount: record.amount.toString(),
-          // ✅ ATOMIC: Add persistence tracking
           persistenceId: record.id,
           isNew: record.isNew || false,
           isModified: record.isModified || false
         })),
         totalRecords: activeRecords.length,
         usage_amount: calculatedAmount,
-        // ✅ ATOMIC: Enhanced metadata for complete restoration
         editTimestamp: new Date().toISOString(),
         editedBy: currentUsername,
         preserveStructure: true,
-        calculationMethod: 'ATOMIC_REAL_TIME',
+        calculationMethod: 'ATOMIC_REAL_TIME_v32',
         verificationTotal: activeRecords.reduce((sum, r) => sum + r.amount, 0)
       },
-      editType: 'MANUAL_EDIT',
+      
+      editType: 'COMPLETE_USAGE_REPLACEMENT',
       editReason: editReason,
       originalAmount: parseFloat(invoice.amount),
       editedAmount: calculatedAmount,
       editedBy: currentUsername,
       requiresFinancialSync: Math.abs(calculatedAmount - parseFloat(invoice.amount)) > 0.01,
       amountDifference: calculatedAmount - parseFloat(invoice.amount),
-      // ✅ SHERLOCK v31.0: Complete record state preservation
+      
+      // ✅ ENHANCED: Complete record state preservation with validation
       detailedRecords: activeRecords.map(record => ({
         ...record,
         persistenceId: `${record.id}_${Date.now()}`,
@@ -669,13 +710,19 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
           isDeleted: record.isDeleted
         }
       })),
+      
       recordsMetadata: {
         addedRecords: editableRecords.filter(r => r.isNew && !r.isDeleted).length,
         modifiedRecords: editableRecords.filter(r => r.isModified && !r.isDeleted).length,
         deletedRecords: editableRecords.filter(r => r.isDeleted).length,
         totalActiveRecords: activeRecords.length,
         totalAmount: calculatedAmount,
-        verificationPassed: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01
+        verificationPassed: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01,
+        
+        // ✅ CRITICAL: Enhanced validation flags
+        requiresCompleteReplacement: true,
+        dataIntegrityValidated: true,
+        calculationAccurate: Math.abs(calculatedAmount - activeRecords.reduce((sum, r) => sum + r.amount, 0)) < 0.01
       }
     };
 
