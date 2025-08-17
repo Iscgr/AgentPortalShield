@@ -2729,6 +2729,17 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
+  // ✅ SHERLOCK v32.0: Get single invoice by ID with full details
+  async getInvoiceById(invoiceId: number): Promise<any | null> {
+    return await withDatabaseRetry(
+      async () => {
+        const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+        return invoice || null;
+      },
+      'getInvoiceById'
+    );
+  }
+
   // SHERLOCK v12.4: Manual Invoices Management Implementation
   async getManualInvoices(options: { page: number; limit: number; search?: string; status?: string }): Promise<{ data: Invoice[]; pagination: any }> {
     return await withDatabaseRetry(
