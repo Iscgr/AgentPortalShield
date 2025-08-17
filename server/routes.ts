@@ -172,6 +172,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register database optimization routes
   app.use('/api/database-optimization', databaseOptimizationRoutes);
 
+  // SHERLOCK v32.0: Register Batch Rollback Routes for safe invoice deletion
+  registerBatchRollbackRoutes(app, authMiddleware);
+
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
     const sessionInfo = {

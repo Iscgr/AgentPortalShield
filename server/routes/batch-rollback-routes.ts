@@ -35,12 +35,12 @@ export function registerBatchRollbackRoutes(app: any, requireAuth: any) {
         }
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Rollback preview error:', error);
       res.status(500).setHeader('Content-Type', 'application/json').json({
         success: false,
         error: 'خطا در تولید گزارش پیش‌نمایش',
-        details: error.message
+        details: error?.message || 'خطای نامشخص'
       });
     }
   });
@@ -71,12 +71,12 @@ export function registerBatchRollbackRoutes(app: any, requireAuth: any) {
         }
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Rollback test error:', error);
       res.status(500).setHeader('Content-Type', 'application/json').json({
         success: false,
         error: 'خطا در تست حذف دسته‌جمعی',
-        details: error.message
+        details: error?.message || 'خطای نامشخص'
       });
     }
   });
@@ -118,12 +118,12 @@ export function registerBatchRollbackRoutes(app: any, requireAuth: any) {
         }
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Rollback execution error:', error);
       res.status(500).json({
         success: false,
         error: 'خطا در اجرای حذف دسته‌جمعی',
-        details: error.message
+        details: error?.message || 'خطای نامشخص'
       });
     }
   });

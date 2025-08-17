@@ -7,7 +7,7 @@
 import { db } from '../db.js';
 import { invoices, representatives, payments, financialTransactions } from '../../shared/schema.js';
 import { eq, and, like, desc } from 'drizzle-orm';
-import { UnifiedFinancialEngine } from './unified-financial-engine.js';
+import { unifiedFinancialEngine } from './unified-financial-engine.js';
 import { FinancialConsistencyEngine } from './financial-consistency-engine.js';
 
 export interface BatchRollbackResult {
@@ -82,7 +82,7 @@ export class BatchInvoiceRollbackEngine {
 
         try {
           // محاسبه وضعیت مالی فعلی
-          const currentFinancial = await UnifiedFinancialEngine.calculateRepresentative(representativeId);
+          const currentFinancial = await unifiedFinancialEngine.calculateRepresentative(representativeId);
           
           // محاسبه مجموع فاکتورهای قرار به حذف
           const totalToDelete = invoiceGroup.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
@@ -103,8 +103,8 @@ export class BatchInvoiceRollbackEngine {
             difference: totalToDelete
           });
 
-        } catch (error) {
-          result.errors.push(`خطا در محاسبه نماینده ${representativeId}: ${error.message}`);
+        } catch (error: any) {
+          result.errors.push(`خطا در محاسبه نماینده ${representativeId}: ${error?.message || 'خطای نامشخص'}`);
         }
       }
 
@@ -123,8 +123,8 @@ export class BatchInvoiceRollbackEngine {
           try {
             await db.delete(invoices).where(eq(invoices.id, invoice.id));
             console.log(`✅ Deleted invoice ${invoice.id}`);
-          } catch (error) {
-            result.errors.push(`خطا در حذف فاکتور ${invoice.id}: ${error.message}`);
+          } catch (error: any) {
+            result.errors.push(`خطا در حذف فاکتور ${invoice.id}: ${error?.message || 'خطای نامشخص'}`);
           }
         }
 
@@ -132,8 +132,8 @@ export class BatchInvoiceRollbackEngine {
         for (const repState of result.restoredFinancialState) {
           try {
             // Force invalidate cache
-            if (UnifiedFinancialEngine.forceInvalidateRepresentative) {
-              UnifiedFinancialEngine.forceInvalidateRepresentative(repState.representativeId, {
+            if (unifiedFinancialEngine.forceInvalidateRepresentative) {
+              unifiedFinancialEngine.forceInvalidateRepresentative(repState.representativeId, {
                 cascadeGlobal: true,
                 reason: 'batch_rollback',
                 immediate: true
@@ -150,8 +150,8 @@ export class BatchInvoiceRollbackEngine {
 
             console.log(`✅ Updated representative ${repState.representativeId} debt: ${repState.previousDebt} → ${repState.newDebt}`);
 
-          } catch (error) {
-            result.errors.push(`خطا در بروزرسانی نماینده ${repState.representativeId}: ${error.message}`);
+          } catch (error: any) {
+            result.errors.push(`خطا در بروزرسانی نماینده ${repState.representativeId}: ${error?.message || 'خطای نامشخص'}`);
           }
         }
 
@@ -168,8 +168,8 @@ export class BatchInvoiceRollbackEngine {
 
       return result;
 
-    } catch (error) {
-      result.errors.push(`خطای سیستمی: ${error.message}`);
+    } catch (error: any) {
+      result.errors.push(`خطای سیستمی: ${error?.message || 'خطای نامشخص'}`);
       result.success = false;
       return result;
     }
@@ -187,9 +187,9 @@ export class BatchInvoiceRollbackEngine {
       await db.insert(financialTransactions).values({
         transactionId,
         type: 'BATCH_INVOICE_ROLLBACK',
-        representativeId: null, // تراکنش سیستمی
+        representativeId: -1, // تراکنش سیستمی - استفاده از ID منفی برای سیستم
         relatedEntityType: 'system',
-        relatedEntityId: null,
+        relatedEntityId: -1,
         originalState: {
           deletedInvoices: deletedInvoices.map(inv => ({
             id: inv.id,
