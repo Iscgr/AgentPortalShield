@@ -82,7 +82,7 @@ export class BatchInvoiceRollbackEngine {
 
         try {
           // محاسبه وضعیت مالی فعلی
-          const currentFinancial = await UnifiedFinancialEngine.prototype.calculateRepresentative(representativeId);
+          const currentFinancial = await UnifiedFinancialEngine.calculateRepresentative(representativeId);
           
           // محاسبه مجموع فاکتورهای قرار به حذف
           const totalToDelete = invoiceGroup.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
@@ -132,11 +132,13 @@ export class BatchInvoiceRollbackEngine {
         for (const repState of result.restoredFinancialState) {
           try {
             // Force invalidate cache
-            UnifiedFinancialEngine.forceInvalidateRepresentative(repState.representativeId, {
-              cascadeGlobal: true,
-              reason: 'batch_rollback',
-              immediate: true
-            });
+            if (UnifiedFinancialEngine.forceInvalidateRepresentative) {
+              UnifiedFinancialEngine.forceInvalidateRepresentative(repState.representativeId, {
+                cascadeGlobal: true,
+                reason: 'batch_rollback',
+                immediate: true
+              });
+            }
 
             // بروزرسانی بدهی در جدول نمایندگان
             await db.update(representatives)

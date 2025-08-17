@@ -51,6 +51,14 @@ import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-route
 // Import database optimization routes registration
 import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
 
+// Import AI Engine routes
+import { registerAiEngineRoutes } from './routes/ai-engine-routes.js';
+// Import Workspace Routes
+import { registerWorkspaceRoutes } from './routes/workspace-routes.js';
+// Import Batch Rollback Routes
+import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
+
+
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession extends Express.Session {
   authenticated?: boolean;

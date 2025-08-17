@@ -17,14 +17,19 @@ export function registerBatchRollbackRoutes(app: any, requireAuth: any) {
       const { issueDate } = req.params;
       
       console.log(`📊 SHERLOCK v32.0: Generating rollback preview for date ${issueDate}`);
+      console.log(`📊 SHERLOCK v32.0: URL encoded date: ${decodeURIComponent(issueDate)}`);
       
-      const report = await BatchInvoiceRollbackEngine.getInvoicesByDateReport(issueDate);
+      const decodedDate = decodeURIComponent(issueDate);
+      const report = await BatchInvoiceRollbackEngine.getInvoicesByDateReport(decodedDate);
       
+      console.log(`📊 SHERLOCK v32.0: Preview results - ${report.invoices.length} invoices, ${report.representativeSummary.length} representatives`);
+      
+      res.setHeader('Content-Type', 'application/json');
       res.json({
         success: true,
         data: report,
         meta: {
-          date: issueDate,
+          date: decodedDate,
           previewMode: true,
           timestamp: new Date().toISOString()
         }
@@ -32,7 +37,7 @@ export function registerBatchRollbackRoutes(app: any, requireAuth: any) {
 
     } catch (error) {
       console.error('❌ Rollback preview error:', error);
-      res.status(500).json({
+      res.status(500).setHeader('Content-Type', 'application/json').json({
         success: false,
         error: 'خطا در تولید گزارش پیش‌نمایش',
         details: error.message
@@ -48,11 +53,16 @@ export function registerBatchRollbackRoutes(app: any, requireAuth: any) {
       const { issueDate } = req.params;
       
       console.log(`🧪 SHERLOCK v32.0: Testing batch rollback for date ${issueDate}`);
+      console.log(`🧪 SHERLOCK v32.0: URL encoded date: ${decodeURIComponent(issueDate)}`);
       
-      const result = await BatchInvoiceRollbackEngine.rollbackInvoicesByDate(issueDate, true);
+      const decodedDate = decodeURIComponent(issueDate);
+      const result = await BatchInvoiceRollbackEngine.rollbackInvoicesByDate(decodedDate, true);
       
+      console.log(`🧪 SHERLOCK v32.0: Test results - Success: ${result.success}, Invoices: ${result.deletedInvoices}, Errors: ${result.errors.length}`);
+      
+      res.setHeader('Content-Type', 'application/json');
       res.json({
-        success: true,
+        success: result.success,
         data: result,
         meta: {
           testMode: true,
@@ -63,7 +73,7 @@ export function registerBatchRollbackRoutes(app: any, requireAuth: any) {
 
     } catch (error) {
       console.error('❌ Rollback test error:', error);
-      res.status(500).json({
+      res.status(500).setHeader('Content-Type', 'application/json').json({
         success: false,
         error: 'خطا در تست حذف دسته‌جمعی',
         details: error.message

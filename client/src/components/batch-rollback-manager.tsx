@@ -45,24 +45,35 @@ export function BatchRollbackManager() {
   const { data: previewData, isLoading: previewLoading, refetch: refetchPreview } = useQuery({
     queryKey: ['rollback-preview', targetDate],
     queryFn: () => apiRequest(`/api/batch-rollback/preview/${encodeURIComponent(targetDate)}`),
-    enabled: false
+    enabled: false,
+    retry: 1
   });
 
   // تست حذف دسته‌جمعی
   const testRollbackMutation = useMutation({
     mutationFn: () => apiRequest(`/api/batch-rollback/test/${encodeURIComponent(targetDate)}`, {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
     }),
     onSuccess: (data) => {
-      toast({
-        title: "تست موفق",
-        description: `${data.data.deletedInvoices} فاکتور برای حذف شناسایی شد`
-      });
+      if (data.success) {
+        toast({
+          title: "تست موفق",
+          description: `${data.data.deletedInvoices} فاکتور برای حذف شناسایی شد`
+        });
+      } else {
+        toast({
+          title: "خطا در تست",
+          description: data.error || 'خطای نامشخص',
+          variant: "destructive"
+        });
+      }
     },
     onError: (error: any) => {
+      console.error('Test rollback error:', error);
       toast({
         title: "خطا در تست",
-        description: error.message,
+        description: error.message || 'خطا در اتصال به سرور',
         variant: "destructive"
       });
     }

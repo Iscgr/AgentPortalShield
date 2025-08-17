@@ -14,59 +14,40 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(url: string, options: ApiRequestOptions = {}): Promise<any> {
-  console.log(`SHERLOCK v12.1: Fetching URL:`, url);
+export async function apiRequest(url: string, options: RequestInit = {}): Promise<any> {
+  console.log(`SHERLOCK v32.0: Fetching URL:`, url);
 
-  const config: RequestInit = {
-    method: options.method || "GET",
+  const response = await fetch(url, {
+    ...options,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...options.headers,
     },
-    credentials: "include",
-  };
+  });
 
-  if (options.data) {
-    config.body = JSON.stringify(options.data);
+  console.log(`SHERLOCK v32.0 DEBUG: Response status for ${url}:`, response.status);
+
+  // Check if response is JSON
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    console.error(`SHERLOCK v32.0: Non-JSON response for ${url}:`, text.substring(0, 200));
+    throw new Error(`Server returned HTML instead of JSON. Check if route is registered.`);
   }
 
-  try {
-    const response = await fetch(url, config);
-
-    console.log(`SHERLOCK v12.1 DEBUG: Response status for ${url}:`, response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API Error (${response.status}) for ${url}:`, errorText);
-
-      // Handle authentication errors - don't redirect automatically
-      if (response.status === 401) {
-        console.log('Auth check failed:', response.status);
-        // Let the calling component handle 401 errors appropriately
-      }
-
-      throw new Error(`HTTP ${response.status}: ${errorText || 'Network Error'}`);
-    }
-
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.warn(`Non-JSON response for ${url}:`, contentType);
-      const text = await response.text();
-      console.log('Response text:', text);
-      return text;
-    }
-
-    const data = await response.json();
-    console.log(`SHERLOCK v12.1 DEBUG: Successful response for ${url}:`, {
-      dataType: Array.isArray(data) ? 'array' : typeof data,
-      length: Array.isArray(data) ? data.length : Object.keys(data || {}).length
-    });
-
-    return data;
-  } catch (error) {
-    console.error(`API Request failed for ${url}:`, error);
-    throw error;
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Parse error' }));
+    console.error(`SHERLOCK v32.0: API Error ${response.status} for ${url}:`, errorData);
+    throw new Error(errorData.error || `HTTP ${response.status}`);
   }
+
+  const data = await response.json();
+  console.log(`SHERLOCK v32.0 DEBUG: Successful response for ${url}:`, {
+    dataType: typeof data,
+    length: Array.isArray(data) ? data.length : Object.keys(data).length
+  });
+
+  return data;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
