@@ -72,6 +72,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 import InvoiceEditDialog from "@/components/invoice-edit-dialog";
+import DebtVerificationPanel from "@/components/debt-verification-panel";
 
 // ✅ SHERLOCK v32.0: Enhanced Real-time debt display with aggressive refresh
 function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId: number, fallbackDebt?: string }) {
@@ -238,6 +239,7 @@ export default function Representatives() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [showVerificationPanel, setShowVerificationPanel] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -805,6 +807,14 @@ export default function Representatives() {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={() => setShowVerificationPanel(!showVerificationPanel)}
+            className={showVerificationPanel ? "bg-blue-100 text-blue-800" : ""}
+          >
+            <CheckCircle className="w-4 h-4 ml-2" />
+            {showVerificationPanel ? "پنهان کردن بررسی" : "بررسی انطباق بدهی"}
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => {
               toast({
                 title: "شروع همگام‌سازی",
@@ -880,6 +890,9 @@ export default function Representatives() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Debt Verification Panel */}
+      {showVerificationPanel && <DebtVerificationPanel />}
 
       {/* Representatives Table */}
       <Card>

@@ -58,6 +58,8 @@ import { registerWorkspaceRoutes } from './routes/workspace-routes.js';
 // Import Batch Rollback Routes
 import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 
+// Import Debt Verification Routes
+import debtVerificationRoutes from './routes/debt-verification-routes.js';
 
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession extends Express.Session {
@@ -174,6 +176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // SHERLOCK v32.0: Register Batch Rollback Routes for safe invoice deletion
   registerBatchRollbackRoutes(app, authMiddleware);
+
+  // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
+  app.use('/api/debt-verification', debtVerificationRoutes);
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
