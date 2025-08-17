@@ -254,46 +254,33 @@ import { invoiceService } from './services/invoice.js';
 import multer from 'multer';
 import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
 
-// Import route modules
-import crmRoutes from './routes/crm-routes.js';
-import workspaceRoutes from './routes/workspace-routes.js';
-import settingsRoutes from './routes/settings-routes.js';
-import maintenanceRoutes from './routes/maintenance-routes.js';
-import aiEngineRoutes from './routes/ai-engine-routes.js';
-import unifiedStatisticsRoutes from './routes/unified-statistics-routes.js';
-import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
-import standardizedInvoiceRoutes from './routes/standardized-invoice-routes.js';
-import unifiedFinancialRoutes from './routes/unified-financial-routes.js';
-import couplingRoutes from './routes/coupling-routes.js';
+// Import route modules - using named imports
+import { registerCrmRoutes } from './routes/crm-routes.js';
+import { registerWorkspaceRoutes } from './routes/workspace-routes.js';
+import { registerSettingsRoutes } from './routes/settings-routes.js';
+import { registerMaintenanceRoutes } from './routes/maintenance-routes.js';
+import { registerAiEngineRoutes } from './routes/ai-engine-routes.js';
+import { registerUnifiedStatisticsRoutes } from './routes/unified-statistics-routes.js';
+import { registerDatabaseOptimizationRoutes } from './routes/database-optimization-routes.js';
+import { registerStandardizedInvoiceRoutes } from './routes/standardized-invoice-routes.js';
+import { registerUnifiedFinancialRoutes } from './routes/unified-financial-routes.js';
+import { registerCouplingRoutes } from './routes/coupling-routes.js';
 
-
-// Define a createRouter function if it's not defined elsewhere and used by registerRoutes
-function createRouter(requireAuth: any) {
-  const router = Router();
-
-  // Example of how routes might be added (adapt as needed)
-  router.use('/crm', crmRoutes(requireAuth));
-  router.use('/workspace', workspaceRoutes(requireAuth));
-  router.use('/settings', settingsRoutes(requireAuth));
-  router.use('/maintenance', maintenanceRoutes(requireAuth));
-  router.use('/ai-engine', aiEngineRoutes(requireAuth));
-  router.use('/unified-statistics', unifiedStatisticsRoutes(requireAuth));
-  router.use('/database-optimization', databaseOptimizationRoutes(requireAuth));
-  router.use('/standardized-invoice', standardizedInvoiceRoutes(requireAuth));
-  router.use('/unified-financial', unifiedFinancialRoutes(requireAuth));
-  router.use('/coupling', couplingRoutes(requireAuth));
-
-
-  return router;
-}
 
 // ✅ Export the registerRoutes function for server/index.ts
-export function registerRoutes(app: any, requireAuth: any) {
-  // Create main router
-  const router = createRouter(requireAuth);
-
-  // Mount all routes
-  app.use('/api', router);
+export function registerRoutes(app: any, requireAuth: any, storage: any) {
+  // Register all route modules with the app
+  registerCrmRoutes(app, requireAuth, storage);
+  registerWorkspaceRoutes(app);
+  registerSettingsRoutes(app);
+  registerMaintenanceRoutes(app, requireAuth);
+  registerAiEngineRoutes(app, requireAuth, storage);
+  registerUnifiedStatisticsRoutes(app, requireAuth);
+  registerDatabaseOptimizationRoutes(app, requireAuth);
+  registerStandardizedInvoiceRoutes(app, requireAuth);
+  registerUnifiedFinancialRoutes(app, requireAuth);
+  registerCouplingRoutes(app, requireAuth);
 
   console.log('✅ All routes registered successfully');
 }
+

@@ -1083,4 +1083,3 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
 });
 
 // ✅ Single export default at the end of file
-export default router;
