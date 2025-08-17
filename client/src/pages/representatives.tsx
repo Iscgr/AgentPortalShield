@@ -257,19 +257,16 @@ export default function Representatives() {
 
   const { data: representatives = [], isLoading, error: repsError } = useQuery<Representative[]>({
     queryKey: ["/api/representatives"],
-    queryFn: () => apiRequest("/api/representatives"),
-    select: (data: any) => {
-      console.log('SHERLOCK v12.1 DEBUG: Representatives data:', data);
-      if (Array.isArray(data)) {
-        console.log('SHERLOCK v12.1 DEBUG: Found array with', data.length, 'representatives');
+    queryFn: async () => {
+      console.log("🔍 SHERLOCK v32.0: Fetching representatives data");
+      try {
+        const data = await apiRequest("/api/representatives");
+        console.log("✅ Representatives data loaded:", data?.length || 0, "items");
         return data;
+      } catch (error) {
+        console.error("❌ Error fetching representatives:", error);
+        throw new Error("خطا در دریافت نمایندگان");
       }
-      if (data && Array.isArray(data.data)) {
-        console.log('SHERLOCK v12.1 DEBUG: Found nested array with', data.data.length, 'representatives');
-        return data.data;
-      }
-      console.log('SHERLOCK v12.1 DEBUG: No valid representatives data found, returning empty array');
-      return [];
     },
     retry: 3,
     retryDelay: 1000,
