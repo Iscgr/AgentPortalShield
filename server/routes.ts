@@ -1,3 +1,75 @@
+import express from 'express';
+import { eq } from 'drizzle-orm';
+import { db } from './db';
+import { invoices } from './schema';
+import { authMiddleware, requireAuth } from './middleware/auth';
+import { storage } from './storage';
+import { unifiedFinancialEngine } from './financial-engine';
+import { createInvoice, createInvoiceSchema } from './invoice';
+import { z } from 'zod';
+import { registerWorkspaceRoutes } from './routes/workspace-routes.js';
+import workspaceRouter from './routes/workspace-routes.js';
+
+const server = express();
+
+// Middleware for parsing JSON bodies
+server.use(express.json());
+
+// Middleware for parsing URL-encoded bodies
+server.use(express.urlencoded({ extended: true }));
+
+// Default route
+server.get("/", (req, res) => {
+  res.send("SHERLOCK v28.0 API is running!");
+});
+
+// ✅ SHERLOCK v28.0: Invoice Creation Endpoint
+server.post('/api/invoices', authMiddleware, async (req, res) => {
+  const debug = {
+    info: (msg: string, data?: any) => console.log(`🔍 SHERLOCK v28.0 INFO: ${msg}`, data || ''),
+    success: (msg: string, data?: any) => console.log(`✅ SHERLOCK v28.0 SUCCESS: ${msg}`, data || ''),
+    error: (msg: string, data?: any) => console.error(`❌ SHERLOCK v28.0 ERROR: ${msg}`, data || ''),
+    warn: (msg: string, data?: any) => console.warn(`⚠️ SHERLOCK v28.0 WARN: ${msg}`, data || '')
+  };
+
+  try {
+    const validatedData = createInvoiceSchema.parse(req.body);
+    const sessionId = req.sessionID;
+
+    debug.info('Invoice Creation Request', {
+      ...validatedData,
+      sessionId: sessionId?.substring(0, 10) + '...'
+    });
+
+    const newInvoice = await createInvoice(validatedData);
+
+    debug.success('Invoice Created Successfully', { invoiceId: newInvoice.id });
+
+    res.status(201).json({
+      success: true,
+      invoiceId: newInvoice.id,
+      message: "فاکتور با موفقیت ایجاد شد"
+    });
+  } catch (error: any) {
+    debug.error('Invoice Creation Failed', { error: error.message, stack: error.stack?.substring(0, 500) });
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: "خطا در اعتبارسنجی داده‌های ورودی",
+        details: error.errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: "خطای داخلی سرور در ایجاد فاکتور",
+      details: error.message
+    });
+  }
+});
+
+// ✅ SHERLOCK v28.0: Invoice Unified Edit Endpoint
 app.post("/api/invoices/unified-edit", authMiddleware, async (req, res) => {
   const debug = {
     info: (msg: string, data?: any) => console.log(`🔍 SHERLOCK v28.0 INFO: ${msg}`, data || ''),
@@ -161,7 +233,7 @@ app.post("/api/invoices/unified-edit", authMiddleware, async (req, res) => {
 });
 
 // ✅ SHERLOCK v28.0: Invoice Usage Details Endpoint
-app.get("/api/invoices/:id/usage-details", authMiddleware, async (req, res) => {
+server.get("/api/invoices/:id/usage-details", authMiddleware, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
 
@@ -220,7 +292,7 @@ app.get("/api/invoices/:id/usage-details", authMiddleware, async (req, res) => {
 });
 
 // ✅ SHERLOCK v28.0: Invoice Edit History Endpoint
-app.get("/api/invoices/:id/edit-history", authMiddleware, async (req, res) => {
+server.get("/api/invoices/:id/edit-history", authMiddleware, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
 
@@ -240,3 +312,11 @@ app.get("/api/invoices/:id/edit-history", authMiddleware, async (req, res) => {
     });
   }
 });
+
+// Register workspace routes using the default export
+server.use('/api/workspace', workspaceRouter);
+
+// Make sure we only register each route once
+console.log("Routes registered successfully");
+
+return server;
