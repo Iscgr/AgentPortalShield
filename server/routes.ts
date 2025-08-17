@@ -21,7 +21,7 @@ import {
 import { z } from "zod";
 
 // Import all route modules
-import { registerAiEngineRoutes } from "./routes/ai-engine-routes";
+import aiEngineRoutes from "./routes/ai-engine-routes";
 import { registerCrmRoutes } from "./routes/crm-routes";
 import { registerSettingsRoutes } from "./routes/settings-routes";
 import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-routes";
@@ -116,7 +116,7 @@ export function registerRoutes(app: Express, storage: IStorage) {
   });
 
   // Register all modular routes
-  registerAiEngineRoutes(app, unifiedAuthMiddleware, storage);
+  app.use("/api/ai-engine", aiEngineRoutes);
   registerCrmRoutes(app, unifiedAuthMiddleware, storage);
   registerSettingsRoutes(app, unifiedAuthMiddleware, storage);
   registerUnifiedFinancialRoutes(app, unifiedAuthMiddleware, storage);
