@@ -1,16 +1,15 @@
 
-import { Pool } from '@neondatabase/serverless';
+
+import { pool, db } from './server/db.js';
+import { representatives } from './shared/schema.js';
+import { eq, and, sql } from 'drizzle-orm';
 
 async function calculateDirectDebtFromRepresentativesTable() {
-  const pool = new Pool({ 
-    connectionString: process.env.DATABASE_URL 
-  });
-
   try {
     console.log('🔍 SHERLOCK v28.0: محاسبه مستقیم مجموع بدهی از جدول نمایندگان...');
     
     // محاسبه مستقیم از ستون total_debt در جدول representatives
-    const query = `
+    const query = sql`
       SELECT 
         COUNT(*) as total_representatives,
         COUNT(CASE WHEN CAST(total_debt as DECIMAL) > 0 THEN 1 END) as representatives_with_debt,
@@ -22,8 +21,8 @@ async function calculateDirectDebtFromRepresentativesTable() {
       WHERE is_active = true
     `;
 
-    const result = await pool.query(query);
-    const data = result.rows[0];
+    const result = await db.execute(query);
+    const data = result[0];
 
     console.log('📊 نتایج محاسبه مستقیم از جدول نمایندگان:');
     console.log('====================================================');
@@ -46,7 +45,7 @@ async function calculateDirectDebtFromRepresentativesTable() {
     console.log(`✅ تطابق: ${difference < 1000 ? 'بله' : 'خیر'}`);
 
     // بررسی 10 نماینده با بیشترین بدهی
-    const topDebtorsQuery = `
+    const topDebtorsQuery = sql`
       SELECT 
         id, name, code, 
         CAST(total_debt as DECIMAL) as debt,
@@ -58,15 +57,13 @@ async function calculateDirectDebtFromRepresentativesTable() {
       LIMIT 10
     `;
 
-    const topDebtors = await pool.query(topDebtorsQuery);
+    const topDebtors = await db.execute(topDebtorsQuery);
     
     console.log('\n📋 10 نماینده با بیشترین بدهی:');
     console.log('====================================================');
-    topDebtors.rows.forEach((rep, index) => {
+    topDebtors.forEach((rep, index) => {
       console.log(`${index + 1}. ${rep.name} (${rep.code}) - بدهی: ${rep.debt?.toLocaleString()} تومان`);
     });
-
-    await pool.end();
     
     return {
       totalDebt: Math.round(data.total_debt_sum),
@@ -75,12 +72,11 @@ async function calculateDirectDebtFromRepresentativesTable() {
       currentDisplayValue,
       difference,
       isMatching: difference < 1000,
-      topDebtors: topDebtors.rows
+      topDebtors: topDebtors
     };
 
   } catch (error) {
     console.error('❌ خطا در محاسبه مستقیم:', error);
-    await pool.end();
     throw error;
   }
 }
@@ -90,7 +86,10 @@ calculateDirectDebtFromRepresentativesTable()
   .then(result => {
     console.log('\n✅ محاسبه مستقیم کامل شد');
     console.log(`🎯 مقدار نهایی: ${result.totalDebt.toLocaleString()} تومان`);
+    process.exit(0);
   })
   .catch(error => {
     console.error('❌ خطا:', error.message);
+    process.exit(1);
   });
+
