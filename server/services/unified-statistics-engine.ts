@@ -523,5 +523,3 @@ class UnifiedStatisticsEngine {
 }
 
 export const unifiedStatisticsEngine = new UnifiedStatisticsEngine();
-
-export const unifiedStatisticsEngine = new UnifiedStatisticsEngine();
