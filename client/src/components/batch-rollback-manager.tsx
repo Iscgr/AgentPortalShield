@@ -56,24 +56,29 @@ export function BatchRollbackManager() {
       headers: { 'Content-Type': 'application/json' }
     }),
     onSuccess: (data) => {
-      if (data.success) {
+      console.log('SHERLOCK v32.0: Test rollback response:', data);
+      if (data.success && data.data) {
+        const { deletedInvoices, affectedRepresentatives, warnings } = data.data;
         toast({
-          title: "تست موفق",
-          description: `${data.data.deletedInvoices} فاکتور برای حذف شناسایی شد`
+          title: "✅ تست موفق",
+          description: `${deletedInvoices} فاکتور از ${affectedRepresentatives} نماینده برای حذف شناسایی شد${warnings?.length ? ' (با هشدار)' : ''}`,
+          variant: "default"
         });
       } else {
         toast({
-          title: "خطا در تست",
-          description: data.error || 'خطای نامشخص',
+          title: "❌ خطا در تست",
+          description: data.error || data.data?.errors?.join(', ') || 'خطای نامشخص',
           variant: "destructive"
         });
       }
     },
     onError: (error: any) => {
-      console.error('Test rollback error:', error);
+      console.error('SHERLOCK v32.0: Test rollback error:', error);
       toast({
-        title: "خطا در تست",
-        description: error.message || 'خطا در اتصال به سرور',
+        title: "❌ خطا در تست",
+        description: error.message.includes('HTML instead of JSON') 
+          ? 'خطا در اتصال به سرور - مسیرهای API غیرفعال هستند'
+          : error.message || 'خطا در اتصال به سرور',
         variant: "destructive"
       });
     }
@@ -116,6 +121,16 @@ export function BatchRollbackManager() {
   });
 
   const handlePreview = () => {
+    if (!targetDate.trim()) {
+      toast({
+        title: "خطای ورودی",
+        description: "لطفاً تاریخ صدور فاکتور را وارد کنید",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    console.log(`SHERLOCK v32.0: Requesting preview for date: ${targetDate}`);
     refetchPreview();
   };
 
@@ -163,24 +178,34 @@ export function BatchRollbackManager() {
             </p>
           </div>
 
-          <div className="flex items-center space-x-4 space-x-reverse">
-            <Button 
-              onClick={handlePreview}
-              disabled={previewLoading || !targetDate}
-              variant="outline"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              {previewLoading ? "در حال بارگذاری..." : "پیش‌نمایش فاکتورها"}
-            </Button>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-4 space-x-reverse">
+              <Button 
+                onClick={handlePreview}
+                disabled={previewLoading || !targetDate}
+                variant="outline"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                {previewLoading ? "در حال بارگذاری..." : "پیش‌نمایش فاکتورها"}
+              </Button>
 
-            <Button 
-              onClick={handleTestRollback}
-              disabled={testRollbackMutation.isPending || !targetDate}
-              variant="secondary"
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              {testRollbackMutation.isPending ? "در حال تست..." : "تست حذف"}
-            </Button>
+              <Button 
+                onClick={handleTestRollback}
+                disabled={testRollbackMutation.isPending || !targetDate}
+                variant="secondary"
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                {testRollbackMutation.isPending ? "در حال تست..." : "تست حذف (شبیه‌سازی)"}
+              </Button>
+            </div>
+            
+            <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+              <CheckCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 dark:text-blue-200">
+                <strong>توضیح:</strong> گزینه "تست حذف" فقط یک شبیه‌سازی است و هیچ تغییری اعمال نمی‌کند. 
+                برای حذف واقعی، باید پس از بررسی نتایج، گزینه "حذف قطعی" را انتخاب کنید.
+              </AlertDescription>
+            </Alert>
           </div>
         </CardContent>
       </Card>

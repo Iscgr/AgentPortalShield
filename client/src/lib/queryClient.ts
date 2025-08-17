@@ -14,40 +14,44 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(url: string, options: RequestInit = {}): Promise<any> {
-  console.log(`SHERLOCK v32.0: Fetching URL:`, url);
+export async function apiRequest(endpoint: string, options: RequestInit = {}) {
+  const url = `${API_BASE_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  console.log(`SHERLOCK v32.0: Fetching URL:`, endpoint);
 
-  console.log(`SHERLOCK v32.0 DEBUG: Response status for ${url}:`, response.status);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+    });
 
-  // Check if response is JSON
-  const contentType = response.headers.get('content-type');
-  if (!contentType || !contentType.includes('application/json')) {
-    const text = await response.text();
-    console.error(`SHERLOCK v32.0: Non-JSON response for ${url}:`, text.substring(0, 200));
-    throw new Error(`Server returned HTML instead of JSON. Check if route is registered.`);
+    console.log(`SHERLOCK v32.0 DEBUG: Response status for ${endpoint}:`, response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`SHERLOCK v32.0: API Error ${response.status} for ${endpoint}:`, errorText.substring(0, 200));
+      throw new Error(`API Error ${response.status}: ${errorText.substring(0, 100)}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error(`SHERLOCK v32.0: Non-JSON response for ${endpoint}:`, text.substring(0, 100));
+      throw new Error(`Server returned HTML instead of JSON for ${endpoint}. Check server routes.`);
+    }
+
+    const data = await response.json();
+    console.log(`SHERLOCK v32.0: Successful API response for ${endpoint}`);
+    return data;
+
+  } catch (error) {
+    console.error(`SHERLOCK v32.0: API Request failed for ${endpoint}:`, error);
+    throw error;
   }
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Parse error' }));
-    console.error(`SHERLOCK v32.0: API Error ${response.status} for ${url}:`, errorData);
-    throw new Error(errorData.error || `HTTP ${response.status}`);
-  }
-
-  const data = await response.json();
-  console.log(`SHERLOCK v32.0 DEBUG: Successful response for ${url}:`, {
-    dataType: typeof data,
-    length: Array.isArray(data) ? data.length : Object.keys(data).length
-  });
-
-  return data;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
