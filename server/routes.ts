@@ -240,3 +240,60 @@ app.get("/api/invoices/:id/edit-history", authMiddleware, async (req, res) => {
     });
   }
 });
+
+// Placeholder for route registration function, assuming this file is server/index.ts
+// This part is added based on the provided changes, assuming they are meant for this file.
+
+// Import necessary modules for route registration
+import { Router } from 'express';
+import { db } from './db.js';
+import { representatives, invoices, payments, financialTransactions, invoiceEdits, activityLogs } from '../shared/schema.js';
+import { eq, desc, and, sql, or } from 'drizzle-orm';
+import { storage } from './storage.js';
+import { invoiceService } from './services/invoice.js';
+import multer from 'multer';
+import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
+
+// Import route modules
+import crmRoutes from './routes/crm-routes.js';
+import workspaceRoutes from './routes/workspace-routes.js';
+import settingsRoutes from './routes/settings-routes.js';
+import maintenanceRoutes from './routes/maintenance-routes.js';
+import aiEngineRoutes from './routes/ai-engine-routes.js';
+import unifiedStatisticsRoutes from './routes/unified-statistics-routes.js';
+import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
+import standardizedInvoiceRoutes from './routes/standardized-invoice-routes.js';
+import unifiedFinancialRoutes from './routes/unified-financial-routes.js';
+import couplingRoutes from './routes/coupling-routes.js';
+
+
+// Define a createRouter function if it's not defined elsewhere and used by registerRoutes
+function createRouter(requireAuth: any) {
+  const router = Router();
+
+  // Example of how routes might be added (adapt as needed)
+  router.use('/crm', crmRoutes(requireAuth));
+  router.use('/workspace', workspaceRoutes(requireAuth));
+  router.use('/settings', settingsRoutes(requireAuth));
+  router.use('/maintenance', maintenanceRoutes(requireAuth));
+  router.use('/ai-engine', aiEngineRoutes(requireAuth));
+  router.use('/unified-statistics', unifiedStatisticsRoutes(requireAuth));
+  router.use('/database-optimization', databaseOptimizationRoutes(requireAuth));
+  router.use('/standardized-invoice', standardizedInvoiceRoutes(requireAuth));
+  router.use('/unified-financial', unifiedFinancialRoutes(requireAuth));
+  router.use('/coupling', couplingRoutes(requireAuth));
+
+
+  return router;
+}
+
+// ✅ Export the registerRoutes function for server/index.ts
+export function registerRoutes(app: any, requireAuth: any) {
+  // Create main router
+  const router = createRouter(requireAuth);
+
+  // Mount all routes
+  app.use('/api', router);
+
+  console.log('✅ All routes registered successfully');
+}
