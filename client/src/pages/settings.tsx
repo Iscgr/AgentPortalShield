@@ -484,7 +484,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="telegram" className="flex items-center">
             <Send className="w-4 h-4 mr-2" />
             تلگرام
@@ -496,6 +496,10 @@ export default function Settings() {
           <TabsTrigger value="invoice-template" className="flex items-center">
             <FileText className="w-4 h-4 mr-2" />
             قالب فاکتور
+          </TabsTrigger>
+          <TabsTrigger value="batch-rollback" className="flex items-center">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            حذف دسته‌جمعی
           </TabsTrigger>
           <TabsTrigger value="ai" className="flex items-center">
             <Bot className="w-4 h-4 mr-2" />
@@ -1022,6 +1026,40 @@ export default function Settings() {
         </TabsContent>
 
 
+
+        {/* Batch Rollback Settings */}
+        <TabsContent value="batch-rollback">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-red-600 dark:text-red-400">
+                <RotateCcw className="w-5 h-5 ml-2" />
+                حذف دسته‌جمعی فاکتورها با تاریخ صدور
+              </CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                حذف تمام فاکتورهای صادر شده در تاریخ مشخص و بازگشت آمار مالی نمایندگان
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <div className="flex items-center">
+                    <AlertTriangle className="w-5 h-5 ml-2 text-red-600 dark:text-red-400" />
+                    <div>
+                      <p className="font-medium text-red-800 dark:text-red-200">
+                        ⚠️ هشدار: عملیات حساس مالی
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        این عملیات تأثیر مستقیم بر آمار مالی سیستم دارد و غیرقابل برگشت است
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <BatchRollbackManager />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* AI Settings */}
         <TabsContent value="ai">

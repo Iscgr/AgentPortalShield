@@ -13,7 +13,7 @@ import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { AlertTriangle, Trash2, Eye, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Trash2, Eye, CheckCircle, RotateCcw, Calendar } from 'lucide-react';
 import { formatCurrency } from '../lib/currency-formatter';
 import { useToast } from '../hooks/use-toast';
 import { apiRequest } from '../lib/utils';
@@ -118,209 +118,192 @@ export function BatchRollbackManager() {
       executeRollbackMutation.mutate();
     } else {
       toast({
-        title: "خطا در تأیید",
-        description: "متن تأیید صحیح نیست",
+        title: "خطای تأیید",
+        description: `لطفاً عبارت DELETE_INVOICES_${targetDate} را دقیقاً وارد کنید`,
         variant: "destructive"
       });
     }
   };
 
-  const previewResult = previewData?.data as RollbackPreview;
-
   return (
     <div className="space-y-6">
+      {/* بخش ورودی تاریخ */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trash2 className="h-5 w-5 text-red-500" />
-            حذف دسته‌جمعی فاکتورها
+          <CardTitle className="flex items-center">
+            <Calendar className="w-5 h-5 ml-2" />
+            انتخاب تاریخ صدور فاکتور
           </CardTitle>
           <CardDescription>
-            حذف فاکتورهای اشتباه با بازگردانی کامل آمار مالی
+            تاریخ صدور فاکتورهایی که می‌خواهید حذف کنید را وارد کنید
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="target-date">تاریخ صدور فاکتورها</Label>
+          <div>
+            <Label htmlFor="targetDate">تاریخ صدور (به فرمت شمسی)</Label>
             <Input
-              id="target-date"
+              id="targetDate"
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
               placeholder="۱۴۰۴/۰۵/۲۶"
               className="max-w-xs"
             />
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              مثال: ۱۴۰۴/۰۵/۲۶ (برای ۲۶ مرداد ۱۴۰۴)
+            </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center space-x-4 space-x-reverse">
             <Button 
               onClick={handlePreview}
+              disabled={previewLoading || !targetDate}
               variant="outline"
-              disabled={!targetDate || previewLoading}
             >
-              <Eye className="h-4 w-4 mr-2" />
-              {previewLoading ? 'در حال بررسی...' : 'پیش‌نمایش'}
+              <Eye className="w-4 h-4 mr-2" />
+              {previewLoading ? "در حال بارگذاری..." : "پیش‌نمایش فاکتورها"}
             </Button>
 
-            {previewResult && (
-              <Button 
-                onClick={handleTestRollback}
-                variant="outline"
-                disabled={testRollbackMutation.isPending}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                {testRollbackMutation.isPending ? 'در حال تست...' : 'تست حذف'}
-              </Button>
-            )}
+            <Button 
+              onClick={handleTestRollback}
+              disabled={testRollbackMutation.isPending || !targetDate}
+              variant="secondary"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              {testRollbackMutation.isPending ? "در حال تست..." : "تست حذف"}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* نمایش پیش‌نمایش */}
-      {previewResult && (
+      {/* بخش پیش‌نمایش */}
+      {previewData?.success && (
         <Card>
           <CardHeader>
-            <CardTitle>گزارش فاکتورهای قابل حذف</CardTitle>
+            <CardTitle>پیش‌نمایش فاکتورهای قابل حذف</CardTitle>
             <CardDescription>
-              تاریخ: {targetDate} | تعداد کل: {previewResult.invoices.length} فاکتور
+              فاکتورهای صادر شده در تاریخ {targetDate}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-red-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-red-700">
-                  {previewResult.invoices.length}
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {previewData.data.invoices?.length || 0}
+                  </div>
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    تعداد فاکتور
+                  </div>
                 </div>
-                <div className="text-sm text-red-600">فاکتور قابل حذف</div>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-orange-700">
-                  {previewResult.representativeSummary.length}
-                </div>
-                <div className="text-sm text-orange-600">نماینده متأثر</div>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-700">
-                  {formatCurrency(previewResult.totalAmount)}
-                </div>
-                <div className="text-sm text-blue-600">مجموع مبلغ (تومان)</div>
-              </div>
-            </div>
 
-            <Separator />
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {previewData.data.representativeSummary?.length || 0}
+                  </div>
+                  <div className="text-sm text-green-800 dark:text-green-200">
+                    نماینده متأثر
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <h4 className="font-medium">نمایندگان متأثر:</h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {previewResult.representativeSummary.map((rep) => (
-                  <div key={rep.representativeId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <div>
-                      <span className="font-medium">{rep.representativeName}</span>
-                      <Badge variant="outline" className="ml-2">
-                        {rep.invoiceCount} فاکتور
-                      </Badge>
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm text-red-600">
-                        -{formatCurrency(rep.totalAmount)} تومان
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        بدهی فعلی: {formatCurrency(rep.currentDebt)} تومان
-                      </div>
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    {formatCurrency(previewData.data.totalAmount || 0)}
+                  </div>
+                  <div className="text-sm text-red-800 dark:text-red-200">
+                    مجموع مبلغ
+                  </div>
+                </div>
+              </div>
+
+              {previewData.data.representativeSummary?.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="font-medium mb-3">نمایندگان متأثر:</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {previewData.data.representativeSummary.map((rep: any) => (
+                        <div key={rep.representativeId} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                          <div>
+                            <span className="font-medium">{rep.representativeName}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400 mr-2">
+                              ({rep.invoiceCount} فاکتور)
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <Badge variant="outline">
+                              {formatCurrency(rep.totalAmount)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                </>
+              )}
             </div>
-
-            {!showConfirmation && (
-              <Button 
-                onClick={() => setShowConfirmation(true)}
-                variant="destructive"
-                className="w-full"
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                شروع فرآیند حذف
-              </Button>
-            )}
           </CardContent>
         </Card>
       )}
 
-      {/* تأیید حذف */}
-      {showConfirmation && (
-        <Card className="border-red-200">
+      {/* بخش تأیید حذف */}
+      {previewData?.success && previewData.data.invoices?.length > 0 && (
+        <Card className="border-red-200 dark:border-red-800">
           <CardHeader>
-            <CardTitle className="text-red-700 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
+            <CardTitle className="text-red-600 dark:text-red-400">
               تأیید حذف دسته‌جمعی
             </CardTitle>
+            <CardDescription>
+              برای اجرای عملیات حذف، عبارت تأیید را وارد کنید
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert variant="destructive">
+            <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                این عمل غیرقابل بازگشت است! تمام فاکتورهای با تاریخ {targetDate} حذف خواهند شد.
+                <strong>هشدار:</strong> این عملیات غیرقابل برگشت است و تمام فاکتورهای انتخاب شده را حذف می‌کند.
+                آمار مالی نمایندگان نیز به حالت قبل از صدور این فاکتورها بازگردانده خواهد شد.
               </AlertDescription>
             </Alert>
 
-            <div className="space-y-2">
+            <div>
               <Label htmlFor="confirmation">
-                برای تأیید، متن زیر را وارد کنید:
-                <code className="bg-gray-100 px-2 py-1 rounded ml-2">
-                  DELETE_INVOICES_{targetDate}
-                </code>
+                برای تأیید، عبارت زیر را دقیقاً وارد کنید:
               </Label>
+              <div className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded font-mono text-sm">
+                DELETE_INVOICES_{targetDate}
+              </div>
               <Input
                 id="confirmation"
                 value={confirmationText}
                 onChange={(e) => setConfirmationText(e.target.value)}
                 placeholder={`DELETE_INVOICES_${targetDate}`}
+                className="mt-2"
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex items-center justify-between pt-4">
               <Button 
-                onClick={handleExecuteRollback}
-                variant="destructive"
-                disabled={confirmationText !== `DELETE_INVOICES_${targetDate}` || executeRollbackMutation.isPending}
-              >
-                {executeRollbackMutation.isPending ? 'در حال حذف...' : 'تأیید و حذف'}
-              </Button>
-              <Button 
+                variant="outline"
                 onClick={() => {
                   setShowConfirmation(false);
                   setConfirmationText('');
                 }}
-                variant="outline"
               >
                 انصراف
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* نمایش نتیجه تست */}
-      {testRollbackMutation.data && (
-        <Card className="border-green-200">
-          <CardHeader>
-            <CardTitle className="text-green-700">نتیجه تست</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div>✅ تست موفق - {testRollbackMutation.data.data.deletedInvoices} فاکتور برای حذف شناسایی شد</div>
-              <div>📊 {testRollbackMutation.data.data.affectedRepresentatives} نماینده متأثر خواهند شد</div>
-              
-              {testRollbackMutation.data.data.warnings.length > 0 && (
-                <div className="mt-2">
-                  <strong>هشدارها:</strong>
-                  <ul className="list-disc list-inside text-yellow-600">
-                    {testRollbackMutation.data.data.warnings.map((warning: string, index: number) => (
-                      <li key={index}>{warning}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <Button 
+                onClick={handleExecuteRollback}
+                disabled={
+                  executeRollbackMutation.isPending || 
+                  confirmationText !== `DELETE_INVOICES_${targetDate}`
+                }
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {executeRollbackMutation.isPending ? "در حال حذف..." : "حذف قطعی فاکتورها"}
+              </Button>
             </div>
           </CardContent>
         </Card>
