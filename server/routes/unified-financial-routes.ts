@@ -635,7 +635,7 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
     // Atomic financial synchronization with enhanced logging
     const syncStartTime = Date.now();
     await unifiedFinancialEngine.syncRepresentativeDebt(representative.id);
-    
+
     // Force immediate cache invalidation with cascade
     UnifiedFinancialEngine.forceInvalidateRepresentative(representative.id, {
       cascadeGlobal: true,
@@ -658,7 +658,7 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
       editDetails: editDetails || null,
       cacheInvalidated: true,
       timestamp: new Date().toISOString(),
-      
+
       // Real-time UI update data
       uiUpdateData: {
         displayDebt: financialData.actualDebt?.toLocaleString() || "0",
@@ -705,7 +705,7 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
 
     // Get fresh financial data for UI
     const financialData = await unifiedFinancialEngine.calculateRepresentative(representativeId);
-    
+
     const uiNotification = {
       type: updateType,
       representativeId,
@@ -725,7 +725,7 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
 
     // Here you would typically broadcast to connected WebSocket clients
     // For now, we'll return the notification data for client polling
-    
+
     res.json({
       success: true,
       notification: uiNotification,
@@ -823,9 +823,9 @@ router.post('/validate-system-integrity', requireAuth, async (req, res) => {
     try {
       const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
       const manualVerification = await unifiedFinancialEngine.verifyTotalDebtSum();
-      
+
       const isConsistent = Math.abs(globalSummary.totalSystemDebt - manualVerification.unifiedEngineSum) < 1000;
-      
+
       validationResults.validationTests.push({
         testName: "Financial Calculation Consistency",
         status: isConsistent ? "PASS" : "FAIL",
@@ -850,13 +850,13 @@ router.post('/validate-system-integrity', requireAuth, async (req, res) => {
       try {
         const repData = await unifiedFinancialEngine.calculateRepresentative(representativeId);
         const dbRep = await storage.getRepresentativeById(representativeId);
-        
+
         const dbDebt = parseFloat(dbRep.totalDebt) || 0;
         const calculatedDebt = repData.actualDebt;
         const debtDifference = Math.abs(dbDebt - calculatedDebt);
-        
+
         const isRepConsistent = debtDifference < 100;
-        
+
         validationResults.validationTests.push({
           testName: "Representative Data Integrity",
           status: isRepConsistent ? "PASS" : "WARN",
