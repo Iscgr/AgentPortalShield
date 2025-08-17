@@ -479,10 +479,7 @@ export default function Representatives() {
     });
   };
 
-  const handleEditInvoice = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setIsInvoiceEditOpen(true);
-  };
+  // Removed unused handleEditInvoice - using inline handlers instead
 
   const handleDeleteInvoice = (invoice: Invoice) => {
     setInvoiceToDelete(invoice);
@@ -1125,7 +1122,11 @@ export default function Representatives() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => handleEditInvoice(invoice)}
+                                      onClick={() => {
+                                        console.log('🔧 Internal edit clicked:', invoice);
+                                        setSelectedInvoice(invoice);
+                                        setIsInvoiceEditOpen(true);
+                                      }}
                                       title="ویرایش جزئیات فاکتور (مسیر داخلی)"
                                       className="bg-blue-50 text-blue-600"
                                     >
@@ -1135,7 +1136,7 @@ export default function Representatives() {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => {
-                                        // Test external dialog
+                                        console.log('🔧 External edit clicked:', invoice);
                                         setSelectedInvoice(invoice);
                                         setIsInvoiceEditOpen(true);
                                       }}
@@ -1267,16 +1268,18 @@ export default function Representatives() {
       />
 
       {/* Edit Invoice Dialog - Using External Component */}
-      {selectedInvoice && selectedRep && (
+      {selectedInvoice && selectedRep && isInvoiceEditOpen && (
         <InvoiceEditDialog
           invoice={selectedInvoice}
           representativeCode={selectedRep.code}
           onEditComplete={() => {
+            console.log('🔧 Edit completed, refreshing data...');
             // Refresh representative details
             if (selectedRep) {
               handleViewDetails(selectedRep);
             }
             setIsInvoiceEditOpen(false);
+            setSelectedInvoice(null);
           }}
         />
       )}
