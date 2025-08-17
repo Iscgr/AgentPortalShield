@@ -424,37 +424,7 @@ export default function Dashboard() {
       {/* This component is now handled by the OverdueInvoicesCard in the grid above */}
       {/* <DebtorRepresentativesCard /> */}
 
-      {/* Stats Grid - Updated to use OverdueInvoicesCard */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <UnifiedStatCard 
-            title="کل درآمد"
-            statKey="totalRevenue"
-            endpoint="/api/unified-statistics/global-summary"
-            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-            formatter="currency"
-            color="blue"
-          />
-
-          <UnifiedStatCard 
-            title="کل بدهی"
-            statKey="totalSystemDebt"
-            endpoint="/api/unified-statistics/global-summary"
-            icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
-            formatter="currency"
-            color="red"
-          />
-
-          <UnifiedStatCard 
-            title="نمایندگان فعال"
-            statKey="activeRepresentatives"
-            endpoint="/api/unified-statistics/global-summary"
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            formatter="number"
-            color="green"
-          />
-
-          <OverdueInvoicesCard />
-        </div>
+      
     </div>
   );
 }
