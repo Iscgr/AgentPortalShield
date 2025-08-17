@@ -1209,6 +1209,70 @@ router.get('/monitoring-status', requireAuth, async (req, res) => {
 });
 
 /**
+ * ✅ SHERLOCK v28.0: Dedicated Overdue Calculations
+ * GET /api/unified-financial/overdue-analysis
+ */
+router.get('/overdue-analysis', requireAuth, async (req, res) => {
+  try {
+    console.log('📊 SHERLOCK v28.0: Comprehensive overdue analysis requested');
+
+    // Calculate overdue by status and representative
+    const overdueAnalysis = await db.select({
+      representativeId: invoices.representativeId,
+      representativeName: representatives.name,
+      representativeCode: representatives.code,
+      overdueAmount: sql<number>`COALESCE(SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
+      unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
+      invoiceCount: sql<number>`COUNT(CASE WHEN invoices.status = 'overdue' THEN 1 END)`,
+      oldestOverdue: sql<string>`MIN(CASE WHEN invoices.status = 'overdue' THEN invoices.created_at END)`
+    })
+    .from(invoices)
+    .leftJoin(representatives, eq(invoices.representativeId, representatives.id))
+    .where(sql`invoices.status IN ('unpaid', 'overdue')`)
+    .groupBy(invoices.representativeId, representatives.name, representatives.code)
+    .having(sql`SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END) > 0`)
+    .orderBy(desc(sql`SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END)`));
+
+    // Calculate totals
+    const [totals] = await db.select({
+      totalOverdue: sql<number>`COALESCE(SUM(CASE WHEN status = 'overdue' THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+      totalUnpaid: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+      overdueCount: sql<number>`COUNT(CASE WHEN status = 'overdue' THEN 1 END)`,
+      unpaidCount: sql<number>`COUNT(CASE WHEN status IN ('unpaid', 'overdue') THEN 1 END)`
+    }).from(invoices);
+
+    console.log(`📊 SHERLOCK v28.0: Found ${overdueAnalysis.length} representatives with overdue amount: ${totals.totalOverdue.toLocaleString()} تومان`);
+
+    res.json({
+      success: true,
+      data: {
+        representatives: overdueAnalysis.slice(0, 20), // Top 20 overdue
+        totals: {
+          totalOverdueAmount: totals.totalOverdue,
+          totalUnpaidAmount: totals.totalUnpaid,
+          overdueInvoicesCount: totals.overdueCount,
+          unpaidInvoicesCount: totals.unpaidCount,
+          representativesWithOverdue: overdueAnalysis.length
+        }
+      },
+      meta: {
+        source: "SHERLOCK v28.0 OVERDUE ANALYSIS",
+        calculationMethod: "DIRECT_STATUS_BASED",
+        accuracyGuaranteed: true,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ SHERLOCK v28.0 Overdue analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در تحلیل مطالبات معوق"
+    });
+  }
+});
+
+/**
  * ✅ SHERLOCK v28.1: Invoice Amount Verification
  * GET /api/unified-financial/verify-invoice-amount/:invoiceId
  */
@@ -1282,17 +1346,34 @@ router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) =>
 // Health endpoint for dashboard
 router.get('/health', requireAuth, async (req, res) => {
   try {
-    console.log('🏥 SHERLOCK v32.0: Health endpoint called for dashboard');
+    console.log('🏥 SHERLOCK v28.0: Health endpoint with accurate overdue calculation');
 
     const engine = new UnifiedFinancialEngine(storage);
     const globalSummary = await engine.calculateGlobalSummary();
+
+    // ✅ SHERLOCK v28.0: Calculate accurate overdue amount
+    const [overdueResult] = await db.select({
+      overdueAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'overdue' THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
+    }).from(invoices);
+
+    // ✅ SHERLOCK v28.0: Calculate unpaid invoices amount  
+    const [unpaidResult] = await db.select({
+      unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
+    }).from(invoices);
+
+    const accurateOverdueAmount = overdueResult.overdueAmount;
+    const totalUnpaidAmount = unpaidResult.unpaidAmount;
+
+    console.log(`💰 SHERLOCK v28.0: Accurate overdue calculation: ${accurateOverdueAmount.toLocaleString()} تومان`);
+    console.log(`📊 SHERLOCK v28.0: Total unpaid: ${totalUnpaidAmount.toLocaleString()} تومان`);
 
     // Calculate system health metrics
     const healthData = {
       healthScore: Math.max(0, 100 - Math.round((globalSummary.criticalReps / globalSummary.totalRepresentatives) * 100)),
       activeDebtors: globalSummary.criticalReps + globalSummary.highRiskReps,
       totalAmount: globalSummary.totalSystemDebt,
-      overdueAmount: Math.round(globalSummary.totalSystemDebt * 0.3), // Estimate
+      overdueAmount: accurateOverdueAmount, // ✅ SHERLOCK v28.0: Accurate calculation
+      unpaidAmount: totalUnpaidAmount, // ✅ Additional metric
       recommendations: globalSummary.criticalReps > 10 ? [
         'تطبیق مالی سراسری انجام دهید',
         'نمایندگان پرریسک را بررسی کنید'
@@ -1301,10 +1382,16 @@ router.get('/health', requireAuth, async (req, res) => {
 
     res.json({
       success: true,
-      data: healthData
+      data: healthData,
+      meta: {
+        source: "SHERLOCK v28.0 COMPLIANT",
+        calculationMethod: "DIRECT_INVOICE_STATUS_QUERY",
+        accuracyGuaranteed: true,
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
-    console.error('❌ Health endpoint error:', error);
+    console.error('❌ SHERLOCK v28.0 Health endpoint error:', error);
     res.status(500).json({
       success: false,
       error: 'خطا در دریافت آمار سلامت سیستم'

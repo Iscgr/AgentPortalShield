@@ -44,6 +44,12 @@ export interface GlobalFinancialSummary {
   totalSystemPaid: number;       // مجموع کل پرداخت‌های تخصیص یافته
   totalSystemDebt: number;       // مجموع بدهی‌های استاندارد تمام نمایندگان
 
+  // ✅ SHERLOCK v28.0: Overdue calculations
+  totalOverdueAmount: number;    // مجموع مطالبات معوق
+  totalUnpaidAmount: number;     // مجموع فاکتورهای پرداخت نشده
+  overdueInvoicesCount: number;  // تعداد فاکتورهای معوق
+  unpaidInvoicesCount: number;   // تعداد فاکتورهای پرداخت نشده
+
   // Distribution analysis
   healthyReps: number;
   moderateReps: number;
@@ -274,8 +280,8 @@ export class UnifiedFinancialEngine {
       active: sql<number>`SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END)`
     }).from(representatives);
 
-    // ✅ محاسبه صحیح آمار کلی سیستم
-    const [systemSales, systemPaid] = await Promise.all([
+    // ✅ محاسبه صحیح آمار کلی سیستم + مطالبات معوق
+    const [systemSales, systemPaid, overdueData] = await Promise.all([
       // فروش کل سیستم = مجموع کل فاکتورهای صادر شده
       db.select({
         totalSystemSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
@@ -284,7 +290,15 @@ export class UnifiedFinancialEngine {
       // پرداخت کل سیستم = مجموع پرداخت‌های تخصیص یافته
       db.select({
         totalSystemPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
-      }).from(payments)
+      }).from(payments),
+
+      // ✅ SHERLOCK v28.0: محاسبه دقیق مطالبات معوق
+      db.select({
+        totalOverdueAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'overdue' THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+        totalUnpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+        overdueInvoicesCount: sql<number>`COUNT(CASE WHEN status = 'overdue' THEN 1 END)`,
+        unpaidInvoicesCount: sql<number>`COUNT(CASE WHEN status IN ('unpaid', 'overdue') THEN 1 END)`
+      }).from(invoices)
     ]);
 
     const totalSystemSales = systemSales[0].totalSystemSales;
@@ -322,6 +336,12 @@ export class UnifiedFinancialEngine {
       totalSystemSales,
       totalSystemPaid,
       totalSystemDebt,
+
+      // ✅ SHERLOCK v28.0: مطالبات معوق
+      totalOverdueAmount: overdueData[0].totalOverdueAmount,
+      totalUnpaidAmount: overdueData[0].totalUnpaidAmount,
+      overdueInvoicesCount: overdueData[0].overdueInvoicesCount,
+      unpaidInvoicesCount: overdueData[0].unpaidInvoicesCount,
 
       healthyReps: healthy,
       moderateReps: moderate,
