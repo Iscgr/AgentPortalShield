@@ -23,7 +23,7 @@ import type { Request, Response, NextFunction } from 'express';
 // ✅ SHERLOCK v26.0: FIXED NO-VALIDATION MIDDLEWARE
 const requireAuth = (req: any, res: any, next: any) => {
   console.log('🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests');
-  
+
   // Force session authentication for compatibility
   if (req.session) {
     req.session.authenticated = true;
@@ -34,7 +34,7 @@ const requireAuth = (req: any, res: any, next: any) => {
       permissions: ['*']
     };
   }
-  
+
   next();
 };
 
@@ -1166,10 +1166,10 @@ router.post('/perform-system-correction', requireAuth, async (req, res) => {
 router.post('/start-monitoring', requireAuth, async (req, res) => {
   try {
     const { intervalMinutes = 30 } = req.body;
-    
+
     const { financialMonitoringService } = await import('../services/financial-monitoring-service.js');
     financialMonitoringService.startMonitoring(intervalMinutes);
-    
+
     res.json({
       success: true,
       message: `📊 نظارت مالی با فاصله ${intervalMinutes} دقیقه شروع شد`,
@@ -1193,7 +1193,7 @@ router.get('/monitoring-status', requireAuth, async (req, res) => {
   try {
     const { financialMonitoringService } = await import('../services/financial-monitoring-service.js');
     const status = financialMonitoringService.getMonitoringStatus();
-    
+
     res.json({
       success: true,
       monitoring: status,
@@ -1215,7 +1215,7 @@ router.get('/monitoring-status', requireAuth, async (req, res) => {
 router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.invoiceId);
-    
+
     if (isNaN(invoiceId)) {
       return res.status(400).json({
         success: false,

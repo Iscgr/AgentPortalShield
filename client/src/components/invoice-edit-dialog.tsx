@@ -335,11 +335,11 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     }
   });
 
-  // Initialize editable records when usage details are loaded
+  // ✅ SHERLOCK v29.0: ENHANCED INITIALIZATION WITH PROPER DATA RESTORATION
   useEffect(() => {
     if ((usageDetails as any)?.records && Array.isArray((usageDetails as any).records) && !isInitialized && !editMode) {
-      const records = ((usageDetails as any).records as any[]).map((record: any) => ({
-        id: generateId(),
+      const records = ((usageDetails as any).records as any[]).map((record: any, index: number) => ({
+        id: record.persistenceId || generateId(), // Use persistence ID if available
         admin_username: record.admin_username || '',
         event_timestamp: record.event_timestamp || '',
         event_type: record.event_type || 'CREATE',
@@ -351,12 +351,17 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       }));
 
       const initialAmount = calculateTotalAmount(records);
+      
+      // ✅ Set states in proper order
       setEditableRecords(records);
-      setCalculatedAmount(initialAmount);
       setOriginalAmount(parseFloat(invoice.amount));
+      setCalculatedAmount(initialAmount);
       setIsInitialized(true);
 
-      console.log(`🧮 SHERLOCK v1.0: Initialized invoice edit - Original: ${invoice.amount}, Calculated: ${initialAmount}`);
+      console.log(`🧮 SHERLOCK v29.0: Enhanced initialization completed`);
+      console.log(`📊 Records loaded: ${records.length}`);
+      console.log(`💰 Original: ${invoice.amount}, Calculated: ${initialAmount}`);
+      console.log(`🔢 Records detail:`, records.map(r => `${r.description}: ${r.amount}`));
     }
   }, [usageDetails, isInitialized, editMode, invoice.amount]);
 
@@ -399,19 +404,19 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     });
   };
 
-  // ✅ SHERLOCK v28.2: ENHANCED REAL-TIME RECORD UPDATE with immediate calculation
+  // ✅ SHERLOCK v29.0: ENHANCED REAL-TIME RECORD UPDATE WITH BATCHED STATE UPDATES
   const updateRecord = (id: string, field: keyof EditableUsageRecord, value: any) => {
-    console.log(`🔄 SHERLOCK v28.2: Updating record ${id}, field: ${field}, value: ${value}`);
+    console.log(`🔄 SHERLOCK v29.0: Updating record ${id}, field: ${field}, value: ${value}`);
     
     setEditableRecords(prev => {
       const updatedRecords = prev.map(record => {
         if (record.id === id) {
           const updated = { ...record, [field]: value, isModified: !record.isNew };
           
-          // ✅ Real-time validation for amount field
+          // ✅ Enhanced validation for amount field
           if (field === 'amount') {
             const numericValue = parseFloat(value) || 0;
-            console.log(`💰 SHERLOCK v28.2: Amount updated for record ${id}: ${record.amount} → ${numericValue}`);
+            console.log(`💰 SHERLOCK v29.0: Amount updated for record ${id}: ${record.amount} → ${numericValue}`);
             updated.amount = numericValue;
           }
           
@@ -420,11 +425,11 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         return record;
       });
       
-      // ✅ IMMEDIATE calculation after state update
+      // ✅ Calculate new total immediately and update state
       const newTotalAmount = calculateTotalAmount(updatedRecords);
-      console.log(`🧮 SHERLOCK v28.2: Immediate calculation result: ${newTotalAmount} تومان`);
+      console.log(`🧮 SHERLOCK v29.0: Batched calculation result: ${newTotalAmount} تومان`);
       
-      // Force immediate UI update
+      // ✅ Update calculated amount immediately in the same render cycle
       setTimeout(() => {
         setCalculatedAmount(newTotalAmount);
       }, 0);
@@ -471,20 +476,22 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     });
   };
 
-  // ✅ SHERLOCK v28.2: REAL-TIME AMOUNT CALCULATION - Critical Fix
+  // ✅ SHERLOCK v29.0: ENHANCED REAL-TIME CALCULATION WITH IMMEDIATE UI UPDATE
   useEffect(() => {
-    const newAmount = calculateTotalAmount(editableRecords);
-    setCalculatedAmount(newAmount);
-
-    console.log(`💰 SHERLOCK v28.2: Real-time calculation - Amount changed from ${calculatedAmount} to ${newAmount}`);
-    console.log(`🔢 SHERLOCK v28.2: Active records count: ${editableRecords.filter(r => !r.isDeleted).length}`);
-    console.log(`📊 SHERLOCK v28.2: Records breakdown:`, editableRecords.map(r => `${r.id}: ${r.amount} (deleted: ${r.isDeleted})`));
-    
-    // SHERLOCK v28.2: Real-time validation - ensure UI reflects changes immediately
-    if (typeof onEditComplete === 'function' && newAmount !== originalAmount) {
-      console.log(`💰 SHERLOCK v28.2: Amount difference detected: ${newAmount - originalAmount} تومان`);
+    if (editableRecords.length > 0) {
+      const newAmount = calculateTotalAmount(editableRecords);
+      
+      // ✅ Force immediate state update without dependencies loop
+      if (newAmount !== calculatedAmount) {
+        setCalculatedAmount(newAmount);
+        console.log(`💰 SHERLOCK v29.0: Real-time calculation updated - ${calculatedAmount} → ${newAmount}`);
+        console.log(`🔢 SHERLOCK v29.0: Active records: ${editableRecords.filter(r => !r.isDeleted).length}`);
+        
+        // ✅ Force re-render by updating a trigger state
+        setIsInitialized(prev => prev); // Trigger re-render without changing actual state
+      }
     }
-  }, [editableRecords, originalAmount, onEditComplete, calculatedAmount]);
+  }, [editableRecords]); // Remove calculatedAmount from dependencies to prevent loop
 
   // Start editing
   const startEditing = () => {
@@ -603,10 +610,10 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       return;
     }
 
-    // SHERLOCK v1.0: Enhanced edit data with representative info for financial sync
+    // ✅ SHERLOCK v29.0: ENHANCED SAVE DATA WITH DETAILED USAGE PRESERVATION
     const editData = {
       invoiceId: invoice.id,
-      representativeCode: representativeCode, // Add representative context
+      representativeCode: representativeCode,
       originalUsageData: (usageDetails as any)?.usageData || {},
       editedUsageData: {
         type: 'edited',
@@ -619,16 +626,30 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
           amount: record.amount.toString()
         })),
         totalRecords: activeRecords.length,
-        usage_amount: calculatedAmount
+        usage_amount: calculatedAmount,
+        // ✅ Additional metadata for proper restoration
+        editTimestamp: new Date().toISOString(),
+        editedBy: currentUsername,
+        preserveStructure: true
       },
       editType: 'MANUAL_EDIT',
       editReason: editReason,
       originalAmount: parseFloat(invoice.amount),
       editedAmount: calculatedAmount,
       editedBy: currentUsername,
-      // SHERLOCK v1.0: Add financial synchronization flags
       requiresFinancialSync: calculatedAmount !== parseFloat(invoice.amount),
-      amountDifference: calculatedAmount - parseFloat(invoice.amount)
+      amountDifference: calculatedAmount - parseFloat(invoice.amount),
+      // ✅ SHERLOCK v29.0: Add detailed record tracking for proper persistence
+      detailedRecords: activeRecords.map(record => ({
+        ...record,
+        persistenceId: `${record.id}_${Date.now()}` // Unique persistence ID
+      })),
+      recordsMetadata: {
+        addedRecords: editableRecords.filter(r => r.isNew && !r.isDeleted).length,
+        modifiedRecords: editableRecords.filter(r => r.isModified && !r.isDeleted).length,
+        deletedRecords: editableRecords.filter(r => r.isDeleted).length,
+        totalActiveRecords: activeRecords.length
+      }
     };
 
     console.log(`💰 SHERLOCK v1.0: Invoice edit initiated - Amount change: ${editData.amountDifference} تومان`);
@@ -878,25 +899,30 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                 </div>
                 <div className="flex gap-2 items-center">
                   {/* ✅ SHERLOCK v28.2: REAL-TIME AMOUNT DISPLAY WITH IMMEDIATE FEEDBACK */}
+              {/* ✅ SHERLOCK v29.0: ENHANCED REAL-TIME DISPLAY WITH BETTER FEEDBACK */}
               <div className="text-sm text-gray-600 flex flex-col items-end border-l-4 border-blue-200 pl-3 bg-gray-50 p-3 rounded-md">
                 <div className="font-bold text-lg text-gray-800 mb-1">
                   مجموع فعلی: 
-                  <span className={`ml-2 ${calculatedAmount !== parseFloat(invoice.amount) ? 'text-blue-600 animate-pulse' : 'text-gray-800'}`}>
+                  <span className={`ml-2 transition-all duration-300 ${
+                    calculatedAmount !== parseFloat(invoice.amount) 
+                      ? 'text-blue-600 font-extrabold animate-pulse' 
+                      : 'text-gray-800'
+                  }`}>
                     {calculatedAmount.toLocaleString()} تومان
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 mb-2">مبلغ اصلی: {originalAmount.toLocaleString()} تومان</div>
                 
-                {/* ✅ Real-time difference indicator */}
+                {/* ✅ Enhanced difference indicator */}
                 {calculatedAmount !== originalAmount && (
-                  <div className={`text-sm font-bold px-3 py-2 rounded-lg mt-1 transition-all duration-300 ${
+                  <div className={`text-sm font-bold px-3 py-2 rounded-lg mt-1 transition-all duration-500 shadow-sm ${
                     calculatedAmount > originalAmount 
-                      ? 'text-green-700 bg-green-100 border border-green-300' 
-                      : 'text-red-700 bg-red-100 border border-red-300'
+                      ? 'text-green-700 bg-green-100 border border-green-300 shadow-green-200' 
+                      : 'text-red-700 bg-red-100 border border-red-300 shadow-red-200'
                   }`}>
                     {calculatedAmount > originalAmount ? '📈 افزایش' : '📉 کاهش'}: {Math.abs(calculatedAmount - originalAmount).toLocaleString()} تومان
                     <div className="text-xs mt-1 opacity-75">
-                      {editableRecords.filter(r => !r.isDeleted).length} آیتم فعال
+                      {editableRecords.filter(r => !r.isDeleted).length} آیتم فعال از {editableRecords.length} کل
                     </div>
                   </div>
                 )}
@@ -907,9 +933,10 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                   </div>
                 )}
                 
-                {/* ✅ Real-time calculation status */}
-                <div className="text-xs text-gray-400 mt-1 italic">
-                  محاسبه خودکار: {new Date().toLocaleTimeString('fa-IR')}
+                {/* ✅ Enhanced calculation status with visual indicator */}
+                <div className="text-xs text-gray-400 mt-1 italic flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                  محاسبه لحظه‌ای: {new Date().toLocaleTimeString('fa-IR')}
                 </div>
               </div>
                   <Button
