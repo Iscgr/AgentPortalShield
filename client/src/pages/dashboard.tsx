@@ -211,7 +211,17 @@ export default function Dashboard() {
     queryFn: async () => {
       try {
         const response = await apiRequest("/api/activity-logs");
-        return Array.isArray(response) ? response : [];
+        console.log('📋 Activity logs response:', response);
+        
+        // Handle different response structures
+        if (response && response.success && Array.isArray(response.data)) {
+          return response.data;
+        } else if (Array.isArray(response)) {
+          return response;
+        } else {
+          console.warn('Unexpected activity logs format:', response);
+          return [];
+        }
       } catch (error) {
         console.warn("Activity logs not available:", error);
         return [];

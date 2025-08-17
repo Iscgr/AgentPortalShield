@@ -82,7 +82,58 @@ export interface RecentActivity {
 
 // ========== UNIFIED STATISTICS ENGINE ========== 
 
-export class UnifiedStatisticsEngine {
+export import { db } from "../db";
+import { representatives, invoices, payments, salesPartners, activityLogs } from "../../shared/schema";
+import { eq, desc, and, or, sql, count, like, gte, lte } from "drizzle-orm";
+
+// Interface definitions
+interface GlobalStatistics {
+  totalSales: number;
+  totalRevenue: number;
+  totalDebt: number;
+  totalCredit: number;
+  totalOutstanding: number;
+  totalRepresentatives: number;
+  activeRepresentatives: number;
+  inactiveRepresentatives: number;
+  riskRepresentatives: number;
+  totalInvoices: number;
+  paidInvoices: number;
+  unpaidInvoices: number;
+  overdueInvoices: number;
+  unsentTelegramInvoices: number;
+  totalSalesPartners: number;
+  activeSalesPartners: number;
+  systemIntegrityScore: number;
+  lastReconciliationDate: string;
+  problematicRepresentativesCount: number;
+  responseTime: number;
+  cacheStatus: 'FRESH' | 'CACHE';
+  lastUpdated: string;
+}
+
+interface RepresentativeStatistics {
+  totalCount: number;
+  activeCount: number;
+  inactiveCount: number;
+  totalSales: number;
+  totalDebt: number;
+  avgPerformance: number;
+  topPerformers: any[];
+  riskAlerts: number;
+  lastSyncTime: string;
+}
+
+interface RecentActivity {
+  id: number;
+  type: 'invoice_created' | 'payment_received' | 'telegram_sent' | 'representative_created' | 'system_update';
+  description: string;
+  relatedId?: number;
+  metadata?: any;
+  createdAt: string;
+}
+
+class UnifiedStatisticsEngine {
   // Enhanced cache for performance optimization with separate cache keys
   private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
   private static readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes for better performance
@@ -521,5 +572,7 @@ export class UnifiedStatisticsEngine {
     }
   }
 }
+
+export const unifiedStatisticsEngine = new UnifiedStatisticsEngine();
 
 export const unifiedStatisticsEngine = new UnifiedStatisticsEngine();
