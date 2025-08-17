@@ -1,0 +1,59 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+✅ XAI Grok Engine initialized successfully
+9:20:59 PM [express] Checking database connection...
+9:20:59 PM [database] Database connection successful
+Query: select "id", "username", "password_hash", "role", "permissions", "is_active", "last_login_at", "created_at" from "admin_users" where "admin_users"."username" = $1 limit $2 -- params: ["mgr", 1]
+Query: update "admin_users" set "password_hash" = $1, "role" = $2, "is_active" = $3 where "admin_users"."username" = $4 -- params: ["$2b$12$.vFm2.04l8imxiCIv4eLFeejP4nnYWDmKFWeJWeWELrmawK.tLGOq", "SUPER_ADMIN", true, "mgr"]
+🔄 Admin user 'mgr' password reset successfully
+Query: select "id", "username", "password_hash", "full_name", "email", "role", "permissions", "is_active", "last_login_at", "created_at", "updated_at" from "crm_users" where "crm_users"."username" = $1 limit $2 -- params: ["crm", 1]
+Query: update "crm_users" set "password_hash" = $1, "role" = $2, "is_active" = $3 where "crm_users"."username" = $4 -- params: ["$2b$12$/53j1JX1z.Gfc9qG6vd15.mprX6FpqhkQeLTONVLtc9.YWrcd8APq", "CRM_MANAGER", true, "crm"]
+🔄 CRM user 'crm' password reset successfully
+✅ XAI Grok Engine initialized successfully
+✅ Settings routes registered successfully
+✅ Standardized Invoice Routes Registered
+✅ Maintenance routes registered successfully
+✅ Batch Rollback Routes Registered
+Server is running on port 5000
+Environment: development
+📊 SHERLOCK v28.0: Starting financial monitoring every 30 minutes
+🔍 SHERLOCK v28.0: Performing routine financial monitoring check...
+📊 SHERLOCK v28.0: Financial monitoring auto-started
+🔍 SHERLOCK v28.0: Starting comprehensive financial consistency validation...
+Query: select "id", "name", "code", "total_debt", "is_active" from "representatives" where "representatives"."is_active" = $1 -- params: [true]
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1795]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1795]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1795]
+Query: select "total_debt" from "representatives" where "representatives"."id" = $1 -- params: [1795]
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1839]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1839]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1839]
+Query: select "total_debt" from "representatives" where "representatives"."id" = $1 -- params: [1839]
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1923]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1923]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1923]
+Query: select "total_debt" from "representatives" where "representatives"."id" = $1 -- params: [1923]
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1808]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1808]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1808]
+Query: select "total_debt" from "representatives" where "representatives"."id" = $1 -- params: [1808]
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1822]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1822]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1822]
+Query: select "total_debt" from "representatives" where "representatives"."id" = $1 -- params: [1822]
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1812]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1812]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1812]
+Query: select "total_debt" from "representatives" where "representatives"."id" = $1 -- params: [1812]
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1830]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1830]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1830]
+Query: select "total_debt" from "representatives" where "representatives"."id" = $1 -- params: [1830]
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1805]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1805]
+9:21:03 PM [vite] Pre-transform error: Failed to resolve import "@/lib/axios" from "client/src/pages/dashboard.tsx". Does the file exist?
