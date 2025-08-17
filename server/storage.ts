@@ -521,33 +521,21 @@ export class DatabaseStorage implements IStorage {
           .orderBy(desc(invoices.createdAt));
 
         return result.map(row => ({
-          id: row.id,
-          invoiceNumber: row.invoiceNumber,
-          representativeId: row.representativeId,
-          batchId: row.batchId,
-          amount: row.amount,
-          issueDate: row.issueDate,
-          dueDate: row.dueDate,
-          status: row.status,
-          usageData: row.usageData,
-          sentToTelegram: row.sentToTelegram,
-          telegramSentAt: row.telegramSentAt,
-          telegramSendCount: row.telegramSendCount,
-          createdAt: row.createdAt,
+          ...row, // Spread all invoice fields
           batch: row.batchName ? {
             id: row.batchId!,
             batchName: row.batchName,
             batchCode: row.batchCode!,
             periodStart: row.periodStart!,
             periodEnd: row.periodEnd!,
-            description: null,
+            description: null, // Placeholder, actual description might not be selected
             status: row.batchStatus!,
-            totalInvoices: null,
-            totalAmount: null,
-            uploadedBy: '',
-            uploadedFileName: null,
-            createdAt: null,
-            completedAt: null
+            totalInvoices: null, // Placeholder
+            totalAmount: null, // Placeholder
+            uploadedBy: '', // Placeholder
+            uploadedFileName: null, // Placeholder
+            createdAt: null, // Placeholder
+            completedAt: null // Placeholder
           } : undefined
         }));
       },

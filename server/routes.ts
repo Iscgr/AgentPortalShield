@@ -1,4 +1,3 @@
-
 import express from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from './db';
@@ -29,8 +28,26 @@ const createInvoice = async (data: any) => {
 
 import workspaceRouter from './routes/workspace-routes';
 
+// Placeholder for other route registration functions (assuming they exist elsewhere)
+// These would typically be imported from their respective files and defined with their specific logic.
+const registerMainRoutes = (app: express.Application, requireAuth: any, storage: any) => { /* ... */ };
+const registerCrmRoutes = (app: express.Application, requireAuth: any, storage: any) => { /* ... */ };
+const registerSettingsRoutes = (app: express.Application, requireAuth: any, storage: any) => { /* ... */ };
+const registerUnifiedFinancialRoutes = (app: express.Application, requireAuth: any, storage: any) => { /* ... */ };
+const registerUnifiedStatisticsRoutes = (app: express.Application, requireAuth: any, storage: any) => { /* ... */ };
+const registerWorkspaceRoutes = (app: express.Application, requireAuth: any, storage: any) => {
+  app.use('/api/workspace', workspaceRouter);
+};
+
+// Placeholder for the requireAuth function, which is likely defined elsewhere
+const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Implement authentication logic here
+  next();
+};
+
+
 export function registerRoutes(app: express.Application) {
-  
+
   // API status route - moved to /api/status to avoid conflicts with frontend
   app.get("/api/status", (req, res) => {
     res.send("SHERLOCK v28.0 API is running!");

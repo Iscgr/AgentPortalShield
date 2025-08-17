@@ -14,11 +14,10 @@ import { invoices } from '../../shared/schema.js'; // Assuming invoices schema i
 import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
 import { storage } from '../storage.js';
 import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
+import type { Express } from 'express';
+import type { IStorage } from '../storage'; // Assuming IStorage type is defined
 
 const router = Router();
-
-// Import authentication middleware from main routes
-import type { Request, Response, NextFunction } from 'express';
 
 // ✅ SHERLOCK v26.0: SIMPLIFIED NO-VALIDATION MIDDLEWARE
 const requireAuth = (req: any, res: any, next: any) => {
@@ -741,12 +740,6 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
   }
 });
 
-export default router;
-
-// Named export function for integration
-export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
-  app.use('/api/unified-financial', router);
-}
 /**
  * ✅ SHERLOCK v27.0: Batch financial calculation for multiple representatives
  * POST /api/unified-financial/batch-calculate
@@ -1082,5 +1075,84 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
     });
   }
 });
+
+// Named export function for integration
+export function registerUnifiedFinancialRoutes(app: Express, authMiddleware: any, storage: IStorage) {
+  console.log("🚀 SHERLOCK v18.2: Registering Unified Financial Engine routes...");
+
+  // Financial calculation endpoint - Public access for dashboard
+  app.get("/api/unified-financial/representative/:id", async (req, res) => {
+    console.log(`💰 GET /api/unified-financial/representative/${req.params.id} - Public access granted`);
+    try {
+      const representativeId = parseInt(req.params.id);
+      const data = await unifiedFinancialEngine.calculateRepresentative(representativeId);
+
+      res.json({
+        success: true,
+        data,
+        meta: {
+          source: "UNIFIED FINANCIAL ENGINE v18.2",
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error getting representative financial data:', error);
+      res.status(500).json({
+        success: false,
+        error: "خطا در محاسبه اطلاعات مالی نماینده"
+      });
+    }
+  });
+
+  // Batch financial calculation - Public access for dashboard
+  app.post("/api/unified-financial/batch-calculate", async (req, res) => {
+    console.log('📊 POST /api/unified-financial/batch-calculate - Public access granted');
+    try {
+      const { representativeIds } = req.body;
+
+      if (!Array.isArray(representativeIds) || representativeIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "فهرست شناسه نمایندگان الزامی است"
+        });
+      }
+
+      // Batch calculation with single database transaction
+      const results = await Promise.all(
+        representativeIds.map(id => unifiedFinancialEngine.calculateRepresentative(id))
+      );
+
+      // Cache all results for future use
+      results.forEach(result => {
+        const cacheKey = `rep_calc_${result.representativeId}`;
+        UnifiedFinancialEngine.queryCache.set(cacheKey, {
+          data: result,
+          timestamp: Date.now()
+        });
+      });
+
+      res.json({
+        success: true,
+        data: results,
+        meta: {
+          count: results.length,
+          cached: true,
+          batchProcessed: true,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      console.error('Batch calculation error:', error);
+      res.status(500).json({
+        success: false,
+        error: "خطا در محاسبه دسته‌ای اطلاعات مالی"
+      });
+    }
+  });
+
+  // Catch-all for other unified financial routes that still require authentication
+  app.use('/api/unified-financial', authMiddleware, router);
+}
 
 export default router;
