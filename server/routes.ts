@@ -254,32 +254,36 @@ import { invoiceService } from './services/invoice.js';
 import multer from 'multer';
 import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
 
-// Import route modules - using named imports
+// Import route modules - using default imports (they export routers)
+import aiEngineRouter from './routes/ai-engine-routes.js';
+import couplingRouter from './routes/coupling-routes.js';
+import unifiedFinancialRouter from './routes/unified-financial-routes.js';
+
+// Import route modules with register functions (named exports)
 import { registerCrmRoutes } from './routes/crm-routes.js';
 import { registerWorkspaceRoutes } from './routes/workspace-routes.js';
 import { registerSettingsRoutes } from './routes/settings-routes.js';
 import { registerMaintenanceRoutes } from './routes/maintenance-routes.js';
-import { registerAiEngineRoutes } from './routes/ai-engine-routes.js';
 import { registerUnifiedStatisticsRoutes } from './routes/unified-statistics-routes.js';
 import { registerDatabaseOptimizationRoutes } from './routes/database-optimization-routes.js';
 import { registerStandardizedInvoiceRoutes } from './routes/standardized-invoice-routes.js';
-import { registerUnifiedFinancialRoutes } from './routes/unified-financial-routes.js';
-import { registerCouplingRoutes } from './routes/coupling-routes.js';
 
 
 // ✅ Export the registerRoutes function for server/index.ts
 export function registerRoutes(app: any, requireAuth: any, storage: any) {
-  // Register all route modules with the app
+  // Register route modules with register functions
   registerCrmRoutes(app, requireAuth, storage);
   registerWorkspaceRoutes(app);
   registerSettingsRoutes(app);
   registerMaintenanceRoutes(app, requireAuth);
-  registerAiEngineRoutes(app, requireAuth, storage);
   registerUnifiedStatisticsRoutes(app, requireAuth);
   registerDatabaseOptimizationRoutes(app, requireAuth);
   registerStandardizedInvoiceRoutes(app, requireAuth);
-  registerUnifiedFinancialRoutes(app, requireAuth);
-  registerCouplingRoutes(app, requireAuth);
+
+  // Mount router-based modules
+  app.use('/api/ai-engine', aiEngineRouter);
+  app.use('/api/coupling', couplingRouter);
+  app.use('/api/unified-financial', unifiedFinancialRouter);
 
   console.log('✅ All routes registered successfully');
 }
