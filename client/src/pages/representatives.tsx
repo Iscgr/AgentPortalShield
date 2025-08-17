@@ -5,7 +5,6 @@ import {
   Search, 
   Filter, 
   Eye, 
-  Edit, 
   Trash2, 
   Plus, 
   DollarSign,
@@ -868,7 +867,7 @@ export default function Representatives() {
                           size="sm"
                           onClick={() => handleEdit(rep)}
                         >
-                          <Edit className="w-4 h-4" />
+                          <Settings className="w-4 h-4" />
                         </Button>
                       </div>
                     </TableCell>
