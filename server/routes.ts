@@ -3,11 +3,30 @@ import express from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from './db';
 import { invoices } from '../shared/schema';
-import { authMiddleware, requireAuth } from './middleware/unified-auth';
+import { unifiedAuthMiddleware } from './middleware/unified-auth';
 import { storage } from './storage';
 import { unifiedFinancialEngine } from './services/unified-financial-engine';
-import { createInvoice, createInvoiceSchema } from './services/invoice';
 import { z } from 'zod';
+// import { createInvoice, createInvoiceSchema } from './services/invoice'; // TODO: These exports don't exist
+
+// Temporary basic schema and function to make the app work
+const createInvoiceSchema = z.object({
+  amount: z.string().or(z.number()),
+  representativeCode: z.string(),
+  issueDate: z.string().optional()
+});
+
+const createInvoice = async (data: any) => {
+  // Temporary function - insert basic invoice into database
+  const [newInvoice] = await db.insert(invoices).values({
+    amount: data.amount.toString(),
+    representativeCode: data.representativeCode,
+    issueDate: data.issueDate || new Date().toISOString().split('T')[0],
+    status: 'issued'
+  }).returning();
+  return newInvoice;
+};
+
 import workspaceRouter from './routes/workspace-routes';
 
 export function registerRoutes(app: express.Application) {
@@ -18,7 +37,7 @@ export function registerRoutes(app: express.Application) {
   });
 
   // ✅ SHERLOCK v28.0: Invoice Creation Endpoint
-  app.post('/api/invoices', authMiddleware, async (req, res) => {
+  app.post('/api/invoices', unifiedAuthMiddleware, async (req, res) => {
     const debug = {
       info: (msg: string, data?: any) => console.log(`🔍 SHERLOCK v28.0 INFO: ${msg}`, data || ''),
       success: (msg: string, data?: any) => console.log(`✅ SHERLOCK v28.0 SUCCESS: ${msg}`, data || ''),
@@ -64,7 +83,7 @@ export function registerRoutes(app: express.Application) {
   });
 
   // ✅ SHERLOCK v28.0: Invoice Unified Edit Endpoint
-  app.post("/api/invoices/unified-edit", authMiddleware, async (req, res) => {
+  app.post("/api/invoices/unified-edit", unifiedAuthMiddleware, async (req, res) => {
     const debug = {
       info: (msg: string, data?: any) => console.log(`🔍 SHERLOCK v28.0 INFO: ${msg}`, data || ''),
       success: (msg: string, data?: any) => console.log(`✅ SHERLOCK v28.0 SUCCESS: ${msg}`, data || ''),
@@ -227,7 +246,7 @@ export function registerRoutes(app: express.Application) {
   });
 
   // ✅ SHERLOCK v28.0: Invoice Usage Details Endpoint
-  app.get("/api/invoices/:id/usage-details", authMiddleware, async (req, res) => {
+  app.get("/api/invoices/:id/usage-details", unifiedAuthMiddleware, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
 
@@ -286,7 +305,7 @@ export function registerRoutes(app: express.Application) {
   });
 
   // ✅ SHERLOCK v28.0: Invoice Edit History Endpoint
-  app.get("/api/invoices/:id/edit-history", authMiddleware, async (req, res) => {
+  app.get("/api/invoices/:id/edit-history", unifiedAuthMiddleware, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
 
