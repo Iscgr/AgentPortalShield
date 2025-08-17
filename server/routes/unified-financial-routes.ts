@@ -1280,7 +1280,7 @@ router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) =>
 });
 
 // Health endpoint for dashboard
-app.get('/api/unified-financial/health', async (req, res) => {
+router.get('/health', requireAuth, async (req, res) => {
   try {
     console.log('🏥 SHERLOCK v32.0: Health endpoint called for dashboard');
 
