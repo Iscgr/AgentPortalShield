@@ -59,11 +59,7 @@ args = "npm run build"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run test"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run deploy"
+args = "npm run start"
 
 [agent]
 integrations = ["javascript_auth_all_persistance==1.0.0", "javascript_database==1.0.0", "javascript_xai==1.0.0"]
