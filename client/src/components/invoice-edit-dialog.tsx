@@ -375,7 +375,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     }
   }, [isOpen, sessionCheckInterval]);
 
-  // Add new record
+  // ✅ SHERLOCK v28.2: ENHANCED ADD RECORD with immediate calculation
   const addNewRecord = () => {
     const newRecord: EditableUsageRecord = {
       id: generateId(),
@@ -389,51 +389,102 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       isDeleted: false
     };
 
-    setEditableRecords(prev => [...prev, newRecord]);
+    console.log(`➕ SHERLOCK v28.2: Adding new record: ${newRecord.id}`);
+    setEditableRecords(prev => {
+      const updated = [...prev, newRecord];
+      const newAmount = calculateTotalAmount(updated);
+      console.log(`🧮 SHERLOCK v28.2: Amount after adding record: ${newAmount} تومان`);
+      setTimeout(() => setCalculatedAmount(newAmount), 0);
+      return updated;
+    });
   };
 
-  // Update record
+  // ✅ SHERLOCK v28.2: ENHANCED REAL-TIME RECORD UPDATE with immediate calculation
   const updateRecord = (id: string, field: keyof EditableUsageRecord, value: any) => {
-    setEditableRecords(prev => prev.map(record => {
-      if (record.id === id) {
-        const updated = { ...record, [field]: value, isModified: !record.isNew };
-        return updated;
-      }
-      return record;
-    }));
+    console.log(`🔄 SHERLOCK v28.2: Updating record ${id}, field: ${field}, value: ${value}`);
+    
+    setEditableRecords(prev => {
+      const updatedRecords = prev.map(record => {
+        if (record.id === id) {
+          const updated = { ...record, [field]: value, isModified: !record.isNew };
+          
+          // ✅ Real-time validation for amount field
+          if (field === 'amount') {
+            const numericValue = parseFloat(value) || 0;
+            console.log(`💰 SHERLOCK v28.2: Amount updated for record ${id}: ${record.amount} → ${numericValue}`);
+            updated.amount = numericValue;
+          }
+          
+          return updated;
+        }
+        return record;
+      });
+      
+      // ✅ IMMEDIATE calculation after state update
+      const newTotalAmount = calculateTotalAmount(updatedRecords);
+      console.log(`🧮 SHERLOCK v28.2: Immediate calculation result: ${newTotalAmount} تومان`);
+      
+      // Force immediate UI update
+      setTimeout(() => {
+        setCalculatedAmount(newTotalAmount);
+      }, 0);
+      
+      return updatedRecords;
+    });
   };
 
-  // Delete record
+  // ✅ SHERLOCK v28.2: ENHANCED DELETE RECORD with immediate calculation
   const deleteRecord = (id: string) => {
-    setEditableRecords(prev => prev.map(record => {
-      if (record.id === id) {
-        return { ...record, isDeleted: true };
-      }
-      return record;
-    }));
+    console.log(`🗑️ SHERLOCK v28.2: Deleting record: ${id}`);
+    setEditableRecords(prev => {
+      const updated = prev.map(record => {
+        if (record.id === id) {
+          console.log(`🗑️ SHERLOCK v28.2: Marking record ${id} as deleted (amount: ${record.amount})`);
+          return { ...record, isDeleted: true };
+        }
+        return record;
+      });
+      
+      const newAmount = calculateTotalAmount(updated);
+      console.log(`🧮 SHERLOCK v28.2: Amount after deleting record: ${newAmount} تومان`);
+      setTimeout(() => setCalculatedAmount(newAmount), 0);
+      return updated;
+    });
   };
 
-  // Restore deleted record
+  // ✅ SHERLOCK v28.2: ENHANCED RESTORE RECORD with immediate calculation
   const restoreRecord = (id: string) => {
-    setEditableRecords(prev => prev.map(record => {
-      if (record.id === id) {
-        return { ...record, isDeleted: false };
-      }
-      return record;
-    }));
+    console.log(`🔄 SHERLOCK v28.2: Restoring record: ${id}`);
+    setEditableRecords(prev => {
+      const updated = prev.map(record => {
+        if (record.id === id) {
+          console.log(`🔄 SHERLOCK v28.2: Restoring record ${id} (amount: ${record.amount})`);
+          return { ...record, isDeleted: false };
+        }
+        return record;
+      });
+      
+      const newAmount = calculateTotalAmount(updated);
+      console.log(`🧮 SHERLOCK v28.2: Amount after restoring record: ${newAmount} تومان`);
+      setTimeout(() => setCalculatedAmount(newAmount), 0);
+      return updated;
+    });
   };
 
-  // Update calculated amount when records change
+  // ✅ SHERLOCK v28.2: REAL-TIME AMOUNT CALCULATION - Critical Fix
   useEffect(() => {
     const newAmount = calculateTotalAmount(editableRecords);
     setCalculatedAmount(newAmount);
 
-    // SHERLOCK v1.0: Auto-sync total amount with usage details
-    // Update the invoice amount in parent state if callback is available
+    console.log(`💰 SHERLOCK v28.2: Real-time calculation - Amount changed from ${calculatedAmount} to ${newAmount}`);
+    console.log(`🔢 SHERLOCK v28.2: Active records count: ${editableRecords.filter(r => !r.isDeleted).length}`);
+    console.log(`📊 SHERLOCK v28.2: Records breakdown:`, editableRecords.map(r => `${r.id}: ${r.amount} (deleted: ${r.isDeleted})`));
+    
+    // SHERLOCK v28.2: Real-time validation - ensure UI reflects changes immediately
     if (typeof onEditComplete === 'function' && newAmount !== originalAmount) {
-      console.log(`💰 SHERLOCK v1.0: Auto-calculated amount changed from ${originalAmount} to ${newAmount}`);
+      console.log(`💰 SHERLOCK v28.2: Amount difference detected: ${newAmount - originalAmount} تومان`);
     }
-  }, [editableRecords, originalAmount, onEditComplete]);
+  }, [editableRecords, originalAmount, onEditComplete, calculatedAmount]);
 
   // Start editing
   const startEditing = () => {
@@ -469,7 +520,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     }
   };
 
-  // Save changes with comprehensive financial sync
+  // ✅ SHERLOCK v28.2: ENHANCED SAVE WITH REAL-TIME VALIDATION
   const saveChanges = async () => {
     if (!editReason.trim()) {
       toast({
@@ -479,6 +530,24 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       });
       return;
     }
+
+    // ✅ SHERLOCK v28.2: Real-time amount validation before save
+    const finalCalculatedAmount = calculateTotalAmount(editableRecords);
+    if (Math.abs(finalCalculatedAmount - calculatedAmount) > 0.1) {
+      console.warn(`⚠️ SHERLOCK v28.2: Amount mismatch detected - Recalculating: ${calculatedAmount} vs ${finalCalculatedAmount}`);
+      setCalculatedAmount(finalCalculatedAmount);
+      
+      toast({
+        title: "🔄 محاسبه مجدد",
+        description: `مبلغ به ${finalCalculatedAmount.toLocaleString()} تومان اصلاح شد`,
+        variant: "default"
+      });
+      
+      // Allow user to see the recalculated amount
+      return;
+    }
+
+    console.log(`💰 SHERLOCK v28.2: Final validation passed - Amount: ${calculatedAmount} تومان`);
 
     // ✅ SHERLOCK v28.0: Pre-save financial consistency check
     if (Math.abs(calculatedAmount - originalAmount) > 50000) {
@@ -808,24 +877,40 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                   </Button>
                 </div>
                 <div className="flex gap-2 items-center">
-                  {/* ✅ SHERLOCK v28.1: ENHANCED AMOUNT DISPLAY WITH REAL-TIME VALIDATION */}
-              <div className="text-sm text-gray-600 flex flex-col items-end border-l-4 border-blue-200 pl-3">
-                <div className="font-semibold text-gray-800">مجموع فعلی: {calculatedAmount.toLocaleString()} تومان</div>
-                <div className="text-xs text-gray-500">مبلغ اصلی: {originalAmount.toLocaleString()} تومان</div>
+                  {/* ✅ SHERLOCK v28.2: REAL-TIME AMOUNT DISPLAY WITH IMMEDIATE FEEDBACK */}
+              <div className="text-sm text-gray-600 flex flex-col items-end border-l-4 border-blue-200 pl-3 bg-gray-50 p-3 rounded-md">
+                <div className="font-bold text-lg text-gray-800 mb-1">
+                  مجموع فعلی: 
+                  <span className={`ml-2 ${calculatedAmount !== parseFloat(invoice.amount) ? 'text-blue-600 animate-pulse' : 'text-gray-800'}`}>
+                    {calculatedAmount.toLocaleString()} تومان
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 mb-2">مبلغ اصلی: {originalAmount.toLocaleString()} تومان</div>
+                
+                {/* ✅ Real-time difference indicator */}
                 {calculatedAmount !== originalAmount && (
-                  <div className={`text-sm font-bold px-2 py-1 rounded-md mt-1 ${
+                  <div className={`text-sm font-bold px-3 py-2 rounded-lg mt-1 transition-all duration-300 ${
                     calculatedAmount > originalAmount 
-                      ? 'text-green-700 bg-green-100' 
-                      : 'text-red-700 bg-red-100'
+                      ? 'text-green-700 bg-green-100 border border-green-300' 
+                      : 'text-red-700 bg-red-100 border border-red-300'
                   }`}>
                     {calculatedAmount > originalAmount ? '📈 افزایش' : '📉 کاهش'}: {Math.abs(calculatedAmount - originalAmount).toLocaleString()} تومان
+                    <div className="text-xs mt-1 opacity-75">
+                      {editableRecords.filter(r => !r.isDeleted).length} آیتم فعال
+                    </div>
                   </div>
                 )}
+                
                 {calculatedAmount === originalAmount && editMode && (
-                  <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1">
-                    ✓ بدون تغییر مبلغ
+                  <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1 border border-blue-200">
+                    ✓ بدون تغییر مبلغ - آماده ذخیره
                   </div>
                 )}
+                
+                {/* ✅ Real-time calculation status */}
+                <div className="text-xs text-gray-400 mt-1 italic">
+                  محاسبه خودکار: {new Date().toLocaleTimeString('fa-IR')}
+                </div>
               </div>
                   <Button
                     onClick={saveChanges}
