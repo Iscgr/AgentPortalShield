@@ -156,7 +156,13 @@ export default function InvoiceEditDialog({
   // Fetch invoice usage details
   const { data: usageDetails, isLoading } = useQuery({
     queryKey: [`/api/invoices/${invoice.id}/usage-details`],
-    enabled: actualIsOpen
+    enabled: actualIsOpen,
+    queryFn: () => apiRequest(`/api/invoices/${invoice.id}/usage-details`),
+    retry: 2,
+    select: (data: any) => {
+      console.log(`🔍 SHERLOCK v32.0: Raw usage details for invoice ${invoice.id}:`, data);
+      return data;
+    }
   });
 
   // Fetch edit history
@@ -356,35 +362,85 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     }
   });
 
-  // ✅ SHERLOCK v29.0: ENHANCED INITIALIZATION WITH PROPER DATA RESTORATION
+  // ✅ SHERLOCK v32.0: ENHANCED INITIALIZATION WITH REAL DATA STRUCTURE SUPPORT
   useEffect(() => {
-    if ((usageDetails as any)?.records && Array.isArray((usageDetails as any).records) && !isInitialized && !editMode) {
-      const records = ((usageDetails as any).records as any[]).map((record: any, index: number) => ({
-        id: record.persistenceId || generateId(), // Use persistence ID if available
-        admin_username: record.admin_username || '',
-        event_timestamp: record.event_timestamp || '',
+    if (usageDetails && !isInitialized && !editMode) {
+      console.log(`🔍 SHERLOCK v32.0: Processing usage details for invoice ${invoice.id}:`, usageDetails);
+      
+      let records: EditableUsageRecord[] = [];
+      
+      // Handle different possible data structures
+      if (usageDetails.records && Array.isArray(usageDetails.records)) {
+        // Case 1: Direct records array
+        records = usageDetails.records;
+      } else if (usageDetails.usageData?.records && Array.isArray(usageDetails.usageData.records)) {
+        // Case 2: Nested in usageData
+        records = usageDetails.usageData.records;
+      } else if (usageDetails.usageData && typeof usageDetails.usageData === 'object') {
+        // Case 3: Parse usage data if it's a stringified JSON or object
+        const usageDataObj = typeof usageDetails.usageData === 'string' 
+          ? JSON.parse(usageDetails.usageData) 
+          : usageDetails.usageData;
+          
+        if (usageDataObj.records && Array.isArray(usageDataObj.records)) {
+          records = usageDataObj.records;
+        } else {
+          // Create single record from usage data
+          records = [{
+            id: generateId(),
+            admin_username: usageDataObj.admin_username || representativeCode,
+            event_timestamp: usageDataObj.period_start || new Date().toISOString(),
+            event_type: 'CREATE',
+            description: usageDataObj.description || `فاکتور ${invoice.invoiceNumber}`,
+            amount: parseFloat(usageDataObj.usage_amount || invoice.amount || '0'),
+            isNew: false,
+            isModified: false,
+            isDeleted: false
+          }];
+        }
+      } else {
+        // Case 4: Fallback - create from invoice amount
+        console.log(`⚠️ SHERLOCK v32.0: No detailed records found, creating fallback record`);
+        records = [{
+          id: generateId(),
+          admin_username: representativeCode,
+          event_timestamp: new Date().toISOString(),
+          event_type: 'CREATE',
+          description: `فاکتور ${invoice.invoiceNumber} - مبلغ کل`,
+          amount: parseFloat(invoice.amount || '0'),
+          isNew: false,
+          isModified: false,
+          isDeleted: false
+        }];
+      }
+
+      // Convert to editable format
+      const editableRecords = records.map((record: any, index: number) => ({
+        id: record.persistenceId || record.id || generateId(),
+        admin_username: record.admin_username || representativeCode,
+        event_timestamp: record.event_timestamp || new Date().toISOString(),
         event_type: record.event_type || 'CREATE',
-        description: record.description || '',
-        amount: parseFloat(record.amount || '0'),
+        description: record.description || record.name || `آیتم ${index + 1}`,
+        amount: parseFloat(record.amount || record.unitPrice || '0'),
         isNew: false,
         isModified: false,
         isDeleted: false
       }));
 
-      const initialAmount = calculateTotalAmount(records);
+      const initialAmount = calculateTotalAmount(editableRecords);
 
       // ✅ Set states in proper order
-      setEditableRecords(records);
+      setEditableRecords(editableRecords);
       setOriginalAmount(parseFloat(invoice.amount));
       setCalculatedAmount(initialAmount);
       setIsInitialized(true);
 
-      console.log(`🧮 SHERLOCK v29.0: Enhanced initialization completed`);
-      console.log(`📊 Records loaded: ${records.length}`);
+      console.log(`🧮 SHERLOCK v32.0: Enhanced initialization completed`);
+      console.log(`📊 Records loaded: ${editableRecords.length}`);
       console.log(`💰 Original: ${invoice.amount}, Calculated: ${initialAmount}`);
-      console.log(`🔢 Records detail:`, records.map(r => `${r.description}: ${r.amount}`));
+      console.log(`🔢 Records detail:`, editableRecords.map(r => `${r.description}: ${r.amount}`));
     }
-  }, [usageDetails, isInitialized, editMode, invoice.amount]);
+  }, [usageDetails, isInitialized, editMode, invoice.amount, representativeCode]);
 
   // Reset initialization when dialog is closed
   useEffect(() => {

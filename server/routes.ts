@@ -2356,40 +2356,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ✅ SHERLOCK v32.0: Enhanced invoice usage details endpoint
   app.get("/api/invoices/:id/usage-details", authMiddleware, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
+      console.log(`🔍 SHERLOCK v32.0: Fetching usage details for invoice ${invoiceId}`);
 
-      if (!invoiceId) {
-        return res.status(400).json({ error: "شناسه فاکتور نامعتبر است" });
-      }
-
-      const invoices = await storage.getInvoices();
-      const invoice = invoices.find(inv => inv.id === invoiceId);
-
+      const invoice = await storage.getInvoiceById(invoiceId);
       if (!invoice) {
         return res.status(404).json({ error: "فاکتور یافت نشد" });
       }
 
-      // Return detailed usage data for editing
-      res.json({
-        invoice: {
-          id: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
+      let usageData = null;
+      let records = [];
+
+      // Parse usage data if exists
+      if (invoice.usageData) {
+        try {
+          usageData = typeof invoice.usageData === 'string'
+            ? JSON.parse(invoice.usageData)
+            : invoice.usageData;
+
+          console.log(`📄 SHERLOCK v32.0: Parsed usage data:`, usageData);
+
+          // Extract records from various possible structures
+          if (usageData.records && Array.isArray(usageData.records)) {
+            records = usageData.records;
+          } else if (usageData.editedUsageData?.records) {
+            records = usageData.editedUsageData.records;
+          } else if (usageData.completeUsageDataReplacement?.records) {
+            records = usageData.completeUsageDataReplacement.records;
+          }
+
+        } catch (parseError) {
+          console.warn(`⚠️ SHERLOCK v32.0: Failed to parse usage data:`, parseError);
+        }
+      }
+
+      // If no detailed records, create a basic one
+      if (!records || records.length === 0) {
+        console.log(`📝 SHERLOCK v32.0: Creating fallback record for invoice ${invoiceId}`);
+        records = [{
+          id: `fallback_${invoiceId}`,
+          admin_username: invoice.representativeCode || 'unknown',
+          event_timestamp: invoice.issueDate || invoice.createdAt,
+          event_type: 'CREATE',
+          description: `فاکتور ${invoice.invoiceNumber} - مبلغ کل`,
           amount: invoice.amount,
-          issueDate: invoice.issueDate,
-          status: invoice.status
-        },
-        usageData: invoice.usageData || {},
-        records: invoice.usageData?.records || []
+          isOriginal: true
+        }];
+      }
+
+      const response = {
+        invoiceId: invoiceId,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: invoice.amount,
+        records: records,
+        usageData: usageData,
+        recordsCount: records.length,
+        totalAmount: records.reduce((sum, r) => sum + parseFloat(r.amount || '0'), 0)
+      };
+
+      console.log(`✅ SHERLOCK v32.0: Returning usage details for invoice ${invoiceId}:`, {
+        recordsCount: response.recordsCount,
+        totalAmount: response.totalAmount
       });
 
-    } catch (error: any) {
-      console.error('خطا در دریافت جزئیات مصرف:', error);
-      res.status(500).json({
-        error: 'خطا در دریافت جزئیات مصرف',
-        details: error.message
-      });
+      res.json(response);
+    } catch (error) {
+      console.error(`❌ SHERLOCK v32.0: Error fetching usage details for invoice ${req.params.id}:`, error);
+      res.status(500).json({ error: "خطا در دریافت جزئیات فاکتور" });
     }
   });
 

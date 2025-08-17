@@ -93,8 +93,10 @@ export interface IStorage {
   updateInvoice(id: number, invoice: Partial<Invoice>): Promise<Invoice>;
   markInvoicesAsSentToTelegram(invoiceIds: number[]): Promise<void>;
   getInvoicesWithBatchInfo(): Promise<(Invoice & { batch?: InvoiceBatch })[]>;
+  // ✅ SHERLOCK v32.0: Get single invoice by ID with full details
+  getInvoiceById(invoiceId: number): Promise<any | null>;
 
-  // Telegram Send History - برای پیگیری ارسال مجدد
+  // Telegram Send History - for resending capability
   getTelegramSendHistory(invoiceId: number): Promise<TelegramSendHistory[]>;
   createTelegramSendHistory(history: InsertTelegramSendHistory): Promise<TelegramSendHistory>;
   markInvoicesAsSentToTelegramWithHistory(invoiceIds: number[], sentBy: string, botToken?: string, chatId?: string, template?: string): Promise<void>;
@@ -555,7 +557,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  // SHERLOCK v11.5: Enhanced with real-time payment allocation status calculation  
+  // SHERLOCK v11.5: Enhanced with real-time payment allocation status calculation
   async getInvoices(): Promise<any[]> {
     // Get base invoice data
     const invoiceResults = await db
@@ -1906,6 +1908,7 @@ export class DatabaseStorage implements IStorage {
     editedBy: string;
     originalAmount: number;
     editedAmount: number;
+    completeUsageDataReplacement?: any; // Added for full replacement scenario
   }): Promise<{ transactionId: string, editId: number, success: boolean }> {
 
     // Generate unique transaction ID with high precision timestamp
@@ -1993,20 +1996,20 @@ export class DatabaseStorage implements IStorage {
 
           if (newUsageData && typeof newUsageData === 'object' && newUsageData.records && Array.isArray(newUsageData.records)) {
             recordsMetadata.totalActiveRecords = newUsageData.records.length;
-            
+
             // Enhanced validation for new data structure
             recordsMetadata.verificationPassed = newUsageData.records.every(record =>
-              record.description && 
-              record.amount >= 0 && 
+              record.description &&
+              record.amount >= 0 &&
               record.admin_username &&
               record.persistenceId
             );
-            
+
             // Enhanced integrity validation
             recordsMetadata.dataIntegrityValidated = newUsageData.records.every(record =>
               parseFloat(record.amount) > 0 && record.description.trim().length > 0
             );
-            
+
             // ✅ CRITICAL: Transform records to ensure consistency
             newUsageData.records = newUsageData.records.map(record => ({
               ...record,
