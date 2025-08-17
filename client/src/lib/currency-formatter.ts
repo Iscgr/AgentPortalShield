@@ -215,3 +215,4 @@ export const formatToPersianTomans = CurrencyFormatter.formatToPersianTomans;
 export const convertRialsToTomans = CurrencyFormatter.convertRialsToTomans;
 export const formatForCRM = CurrencyFormatter.formatForCRM;
 export const formatCompact = CurrencyFormatter.formatCompact;
+export const formatCurrency = CurrencyFormatter.formatCurrency;

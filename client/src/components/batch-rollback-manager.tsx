@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { AlertTriangle, Trash2, Eye, CheckCircle, RotateCcw, Calendar } from 'lucide-react';
-import { formatCurrency } from '../lib/currency-formatter';
+import { formatForCRM } from '../lib/currency-formatter';
 import { useToast } from '../hooks/use-toast';
 import { apiRequest } from '../lib/queryClient';
 
@@ -206,7 +206,7 @@ export function BatchRollbackManager() {
 
                 <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    {formatCurrency(previewData.data.totalAmount || 0)}
+                    {formatForCRM(previewData.data.totalAmount || 0)}
                   </div>
                   <div className="text-sm text-red-800 dark:text-red-200">
                     مجموع مبلغ
@@ -230,7 +230,7 @@ export function BatchRollbackManager() {
                           </div>
                           <div className="text-sm">
                             <Badge variant="outline">
-                              {formatCurrency(rep.totalAmount)}
+                              {formatForCRM(rep.totalAmount)}
                             </Badge>
                           </div>
                         </div>
