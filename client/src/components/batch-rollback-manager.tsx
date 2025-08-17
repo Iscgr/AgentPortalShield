@@ -1,4 +1,3 @@
-
 /**
  * SHERLOCK v32.0: BATCH ROLLBACK MANAGER UI
  * رابط کاربری حذف دسته‌جمعی فاکتورها
@@ -16,7 +15,7 @@ import { Separator } from './ui/separator';
 import { AlertTriangle, Trash2, Eye, CheckCircle, RotateCcw, Calendar } from 'lucide-react';
 import { formatCurrency } from '../lib/currency-formatter';
 import { useToast } from '../hooks/use-toast';
-import { apiRequest } from '../lib/utils';
+import { apiRequest } from '../lib/queryClient';
 
 interface RollbackPreview {
   invoices: Array<{
