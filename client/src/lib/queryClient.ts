@@ -14,6 +14,11 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Define API_BASE_URL based on environment
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
+  typeof window !== 'undefined' ? window.location.origin : ''
+);
+
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
 
