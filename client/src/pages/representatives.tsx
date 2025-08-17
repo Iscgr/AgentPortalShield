@@ -70,6 +70,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUnifiedAuth } from "@/contexts/unified-auth-context";
+import InvoiceEditDialog from "@/components/invoice-edit-dialog";
 
 // ✅ SHERLOCK v24.0: کامپوننت Real-time نمایش بدهی با بهینه‌سازی
 function RealTimeDebtCell({ representativeId }: { representativeId: number }) {
@@ -1119,14 +1120,30 @@ export default function Representatives() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditInvoice(invoice)}
-                                    title="ویرایش جزئیات فاکتور"
-                                  >
-                                    <Settings className="w-4 h-4" />
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditInvoice(invoice)}
+                                      title="ویرایش جزئیات فاکتور (مسیر داخلی)"
+                                      className="bg-blue-50 text-blue-600"
+                                    >
+                                      <Settings className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        // Test external dialog
+                                        setSelectedInvoice(invoice);
+                                        setIsInvoiceEditOpen(true);
+                                      }}
+                                      title="ویرایش جزئیات فاکتور (مسیر خارجی)"
+                                      className="bg-green-50 text-green-600"
+                                    >
+                                      <Edit3 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1248,14 +1265,12 @@ export default function Representatives() {
         isLoading={updateRepresentativeMutation.isPending}
       />
 
-      {/* Edit Invoice Dialog */}
-      {selectedInvoice && (
-        <EditInvoiceDialog
-          open={isInvoiceEditOpen}
-          onOpenChange={setIsInvoiceEditOpen}
+      {/* Edit Invoice Dialog - Using External Component */}
+      {selectedInvoice && selectedRep && (
+        <InvoiceEditDialog
           invoice={selectedInvoice}
-          representative={selectedRep}
-          onSave={() => {
+          representativeCode={selectedRep.code}
+          onEditComplete={() => {
             // Refresh representative details
             if (selectedRep) {
               handleViewDetails(selectedRep);
@@ -1832,20 +1847,7 @@ function EditRepresentativeDialog({
   );
 }
 
-// Edit Invoice Dialog Component
-function EditInvoiceDialog({
-  open,
-  onOpenChange,
-  invoice,
-  representative,
-  onSave
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  invoice: Invoice;
-  representative: RepresentativeWithDetails | null;
-  onSave: () => void;
-}) {
+// Internal EditInvoiceDialog component removed - using external component instead
   const { toast } = useToast();
   const queryClient = useQueryClient(); // Add queryClient here
   const [amount, setAmount] = useState(invoice.amount);
