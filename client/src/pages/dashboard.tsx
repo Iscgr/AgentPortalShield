@@ -44,14 +44,7 @@ interface DashboardData {
   lastUpdated: string;
 }
 
-// SHERLOCK v1.0: Define interface for financial health data
-interface FinancialHealthData {
-  healthScore: number;
-  activeDebtors: number;
-  totalCredit: number;
-  overdueAmount: number;
-  recommendations: string[];
-}
+
 
 // Placeholder for UnifiedStatCard - assuming it's defined elsewhere and used for generic stats
 function UnifiedStatCard({ title, statKey, endpoint, icon, formatter, color }: { title: string; statKey: keyof DashboardData | 'totalSystemDebt'; endpoint: string; icon: React.ReactNode; formatter: string; color: string }) {
@@ -344,22 +337,7 @@ export default function Dashboard() {
     select: (data: any) => data?.value || null
   });
 
-  // SHERLOCK v28.0: Financial health data with accurate overdue calculation
-  const { data: financialHealth, isLoading: healthLoading } = useQuery<FinancialHealthData>({
-    queryKey: ["/api/unified-financial/overdue-analysis"],
-    staleTime: 5 * 60 * 1000, // 5 minutes for real-time accuracy
-    refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
-    select: (data: any) => ({
-      healthScore: data?.data?.totals ? Math.max(0, 100 - Math.round((data.data.representatives.length / 246) * 100)) : 85,
-      activeDebtors: data?.data?.totals?.representativesWithOverdue || 0,
-      totalCredit: data?.data?.totals?.totalUnpaidAmount || 0,
-      overdueAmount: data?.data?.totals?.totalOverdueAmount || 0,
-      recommendations: data?.data?.totals?.totalOverdueAmount > 100000000 ? [
-        'تطبیق مالی سراسری انجام دهید',
-        'نمایندگان پرریسک را بررسی کنید'
-      ] : []
-    })
-  });
+  
 
 
   if (isLoading) {
@@ -429,64 +407,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* SHERLOCK v1.0: Financial Health Card */}
-      {financialHealth && (
-        <div className="mb-8">
-          <Card className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-200/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <span className="text-2xl">🏥</span>
-                سلامت مالی سیستم - SHERLOCK v1.0
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className={`text-3xl font-bold ${
-                    financialHealth.healthScore >= 80 ? 'text-green-400' :
-                    financialHealth.healthScore >= 60 ? 'text-yellow-400' : 'text-red-400'
-                  }`}>
-                    {toPersianDigits(financialHealth.healthScore.toString())}%
-                  </div>
-                  <div className="text-gray-300 text-sm">امتیاز سلامت</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-400">
-                    {toPersianDigits(financialHealth.activeDebtors.toString())}
-                  </div>
-                  <div className="text-gray-300 text-sm">بدهکار فعال</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-400">
-                    {formatCurrency(financialHealth.totalCredit)}
-                  </div>
-                  <div className="text-gray-300 text-sm">کل اعتبار</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-400">
-                    {formatCurrency(financialHealth.overdueAmount)}
-                  </div>
-                  <div className="text-gray-300 text-sm">سررسید گذشته</div>
-                </div>
-              </div>
-
-              {financialHealth.recommendations.length > 0 && (
-                <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-300/20">
-                  <h4 className="text-blue-200 font-semibold mb-2">💡 توصیه‌های سیستم:</h4>
-                  <ul className="text-gray-300 text-sm space-y-1">
-                    {financialHealth.recommendations.map((rec, index) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <span className="text-blue-400">•</span>
-                        {rec}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Invoice Generation Section */}
