@@ -19,10 +19,10 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
   res.header('Access-Control-Allow-Credentials', 'true');
-
+  
   // Check if this is a portal route (public access)
   const isPortalRoute = req.path.startsWith('/portal') || req.path.startsWith('/api/portal');
-
+  
   if (isPortalRoute) {
     // Relaxed security headers for portal routes to improve Android browser compatibility
     res.header('X-Content-Type-Options', 'nosniff');
@@ -30,7 +30,7 @@ app.use((req, res, next) => {
     res.header('Referrer-Policy', 'no-referrer-when-downgrade');
     res.header('Cache-Control', 'public, max-age=300'); // Allow caching for portal content
     res.header('Pragma', 'public');
-
+    
     // Additional headers for Android browser compatibility
     res.header('X-UA-Compatible', 'IE=edge,chrome=1');
     res.header('X-DNS-Prefetch-Control', 'on');
@@ -45,13 +45,13 @@ app.use((req, res, next) => {
     res.header('Pragma', 'no-cache');
     res.header('Expires', '0');
   }
-
+  
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
-
+  
   next();
 });
 
@@ -79,7 +79,7 @@ const sessionMiddleware = session({
 // Apply session middleware for all non-portal routes
 app.use((req, res, next) => {
   const isPortalRoute = req.path.startsWith('/portal') || req.path.startsWith('/api/portal');
-
+  
   if (isPortalRoute) {
     // Skip session middleware for portal routes to avoid authentication issues
     next();
@@ -103,19 +103,19 @@ app.use((req, res, next) => {
   const userAgent = req.headers['user-agent'] || '';
   const isAndroid = /Android/.test(userAgent);
   const isPortalRoute = req.path.startsWith('/portal') || req.path.startsWith('/api/portal');
-
+  
   if (isAndroid && isPortalRoute) {
     // Additional Android-specific headers for better compatibility
     res.header('Accept-Ranges', 'bytes');
     res.header('Content-Security-Policy', 'default-src \'self\' \'unsafe-inline\' \'unsafe-eval\' data: blob:; connect-src \'self\' *');
     res.header('X-Permitted-Cross-Domain-Policies', 'none');
     res.header('X-Download-Options', 'noopen');
-
+    
     // Remove problematic headers that cause issues on some Android browsers
     res.removeHeader('X-XSS-Protection');
     res.removeHeader('Strict-Transport-Security');
   }
-
+  
   next();
 });
 
@@ -177,7 +177,7 @@ app.use((req, res, next) => {
     try {
       const dbHealthy = await checkDatabaseHealth();
       const memoryUsage = process.memoryUsage();
-
+      
       res.status(200).json({ 
         status: 'healthy', 
         timestamp: Date.now(),
@@ -206,7 +206,7 @@ app.use((req, res, next) => {
       });
     }
   });
-
+  
   app.get('/ready', (req, res) => {
     res.status(200).json({ 
       status: 'ready', 
@@ -221,9 +221,9 @@ app.use((req, res, next) => {
   app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
+    
     log(`Error ${status}: ${message} - ${req.method} ${req.path}`, 'error');
-
+    
     // Don't crash the server, just log and respond
     res.status(status).json({ 
       error: message,
@@ -237,7 +237,7 @@ app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) {
       return next();
     }
-
+    
     // Special handling for portal routes
     if (req.path.startsWith('/portal/')) {
       // Set portal-specific headers for better Android compatibility
@@ -245,7 +245,7 @@ app.use((req, res, next) => {
       res.header('X-UA-Compatible', 'IE=edge');
       res.header('Viewport', 'width=device-width, initial-scale=1.0');
     }
-
+    
     next();
   });
 
@@ -263,47 +263,60 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, async () => { // Make the callback async to use await for importing services
-    console.log(`Server is running on port ${port}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-
-    // ✅ SHERLOCK v28.0: Auto-start financial monitoring
-    try {
-      const { financialMonitoringService } = await import('./services/financial-monitoring-service.js');
-      financialMonitoringService.startMonitoring(30); // Every 30 minutes
-      console.log('📊 SHERLOCK v28.0: Financial monitoring auto-started');
-    } catch (error) {
-      console.warn('⚠️ Failed to start financial monitoring:', error);
+  }, () => {
+    log(`serving on port ${port}`);
+    log(`Environment: ${app.get("env")}`);
+    log(`Health check available at /health`);
+    
+    // SHERLOCK v16.2 DEPLOYMENT STABILITY: Enhanced process persistence
+    if (app.get("env") === "production") {
+      log(`Production server started successfully`);
+      log(`Process ID: ${process.pid}`);
+      
+      // Keep process alive and handle unexpected exits
+      process.on('SIGTERM', () => log('SIGTERM received, preparing graceful shutdown...'));
+      process.on('SIGINT', () => log('SIGINT received, preparing graceful shutdown...'));
+      
+      // Prevent process exit on uncaught exceptions
+      process.on('uncaughtException', (err) => {
+        log(`Uncaught Exception: ${err.message}`, 'error');
+        // Don't exit in production, just log
+      });
+      
+      process.on('unhandledRejection', (reason, promise) => {
+        log(`Unhandled Rejection at Promise: ${reason}`, 'error');
+        // Don't exit in production, just log
+      });
     }
   });
 
   // Graceful shutdown handling for production stability
   const gracefulShutdown = async (signal: string) => {
     log(`Received ${signal} signal, starting graceful shutdown...`);
-
+    
     try {
       // Close HTTP server
       server.close(async () => {
         log('HTTP server closed');
-
+        
         // Close database connections
         await closeDatabaseConnection();
-
+        
         log('Graceful shutdown complete');
         process.exit(0);
       });
-
+      
       // Force close after 10 seconds
       setTimeout(() => {
         log('Force shutdown after timeout');
         process.exit(1);
       }, 10000);
-
+      
     } catch (error) {
       log(`Error during shutdown: ${error}`, 'error');
       process.exit(1);
@@ -313,14 +326,14 @@ app.use((req, res, next) => {
   // Handle various termination signals
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
+  
   // Handle uncaught exceptions to prevent crashes
   process.on('uncaughtException', (error) => {
     log(`Uncaught Exception: ${error.message}`, 'error');
     console.error(error.stack);
     // Don't exit - let the server continue running
   });
-
+  
   process.on('unhandledRejection', (reason, promise) => {
     log(`Unhandled Rejection at promise: ${reason}`, 'error');
     // Don't exit - let the server continue running

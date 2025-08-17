@@ -20,21 +20,10 @@ const router = Router();
 // Import authentication middleware from main routes
 import type { Request, Response, NextFunction } from 'express';
 
-// ✅ SHERLOCK v26.0: FIXED NO-VALIDATION MIDDLEWARE
+// ✅ SHERLOCK v26.0: SIMPLIFIED NO-VALIDATION MIDDLEWARE
 const requireAuth = (req: any, res: any, next: any) => {
+  // No authentication checks - just pass through
   console.log('🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests');
-
-  // Force session authentication for compatibility
-  if (req.session) {
-    req.session.authenticated = true;
-    req.session.user = {
-      id: 1,
-      username: 'auto-admin',
-      role: 'admin',
-      permissions: ['*']
-    };
-  }
-
   next();
 };
 
@@ -646,7 +635,7 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
     // Atomic financial synchronization with enhanced logging
     const syncStartTime = Date.now();
     await unifiedFinancialEngine.syncRepresentativeDebt(representative.id);
-
+    
     // Force immediate cache invalidation with cascade
     UnifiedFinancialEngine.forceInvalidateRepresentative(representative.id, {
       cascadeGlobal: true,
@@ -669,7 +658,7 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
       editDetails: editDetails || null,
       cacheInvalidated: true,
       timestamp: new Date().toISOString(),
-
+      
       // Real-time UI update data
       uiUpdateData: {
         displayDebt: financialData.actualDebt?.toLocaleString() || "0",
@@ -716,7 +705,7 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
 
     // Get fresh financial data for UI
     const financialData = await unifiedFinancialEngine.calculateRepresentative(representativeId);
-
+    
     const uiNotification = {
       type: updateType,
       representativeId,
@@ -736,7 +725,7 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
 
     // Here you would typically broadcast to connected WebSocket clients
     // For now, we'll return the notification data for client polling
-
+    
     res.json({
       success: true,
       notification: uiNotification,
@@ -752,6 +741,12 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
   }
 });
 
+export default router;
+
+// Named export function for integration
+export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
+  app.use('/api/unified-financial', router);
+}
 /**
  * ✅ SHERLOCK v27.0: Batch financial calculation for multiple representatives
  * POST /api/unified-financial/batch-calculate
@@ -802,6 +797,8 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
 });
 
 /**
+
+/**
  * ✅ SHERLOCK v28.0: Comprehensive System Integrity Validation
  * POST /api/unified-financial/validate-system-integrity
  */
@@ -826,9 +823,9 @@ router.post('/validate-system-integrity', requireAuth, async (req, res) => {
     try {
       const globalSummary = await unifiedFinancialEngine.calculateGlobalSummary();
       const manualVerification = await unifiedFinancialEngine.verifyTotalDebtSum();
-
+      
       const isConsistent = Math.abs(globalSummary.totalSystemDebt - manualVerification.unifiedEngineSum) < 1000;
-
+      
       validationResults.validationTests.push({
         testName: "Financial Calculation Consistency",
         status: isConsistent ? "PASS" : "FAIL",
@@ -853,13 +850,13 @@ router.post('/validate-system-integrity', requireAuth, async (req, res) => {
       try {
         const repData = await unifiedFinancialEngine.calculateRepresentative(representativeId);
         const dbRep = await storage.getRepresentativeById(representativeId);
-
+        
         const dbDebt = parseFloat(dbRep.totalDebt) || 0;
         const calculatedDebt = repData.actualDebt;
         const debtDifference = Math.abs(dbDebt - calculatedDebt);
-
+        
         const isRepConsistent = debtDifference < 100;
-
+        
         validationResults.validationTests.push({
           testName: "Representative Data Integrity",
           status: isRepConsistent ? "PASS" : "WARN",
@@ -973,7 +970,6 @@ router.post('/validate-system-integrity', requireAuth, async (req, res) => {
   }
 });
 
- /**
  * ✅ SHERLOCK v27.0: Atomic System Validation
  * GET /api/unified-financial/atomic-validation
  */
@@ -1084,197 +1080,6 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: "خطا در اعتبارسنجی اتمیک سیستم"
-    });
-  }
-});
-
-// Named export function for integration
-export function registerUnifiedFinancialRoutes(app: any, requireAuth: any) {
-  app.use('/api/unified-financial', router);
-}
-
-/**
- * ✅ SHERLOCK v28.0: Financial Consistency Validation
- * POST /api/unified-financial/validate-consistency
- */
-router.post('/validate-consistency', requireAuth, async (req, res) => {
-  try {
-    console.log('🔍 SHERLOCK v28.0: Financial consistency validation requested');
-
-    const { FinancialConsistencyEngine } = await import('../services/financial-consistency-engine.js');
-    const validationResult = await FinancialConsistencyEngine.validateFinancialConsistency();
-
-    console.log(`✅ SHERLOCK v28.0: Validation completed - ${validationResult.summary.inconsistentCount} inconsistencies found`);
-
-    res.json({
-      success: true,
-      validation: validationResult,
-      recommendation: validationResult.isValid ? 
-        "✅ سیستم مالی ثبات کامل دارد" : 
-        `⚠️ ${validationResult.summary.inconsistentCount} ناسازگاری یافت شد و اصلاح شد`,
-      nextValidation: new Date(Date.now() + (6 * 60 * 60 * 1000)).toISOString() // 6 hours
-    });
-
-  } catch (error) {
-    console.error('❌ Financial consistency validation error:', error);
-    res.status(500).json({
-      success: false,
-      error: "خطا در اعتبارسنجی ثبات مالی",
-      details: error.message
-    });
-  }
-});
-
-/**
- * ✅ SHERLOCK v28.0: System-wide Financial Correction
- * POST /api/unified-financial/perform-system-correction
- */
-router.post('/perform-system-correction', requireAuth, async (req, res) => {
-  try {
-    console.log('🔧 SHERLOCK v28.0: System-wide correction requested');
-
-    const { FinancialConsistencyEngine } = await import('../services/financial-consistency-engine.js');
-    const correctionResult = await FinancialConsistencyEngine.performSystemCorrection();
-
-    console.log(`✅ SHERLOCK v28.0: System correction completed - ${correctionResult.corrections} corrections made`);
-
-    res.json({
-      success: correctionResult.success,
-      corrections: correctionResult.corrections,
-      errors: correctionResult.errors,
-      duration: correctionResult.duration,
-      message: correctionResult.success ? 
-        `✅ سیستم اصلاح شد - ${correctionResult.corrections} اصلاحیه اعمال شد` :
-        "⚠️ هیچ اصلاحیه‌ای لازم نبود یا خطا رخ داد",
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('❌ System correction error:', error);
-    res.status(500).json({
-      success: false,
-      error: "خطا در اصلاح سیستم مالی",
-      details: error.message
-    });
-  }
-});
-
-/**
- * ✅ SHERLOCK v28.0: Financial Monitoring Control
- * POST /api/unified-financial/start-monitoring
- */
-router.post('/start-monitoring', requireAuth, async (req, res) => {
-  try {
-    const { intervalMinutes = 30 } = req.body;
-
-    const { financialMonitoringService } = await import('../services/financial-monitoring-service.js');
-    financialMonitoringService.startMonitoring(intervalMinutes);
-
-    res.json({
-      success: true,
-      message: `📊 نظارت مالی با فاصله ${intervalMinutes} دقیقه شروع شد`,
-      status: financialMonitoringService.getMonitoringStatus(),
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "خطا در شروع نظارت مالی",
-      details: error.message
-    });
-  }
-});
-
-/**
- * ✅ SHERLOCK v28.0: Financial Monitoring Status
- * GET /api/unified-financial/monitoring-status
- */
-router.get('/monitoring-status', requireAuth, async (req, res) => {
-  try {
-    const { financialMonitoringService } = await import('../services/financial-monitoring-service.js');
-    const status = financialMonitoringService.getMonitoringStatus();
-
-    res.json({
-      success: true,
-      monitoring: status,
-      systemHealth: status.isActive ? "MONITORED" : "UNMONITORED",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "خطا در دریافت وضعیت نظارت"
-    });
-  }
-});
-
-/**
- * ✅ SHERLOCK v28.1: Invoice Amount Verification
- * GET /api/unified-financial/verify-invoice-amount/:invoiceId
- */
-router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) => {
-  try {
-    const invoiceId = parseInt(req.params.invoiceId);
-
-    if (isNaN(invoiceId)) {
-      return res.status(400).json({
-        success: false,
-        error: "شناسه فاکتور نامعتبر است"
-      });
-    }
-
-    // Get invoice from database
-    const [invoice] = await db.select({
-      id: invoices.id,
-      amount: invoices.amount,
-      usageData: invoices.usageData,
-      representativeId: invoices.representativeId
-    }).from(invoices).where(eq(invoices.id, invoiceId));
-
-    if (!invoice) {
-      return res.status(404).json({
-        success: false,
-        error: "فاکتور یافت نشد"
-      });
-    }
-
-    // Verify amount matches usage data
-    let calculatedAmount = 0;
-    if (invoice.usageData && typeof invoice.usageData === 'object') {
-      const usageData = invoice.usageData as any;
-      if (usageData.records && Array.isArray(usageData.records)) {
-        calculatedAmount = usageData.records.reduce((sum: number, record: any) => {
-          return sum + (parseFloat(record.amount) || 0);
-        }, 0);
-      } else if (usageData.usage_amount) {
-        calculatedAmount = parseFloat(usageData.usage_amount) || 0;
-      }
-    }
-
-    const storedAmount = parseFloat(invoice.amount);
-    const difference = Math.abs(storedAmount - calculatedAmount);
-    const isConsistent = difference < 1;
-
-    res.json({
-      success: true,
-      verification: {
-        invoiceId,
-        storedAmount,
-        calculatedAmount,
-        difference,
-        isConsistent,
-        message: isConsistent 
-          ? "✅ مبلغ فاکتور با جزئیات مطابقت دارد" 
-          : `⚠️ عدم تطابق ${difference.toLocaleString()} تومان`
-      },
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('Error verifying invoice amount:', error);
-    res.status(500).json({
-      success: false,
-      error: "خطا در تایید مبلغ فاکتور"
     });
   }
 });

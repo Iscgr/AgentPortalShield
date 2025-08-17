@@ -20,17 +20,14 @@
 ### مرحله 1: تقویت سیستم ویرایش فاکتور
 - [x] ایجاد فرم ویرایش فاکتور
 - [x] اتصال به API backend
-- [x] **پیاده‌سازی validation rules**
-- [x] **Error handling جامع**
-- [x] **اصلاح بروزرسانی مبلغ فاکتور در دیتابیس**
-- [x] **همگام‌سازی مالی فوری پس از ویرایش**
+- [ ] **پیاده‌سازی validation rules**
+- [ ] **Error handling جامع**
 
 ### مرحله 2: همگام‌سازی مالی Real-time
 - [x] API endpoint برای sync نماینده
-- [x] **Cache invalidation فوری**
-- [x] **بروزرسانی UI بدون reload**
-- [x] **Real-time verification system**
-- [x] **Comprehensive financial synchronization**
+- [ ] **Cache invalidation فوری**
+- [ ] **بروزرسانی UI بدون reload**
+- [ ] **WebSocket برای real-time updates**
 
 ### مرحله 3: اعتبارسنجی جامع سیستم
 - [x] Atomic validation endpoint
