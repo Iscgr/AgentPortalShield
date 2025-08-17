@@ -898,7 +898,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                             id={`username-${record.id}`}
                             value={record.admin_username}
                             onChange={(e) => updateRecord(record.id, 'admin_username', e.target.value)}
-                            disabled={!editMode || record.isDeleted}
+                            disabled={record.isDeleted}
                           />
                         </div>
 
@@ -909,7 +909,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                             type="datetime-local"
                             value={record.event_timestamp ? new Date(record.event_timestamp).toISOString().slice(0, 16) : ''}
                             onChange={(e) => updateRecord(record.id, 'event_timestamp', new Date(e.target.value).toISOString())}
-                            disabled={!editMode || record.isDeleted}
+                            disabled={record.isDeleted}
                           />
                         </div>
 
@@ -918,7 +918,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                           <Select
                             value={record.event_type}
                             onValueChange={(value) => updateRecord(record.id, 'event_type', value as any)}
-                            disabled={!editMode || record.isDeleted}
+                            disabled={record.isDeleted}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -940,7 +940,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                             min="0"
                             value={record.amount}
                             onChange={(e) => updateRecord(record.id, 'amount', parseFloat(e.target.value) || 0)}
-                            disabled={!editMode || record.isDeleted}
+                            disabled={record.isDeleted}
                           />
                         </div>
                       </div>
@@ -951,7 +951,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                           id={`description-${record.id}`}
                           value={record.description}
                           onChange={(e) => updateRecord(record.id, 'description', e.target.value)}
-                          disabled={!editMode || record.isDeleted}
+                          disabled={record.isDeleted}
                           className="mt-1"
                         />
                       </div>
