@@ -797,8 +797,6 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
  */
 router.post('/batch-calculate', requireAuth, async (req, res) => {
   try {
-    const { representativeIds } = req.body;
-
     // ✅ SHERLOCK v32.0: Enhanced validation with better error handling
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({
