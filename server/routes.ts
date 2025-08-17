@@ -5,10 +5,10 @@ import { db } from './db';
 import { invoices } from '../shared/schema';
 import { authMiddleware, requireAuth } from './middleware/unified-auth';
 import { storage } from './storage';
-import { unifiedFinancialEngine } from './financial-engine';
-import { createInvoice, createInvoiceSchema } from './invoice';
+import { unifiedFinancialEngine } from './services/unified-financial-engine';
+import { createInvoice, createInvoiceSchema } from './services/invoice';
 import { z } from 'zod';
-import workspaceRouter from './routes/workspace-routes.js';
+import workspaceRouter from './routes/workspace-routes';
 
 export function registerRoutes(app: express.Application) {
   
