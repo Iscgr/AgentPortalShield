@@ -380,7 +380,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
     }
   }, [isOpen, sessionCheckInterval]);
 
-  // ✅ SHERLOCK v28.2: ENHANCED ADD RECORD with immediate calculation
+  // ✅ SHERLOCK v30.0: ENHANCED ADD RECORD with IMMEDIATE calculation
   const addNewRecord = () => {
     const newRecord: EditableUsageRecord = {
       id: generateId(),
@@ -394,29 +394,29 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
       isDeleted: false
     };
 
-    console.log(`➕ SHERLOCK v28.2: Adding new record: ${newRecord.id}`);
+    console.log(`➕ SHERLOCK v30.0: Adding new record: ${newRecord.id}`);
     setEditableRecords(prev => {
       const updated = [...prev, newRecord];
       const newAmount = calculateTotalAmount(updated);
-      console.log(`🧮 SHERLOCK v28.2: Amount after adding record: ${newAmount} تومان`);
-      setTimeout(() => setCalculatedAmount(newAmount), 0);
+      console.log(`🧮 SHERLOCK v30.0: Amount after adding record: ${newAmount} تومان`);
+      setCalculatedAmount(newAmount); // ✅ IMMEDIATE update, no setTimeout
       return updated;
     });
   };
 
-  // ✅ SHERLOCK v29.0: ENHANCED REAL-TIME RECORD UPDATE WITH BATCHED STATE UPDATES
+  // ✅ SHERLOCK v30.0: CRITICAL FIX - IMMEDIATE REAL-TIME CALCULATION
   const updateRecord = (id: string, field: keyof EditableUsageRecord, value: any) => {
-    console.log(`🔄 SHERLOCK v29.0: Updating record ${id}, field: ${field}, value: ${value}`);
+    console.log(`🔄 SHERLOCK v30.0: CRITICAL UPDATE - record ${id}, field: ${field}, value: ${value}`);
     
     setEditableRecords(prev => {
       const updatedRecords = prev.map(record => {
         if (record.id === id) {
           const updated = { ...record, [field]: value, isModified: !record.isNew };
           
-          // ✅ Enhanced validation for amount field
+          // ✅ CRITICAL: Enhanced validation for amount field
           if (field === 'amount') {
             const numericValue = parseFloat(value) || 0;
-            console.log(`💰 SHERLOCK v29.0: Amount updated for record ${id}: ${record.amount} → ${numericValue}`);
+            console.log(`💰 CRITICAL: Amount updated for record ${id}: ${record.amount} → ${numericValue}`);
             updated.amount = numericValue;
           }
           
@@ -425,73 +425,56 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
         return record;
       });
       
-      // ✅ Calculate new total immediately and update state
+      // ✅ CRITICAL: Calculate new total IMMEDIATELY
       const newTotalAmount = calculateTotalAmount(updatedRecords);
-      console.log(`🧮 SHERLOCK v29.0: Batched calculation result: ${newTotalAmount} تومان`);
+      console.log(`🧮 CRITICAL: Real-time calculation result: ${newTotalAmount} تومان`);
       
-      // ✅ Update calculated amount immediately in the same render cycle
-      setTimeout(() => {
-        setCalculatedAmount(newTotalAmount);
-      }, 0);
+      // ✅ CRITICAL: Update calculated amount IMMEDIATELY - no async delay
+      setCalculatedAmount(newTotalAmount);
       
       return updatedRecords;
     });
   };
 
-  // ✅ SHERLOCK v28.2: ENHANCED DELETE RECORD with immediate calculation
+  // ✅ SHERLOCK v30.0: ENHANCED DELETE RECORD with IMMEDIATE calculation
   const deleteRecord = (id: string) => {
-    console.log(`🗑️ SHERLOCK v28.2: Deleting record: ${id}`);
+    console.log(`🗑️ SHERLOCK v30.0: Deleting record: ${id}`);
     setEditableRecords(prev => {
       const updated = prev.map(record => {
         if (record.id === id) {
-          console.log(`🗑️ SHERLOCK v28.2: Marking record ${id} as deleted (amount: ${record.amount})`);
+          console.log(`🗑️ SHERLOCK v30.0: Marking record ${id} as deleted (amount: ${record.amount})`);
           return { ...record, isDeleted: true };
         }
         return record;
       });
       
       const newAmount = calculateTotalAmount(updated);
-      console.log(`🧮 SHERLOCK v28.2: Amount after deleting record: ${newAmount} تومان`);
-      setTimeout(() => setCalculatedAmount(newAmount), 0);
+      console.log(`🧮 SHERLOCK v30.0: Amount after deleting record: ${newAmount} تومان`);
+      setCalculatedAmount(newAmount); // ✅ IMMEDIATE update, no setTimeout
       return updated;
     });
   };
 
-  // ✅ SHERLOCK v28.2: ENHANCED RESTORE RECORD with immediate calculation
+  // ✅ SHERLOCK v30.0: ENHANCED RESTORE RECORD with IMMEDIATE calculation
   const restoreRecord = (id: string) => {
-    console.log(`🔄 SHERLOCK v28.2: Restoring record: ${id}`);
+    console.log(`🔄 SHERLOCK v30.0: Restoring record: ${id}`);
     setEditableRecords(prev => {
       const updated = prev.map(record => {
         if (record.id === id) {
-          console.log(`🔄 SHERLOCK v28.2: Restoring record ${id} (amount: ${record.amount})`);
+          console.log(`🔄 SHERLOCK v30.0: Restoring record ${id} (amount: ${record.amount})`);
           return { ...record, isDeleted: false };
         }
         return record;
       });
       
       const newAmount = calculateTotalAmount(updated);
-      console.log(`🧮 SHERLOCK v28.2: Amount after restoring record: ${newAmount} تومان`);
-      setTimeout(() => setCalculatedAmount(newAmount), 0);
+      console.log(`🧮 SHERLOCK v30.0: Amount after restoring record: ${newAmount} تومان`);
+      setCalculatedAmount(newAmount); // ✅ IMMEDIATE update, no setTimeout
       return updated;
     });
   };
 
-  // ✅ SHERLOCK v29.0: ENHANCED REAL-TIME CALCULATION WITH IMMEDIATE UI UPDATE
-  useEffect(() => {
-    if (editableRecords.length > 0) {
-      const newAmount = calculateTotalAmount(editableRecords);
-      
-      // ✅ Force immediate state update without dependencies loop
-      if (newAmount !== calculatedAmount) {
-        setCalculatedAmount(newAmount);
-        console.log(`💰 SHERLOCK v29.0: Real-time calculation updated - ${calculatedAmount} → ${newAmount}`);
-        console.log(`🔢 SHERLOCK v29.0: Active records: ${editableRecords.filter(r => !r.isDeleted).length}`);
-        
-        // ✅ Force re-render by updating a trigger state
-        setIsInitialized(prev => prev); // Trigger re-render without changing actual state
-      }
-    }
-  }, [editableRecords]); // Remove calculatedAmount from dependencies to prevent loop
+  // ✅ SHERLOCK v30.0: REMOVED CONFLICTING useEffect - Real-time updates handled directly in updateRecord
 
   // Start editing
   const startEditing = () => {
