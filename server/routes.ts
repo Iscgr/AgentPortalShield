@@ -729,17 +729,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return dateA.getTime() - dateB.getTime(); // FIFO: Oldest first
       });
 
-      // Don't expose sensitive data in public portal
+      // ✅ SHERLOCK v32.1: ارسال داده‌های مالی محاسبه شده از Unified Financial Engine
       const publicData = {
         name: rep.name,
         code: rep.code,
         panelUsername: rep.panelUsername,
         ownerName: rep.ownerName,
-        // Don't expose stored totalDebt and totalSales, use calculated ones
-        // totalDebt: rep.totalDebt,
-        // totalSales: rep.totalSales,
+        // ✅ استفاده از داده‌های محاسبه شده از Unified Financial Engine
+        totalDebt: financialData.actualDebt.toString(),
+        totalSales: financialData.totalSales.toString(),
         credit: rep.credit,
-        portalConfig,
+        portalConfig,</old_str>
         invoices: sortedInvoices.map(inv => ({
           invoiceNumber: inv.invoiceNumber,
           amount: inv.amount,
