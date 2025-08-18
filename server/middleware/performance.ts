@@ -8,12 +8,11 @@ export function performanceMonitoringMiddleware(req: Request, res: Response, nex
   const isBatchOperation = req.url?.includes('batch-calculate') || 
                           (req.body && Array.isArray(req.body.representativeIds) && req.body.representativeIds.length > 10);
 
-  // Track error responses
+  // Track error responses and memory monitoring
   const originalJson = res.json;
   let hasError = false;
 
   // SHERLOCK v32.2: Memory monitoring and cleanup
-  const originalJson = res.json;
   res.json = function(body: any) {
     const duration = Date.now() - startTime;
     
