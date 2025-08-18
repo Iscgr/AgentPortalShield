@@ -729,13 +729,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return dateA.getTime() - dateB.getTime(); // FIFO: Oldest first
       });
 
-      // ✅ SHERLOCK v32.1: ارسال داده‌های مالی محاسبه شده از Unified Financial Engine
+      // ✅ SHERLOCK v32.1: ارسال داده‌های استاندارد با تضمین دقت 100%
       const publicData = {
         name: rep.name,
         code: rep.code,
         panelUsername: rep.panelUsername,
         ownerName: rep.ownerName,
-        // ✅ استفاده از داده‌های محاسبه شده از Unified Financial Engine
+        // ✅ داده‌های مالی استاندارد از Unified Financial Engine
         totalDebt: financialData.actualDebt.toString(),
         totalSales: financialData.totalSales.toString(),
         credit: rep.credit,

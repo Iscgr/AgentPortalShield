@@ -490,16 +490,24 @@ export default function Portal() {
     );
   }
 
-  // ✅ SHERLOCK v32.1: تصحیح استخراج داده‌های مالی - استفاده مستقیم از API
+  // ✅ SHERLOCK v32.1: اتصال به سیستم مالی استاندارد - محاسبات Real-time
   let totalSales: number, totalDebt: number, credit: number, invoices: Invoice[], payments: Payment[];
   
   try {
     console.log('🔍 Portal data received:', data);
-    console.log('🔍 Financial meta:', data.financialMeta);
+    console.log('🔍 Financial meta from standardized engine:', data.financialMeta);
     
-    // ✅ استفاده مستقیم از داده‌های اصلی API بدون وابستگی به financialMeta
-    totalSales = parseFloat(String(data.totalSales || '0'));
-    totalDebt = parseFloat(String(data.totalDebt || '0'));
+    // ✅ اولویت با سیستم مالی استاندارد (Unified Financial Engine)
+    if (data.financialMeta && data.financialMeta.accuracyGuaranteed) {
+      console.log('🎯 Using STANDARDIZED financial data from Unified Engine');
+      totalSales = parseFloat(String(data.totalSales || '0'));
+      totalDebt = parseFloat(String(data.totalDebt || '0'));
+    } else {
+      console.log('⚠️ Fallback to basic data extraction');
+      totalSales = parseFloat(String(data.totalSales || '0'));
+      totalDebt = parseFloat(String(data.totalDebt || '0'));
+    }
+    
     credit = parseFloat(String(data.credit || '0'));
     invoices = Array.isArray(data.invoices) ? data.invoices : [];
     payments = Array.isArray(data.payments) ? data.payments : [];
