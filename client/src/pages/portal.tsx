@@ -308,18 +308,127 @@ export default function Portal() {
   }
 
   if (error || !data) {
+    console.error('=== SHERLOCK v32.1 PORTAL ERROR DETAILS ===');
+    console.error('Error object:', error);
+    console.error('Data object:', data);
+    console.error('PublicId:', publicId);
+    console.error('Current URL:', window.location.href);
+
+    // تشخیص نوع خطا
+    const isNotFound = error?.response?.status === 404 || 
+                      error?.message?.includes('404') ||
+                      (!data && !error);
+    
+    const isServerError = error?.response?.status >= 500;
+    const isNetworkError = error?.message?.includes('Network') || 
+                          error?.message?.includes('fetch');
+
     return (
       <div style={{ 
         minHeight: '100vh', 
         background: 'linear-gradient(135deg, #7f1d1d, #991b1b)', 
         color: 'white', 
         padding: '40px',
-        fontFamily: 'sans-serif',
-        direction: 'rtl'
+        fontFamily: 'Tahoma, sans-serif',
+        direction: 'rtl',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}>
-        <h1 style={{ fontSize: '24px', marginBottom: '20px' }}>خطا در بارگذاری!</h1>
-        <p>داده: {JSON.stringify(data)}</p>
-        <p>خطا: {JSON.stringify(error)}</p>
+        <div style={{ 
+          background: 'rgba(255, 255, 255, 0.1)', 
+          padding: '40px', 
+          borderRadius: '15px',
+          maxWidth: '600px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>⚠️</div>
+          
+          {isNotFound && (
+            <>
+              <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+                پرتال نماینده یافت نشد!
+              </h1>
+              <p style={{ fontSize: '16px', marginBottom: '15px', lineHeight: '1.6' }}>
+                شناسه پرتال "{publicId}" در سیستم موجود نیست.
+              </p>
+              <p style={{ fontSize: '14px', opacity: 0.8, marginBottom: '20px' }}>
+                لطفاً لینک صحیح پرتال را از مدیر سیستم دریافت کنید.
+              </p>
+            </>
+          )}
+
+          {isServerError && (
+            <>
+              <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+                خطای سرور!
+              </h1>
+              <p style={{ fontSize: '16px', marginBottom: '15px', lineHeight: '1.6' }}>
+                مشکلی در سرور به وجود آمده است.
+              </p>
+              <p style={{ fontSize: '14px', opacity: 0.8, marginBottom: '20px' }}>
+                لطفاً چند دقیقه دیگر مجدداً تلاش کنید.
+              </p>
+            </>
+          )}
+
+          {isNetworkError && (
+            <>
+              <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+                مشکل اتصال اینترنت!
+              </h1>
+              <p style={{ fontSize: '16px', marginBottom: '15px', lineHeight: '1.6' }}>
+                اتصال اینترنت شما قطع شده است.
+              </p>
+              <p style={{ fontSize: '14px', opacity: 0.8, marginBottom: '20px' }}>
+                لطفاً اتصال اینترنت خود را بررسی کنید.
+              </p>
+            </>
+          )}
+
+          {!isNotFound && !isServerError && !isNetworkError && (
+            <>
+              <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+                خطا در بارگذاری اطلاعات!
+              </h1>
+              <p style={{ fontSize: '16px', marginBottom: '15px', lineHeight: '1.6' }}>
+                امکان دریافت اطلاعات پرتال وجود ندارد.
+              </p>
+              <p style={{ fontSize: '14px', opacity: 0.8, marginBottom: '20px' }}>
+                لطفاً صفحه را مجدداً بارگذاری کنید.
+              </p>
+            </>
+          )}
+
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{
+              background: 'linear-gradient(135deg, #1e40af, #3730a3)',
+              color: 'white',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer',
+              marginTop: '10px'
+            }}
+          >
+            🔄 بارگذاری مجدد
+          </button>
+
+          {process.env.NODE_ENV === 'development' && (
+            <details style={{ marginTop: '30px', textAlign: 'left', fontSize: '12px' }}>
+              <summary style={{ cursor: 'pointer', marginBottom: '10px' }}>جزئیات فنی (فقط در حالت توسعه)</summary>
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '5px' }}>
+                <p><strong>Public ID:</strong> {publicId}</p>
+                <p><strong>URL:</strong> {window.location.href}</p>
+                <p><strong>Error:</strong> {JSON.stringify(error, null, 2)}</p>
+                <p><strong>Data:</strong> {JSON.stringify(data, null, 2)}</p>
+              </div>
+            </details>
+          )}
+        </div>
       </div>
     );
   }

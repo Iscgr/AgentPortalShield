@@ -633,13 +633,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public Portal API
   app.get("/api/portal/:publicId", async (req, res) => {
     try {
-      const representative = await storage.getRepresentativeByPublicId(req.params.publicId);
-      if (!representative) {
-        return res.status(404).json({ error: "پورتال یافت نشد" });
+      const { publicId } = req.params;
+
+      console.log('=== SHERLOCK v32.1 PORTAL REQUEST ===');
+      console.log('publicId:', publicId);
+      console.log('Request URL:', req.url);
+      console.log('Request IP:', req.ip);
+      console.log('User Agent:', req.get('User-Agent')?.slice(0, 100));
+
+      // Basic validation
+      if (!publicId || publicId.trim() === '') {
+        console.log('❌ Invalid publicId - empty or null');
+        return res.status(400).json({ 
+          error: 'شناسه پرتال نامعتبر است',
+          details: 'publicId خالی یا نامعتبر'
+        });
       }
 
-      const invoices = await storage.getInvoicesByRepresentative(representative.id);
-      const payments = await storage.getPaymentsByRepresentative(representative.id);
+      // Find representative by publicId
+      console.log('🔍 Searching for representative with publicId:', publicId);
+      const representative = await db.select().from(representatives).where(eq(representatives.publicId, publicId)).limit(1);
+
+      if (!representative.length) {
+        console.log('❌ Representative not found for publicId:', publicId);
+        console.log('🔍 Checking if any representatives exist...');
+
+        // Additional debugging - check if any representatives exist at all
+        const totalReps = await db.select().from(representatives).limit(5);
+        console.log('Sample representatives:', totalReps.map(r => ({ id: r.id, code: r.code, publicId: r.publicId })));
+
+        return res.status(404).json({ 
+          error: 'نماینده یافت نشد',
+          details: `پرتالی با شناسه "${publicId}" در سیستم موجود نیست`,
+          publicId: publicId
+        });
+      }
+      const rep = representative[0];
+
+      const invoices = await storage.getInvoicesByRepresentative(rep.id);
+      const payments = await storage.getPaymentsByRepresentative(rep.id);
 
       // Fetch portal customization settings
       const [
@@ -690,13 +722,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Don't expose sensitive data in public portal
       const publicData = {
-        name: representative.name,
-        code: representative.code,
-        panelUsername: representative.panelUsername,
-        ownerName: representative.ownerName,
-        totalDebt: representative.totalDebt,
-        totalSales: representative.totalSales,
-        credit: representative.credit,
+        name: rep.name,
+        code: rep.code,
+        panelUsername: rep.panelUsername,
+        ownerName: rep.ownerName,
+        totalDebt: rep.totalDebt,
+        totalSales: rep.totalSales,
+        credit: rep.credit,
         portalConfig,
         invoices: sortedInvoices.map(inv => ({
           invoiceNumber: inv.invoiceNumber,
