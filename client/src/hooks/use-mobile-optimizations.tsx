@@ -7,23 +7,27 @@ export function useMobileOptimizations() {
 
   useEffect(() => {
     if (isMobile) {
-      // Disable smooth scrolling on mobile for better performance
-      document.documentElement.style.scrollBehavior = 'auto';
+      // Keep smooth scrolling but optimize
+      document.documentElement.style.scrollBehavior = 'smooth';
       
       // Add mobile-specific classes for performance
       document.body.classList.add('mobile-optimized');
       
-      // Disable hover effects on mobile
+      // Balanced hover effects for mobile - only disable problematic ones
       const style = document.createElement('style');
       style.textContent = `
-        @media (hover: none) {
+        @media (hover: none) and (pointer: coarse) {
           .admin-glass-card:hover,
           .stat-card:hover,
-          .clay-card:hover,
+          .clay-card:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
+          }
+          
           .admin-nav-item:hover,
           .clay-nav-item:hover {
-            transform: none !important;
-            box-shadow: inherit !important;
+            transform: translateX(-2px) !important;
+            background: rgba(30, 41, 59, 0.4) !important;
           }
         }
       `;
@@ -40,8 +44,8 @@ export function useMobileOptimizations() {
 
   return {
     isMobile,
-    shouldReduceMotion: isMobile,
-    shouldDisableAnimations: isMobile,
+    shouldReduceMotion: false, // Allow motion for better UX
+    shouldDisableAnimations: false, // Keep animations for feedback
     touchOptimized: isMobile
   };
 }

@@ -786,36 +786,36 @@
       @apply p-3;
     }
 
-    /* Mobile performance optimizations */
+    /* Balanced mobile optimizations - maintain functionality */
     .admin-glass-card {
-      backdrop-filter: blur(8px) !important; /* Reduced from 20px */
-      transform: none !important; /* Disable transforms on mobile */
-      transition: none !important; /* Disable animations */
+      backdrop-filter: blur(12px) !important; /* Balanced blur */
+      transition: opacity 0.2s ease !important; /* Keep basic transitions */
     }
 
     .admin-glass-card:hover {
-      transform: none !important;
-      transition: none !important;
+      transform: translateY(-1px) !important; /* Subtle hover effect */
+      transition: all 0.2s ease !important;
     }
 
     .clay-card {
-      backdrop-filter: blur(4px) !important; /* Reduced from 10px */
-      transition: transform 0.1s ease !important; /* Faster transitions */
+      backdrop-filter: blur(8px) !important; /* Balanced blur */
+      transition: transform 0.2s ease !important; /* Smooth interactions */
     }
 
+    /* Keep essential animations for feedback */
     .clay-floating {
-      animation: none !important; /* Disable floating animations */
+      animation: float 6s ease-in-out infinite !important; /* Slower float */
     }
 
     .clay-pulse {
-      animation: none !important; /* Disable pulse animations */
+      animation: clayPulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite !important; /* Slower pulse */
     }
 
-    /* Simplified shadows for mobile */
+    /* Balanced shadows for mobile */
     .admin-glass-card,
     .stat-card,
     .clay-card {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     }
 
     /* Touch-friendly interactive elements */
@@ -825,14 +825,17 @@
       padding: 12px !important;
     }
 
-    /* Reduce complex gradients on mobile */
+    /* Maintain visual appeal on mobile */
     .admin-panel-background::before {
-      background: rgba(59, 130, 246, 0.02) !important;
+      background: 
+        radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(147, 51, 234, 0.06) 0%, transparent 50%);
     }
 
     .clay-background {
       background: linear-gradient(135deg, 
         hsl(220, 30%, 8%) 0%, 
+        hsl(235, 25%, 10%) 50%,
         hsl(280, 30%, 8%) 100%
       ) !important;
     }
