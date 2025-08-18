@@ -490,12 +490,22 @@ export default function Portal() {
     );
   }
 
-  // SHERLOCK v16.3 RUNTIME ERROR FIX: Safe data extraction with comprehensive error handling
+  // ✅ SHERLOCK v32.1: Enhanced data extraction with financial meta validation
   let totalSales: number, totalDebt: number, credit: number, invoices: Invoice[], payments: Payment[];
   
   try {
-    totalSales = parseFloat(String(data.totalSales || '0'));
-    totalDebt = parseFloat(String(data.totalDebt || '0'));
+    console.log('🔍 Portal data received:', data);
+    console.log('🔍 Financial meta:', data.financialMeta);
+    
+    // ✅ اولویت با داده‌های محاسبه شده از financialMeta
+    totalSales = data.financialMeta?.calculatedSales 
+      ? parseFloat(String(data.financialMeta.calculatedSales))
+      : parseFloat(String(data.totalSales || '0'));
+      
+    totalDebt = data.financialMeta?.calculatedDebt 
+      ? parseFloat(String(data.financialMeta.calculatedDebt))
+      : parseFloat(String(data.totalDebt || '0'));
+    
     credit = parseFloat(String(data.credit || '0'));
     invoices = Array.isArray(data.invoices) ? data.invoices : [];
     payments = Array.isArray(data.payments) ? data.payments : [];
@@ -505,8 +515,16 @@ export default function Portal() {
     if (isNaN(totalDebt)) totalDebt = 0;
     if (isNaN(credit)) credit = 0;
     
+    console.log('✅ Portal final values:', {
+      totalSales: totalSales.toLocaleString(),
+      totalDebt: totalDebt.toLocaleString(),
+      credit: credit.toLocaleString(),
+      invoicesCount: invoices.length,
+      paymentsCount: payments.length
+    });
+    
   } catch (error) {
-    console.error('Portal data extraction error:', error);
+    console.error('❌ Portal data extraction error:', error);
     totalSales = 0;
     totalDebt = 0;
     credit = 0;
@@ -543,6 +561,16 @@ export default function Portal() {
         <p style={{ fontSize: '16px', color: '#dbeafe' }}>
           شناسه پنل: {data.panelUsername}
         </p>
+        {data.financialMeta?.accuracyGuaranteed && (
+          <p style={{ fontSize: '12px', color: '#a7f3d0', marginTop: '8px' }}>
+            ✅ داده‌های مالی با دقت Real-time محاسبه شده
+            {data.financialMeta.lastCalculation && (
+              <span style={{ marginLeft: '8px' }}>
+                ({new Date(data.financialMeta.lastCalculation).toLocaleString('fa-IR')})
+              </span>
+            )}
+          </p>
+        )}
       </div>
 
       {/* Financial Overview - Simple Cards */}

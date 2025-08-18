@@ -671,8 +671,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const rep = representative[0];
 
-      // ✅ استفاده از Unified Financial Engine برای محاسبات دقیق
+      // ✅ SHERLOCK v32.1: استفاده از Unified Financial Engine برای محاسبات دقیق
       const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
+      console.log(`🔍 Portal: Financial data for ${rep.code}:`, {
+        totalSales: financialData.totalSales,
+        actualDebt: financialData.actualDebt,
+        totalPaid: financialData.totalPaid
+      });
 
       const invoices = await storage.getInvoicesByRepresentative(rep.id);
       const payments = await storage.getPaymentsByRepresentative(rep.id);
