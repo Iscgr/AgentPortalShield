@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Router } from "wouter";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
@@ -203,9 +203,7 @@ function App() {
         <UnifiedAuthProvider>
           <Router>
             <div className={`min-h-screen bg-background ${isMobile ? 'mobile-optimized' : ''} ${shouldReduceMotion ? 'reduce-motion' : ''}`}>
-              <Routes>
-                {/* Existing routes will be rendered here by AuthenticatedRouter */}
-              </Routes>
+              <AuthenticatedRouter />
             </div>
           </Router>
         </UnifiedAuthProvider>
