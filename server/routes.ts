@@ -2046,54 +2046,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced Telegram connection status with live validation
-  app.get("/api/test-telegram-status", authMiddleware, async (req, res) => {
-    try {
-      console.log('🔍 SHERLOCK v32.1: Checking Telegram status...');
-      
-      const botToken = await storage.getSetting('telegram_bot_token');
-      const chatId = await storage.getSetting('telegram_chat_id');
-      
-      const botTokenExists = !!(botToken?.value && botToken.value.length > 0);
-      const chatIdExists = !!(chatId?.value && chatId.value.length > 0);
-      const isConnected = botTokenExists && chatIdExists;
-      
-      console.log('📊 SHERLOCK v32.1: Telegram status:', {
-        botTokenExists,
-        chatIdExists,
-        isConnected,
-        botTokenLength: botToken?.value?.length || 0,
-        chatIdLength: chatId?.value?.length || 0
-      });
-
-      // Set cache headers to prevent caching
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      res.json({ 
-        connected: isConnected,
-        botTokenExists,
-        chatIdExists,
-        timestamp: new Date().toISOString(),
-        details: {
-          botTokenLength: botToken?.value?.length || 0,
-          chatIdLength: chatId?.value?.length || 0
-        }
-      });
-    } catch (error) {
-      console.error('❌ SHERLOCK v32.1: Telegram status check error:', error);
-      res.status(500).json({ 
-        error: "خطا در بررسی وضعیت تلگرام",
-        connected: false,
-        botTokenExists: false,
-        chatIdExists: false
-      });
-    }
-  });
-
   app.put("/api/settings/:key", authMiddleware, async (req, res) => {
     try {
       const { value } = req.body;

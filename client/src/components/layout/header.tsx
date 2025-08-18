@@ -21,39 +21,22 @@ export default function Header({ onMenuClick }: HeaderProps) {
     return () => clearInterval(timer);
   }, []);
 
-  // Real-time Telegram status check - Primary source
-  const { data: telegramStatus, refetch: refetchTelegramStatus } = useQuery({
-    queryKey: ["/api/test-telegram-status"],
-    retry: false,
-    refetchInterval: 15000, // Check every 15 seconds
-    staleTime: 0, // Always consider stale
-    cacheTime: 0 // Don't cache
+  // Check Telegram connection status
+  const { data: telegramBotToken } = useQuery({
+    queryKey: ["/api/settings/telegram_bot_token"],
+    retry: false
   });
 
-  // Force refresh telegram status on mount
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetchTelegramStatus();
-    }, 10000); // Every 10 seconds
+  const { data: telegramChatId } = useQuery({
+    queryKey: ["/api/settings/telegram_chat_id"],
+    retry: false
+  });
 
-    return () => clearInterval(interval);
-  }, [refetchTelegramStatus]);
-
-  // Primary Telegram connection logic - Use real-time status
-  const isTelegramConnected = Boolean(
-    telegramStatus?.connected === true &&
-    telegramStatus?.botTokenExists === true &&
-    telegramStatus?.chatIdExists === true
-  );
-
-  // Debug logging for Telegram status
-  useEffect(() => {
-    console.log('🔍 SHERLOCK v32.1: Telegram Status Debug:', {
-      telegramStatus,
-      isTelegramConnected,
-      timestamp: new Date().toISOString()
-    });
-  }, [telegramStatus, isTelegramConnected]);
+  const isTelegramConnected = 
+    (telegramBotToken as any)?.value && 
+    (telegramBotToken as any).value.length > 0 &&
+    (telegramChatId as any)?.value && 
+    (telegramChatId as any).value.length > 0;
 
   const handleLogout = async () => {
     try {
