@@ -766,33 +766,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastCalculation: financialData.calculationTimestamp,
           accuracyGuaranteed: financialData.accuracyGuaranteed
         }
-      };</old_str>
-        invoices: sortedInvoices.map(inv => ({
-          invoiceNumber: inv.invoiceNumber,
-          amount: inv.amount,
-          issueDate: inv.issueDate,
-          dueDate: inv.dueDate,
-          status: inv.status,
-          usageData: inv.usageData, // Include usage data for detailed view
-          createdAt: inv.createdAt
-        })),
-        payments: payments.map(pay => ({
-          amount: pay.amount,
-          paymentDate: pay.paymentDate,
-          description: pay.description
-        })).sort((a, b) => {
-          const dateA = new Date(a.paymentDate);
-          const dateB = new Date(b.paymentDate);
-          return dateB.getTime() - dateA.getTime();
-        }),
-
-        // ✅ اطلاعات اضافی برای نمایش در پرتال
-        financialMeta: {
-          paymentRatio: financialData.paymentRatio,
-          debtLevel: financialData.debtLevel,
-          lastCalculation: financialData.calculationTimestamp,
-          accuracyGuaranteed: financialData.accuracyGuaranteed
-        }
       };
 
       // ✅ استفاده از داده‌های محاسبه شده از Unified Financial Engine
@@ -1638,7 +1611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // فاز ۳: Payment Synchronization API Routes
+  // فاز ۲: Payment Synchronization API Routes
 
   // Get unallocated payments API
   app.get("/api/payments/unallocated", authMiddleware, async (req, res) => {
