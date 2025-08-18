@@ -314,14 +314,16 @@ export default function Portal() {
     console.error('PublicId:', publicId);
     console.error('Current URL:', window.location.href);
 
-    // تشخیص نوع خطا
-    const isNotFound = error?.response?.status === 404 || 
+    // تشخیص نوع خطا - Fixed for TanStack Query error format
+    const responseError = (error as any)?.response || (error as any)?.cause?.response;
+    const isNotFound = responseError?.status === 404 || 
                       error?.message?.includes('404') ||
                       (!data && !error);
     
-    const isServerError = error?.response?.status >= 500;
+    const isServerError = responseError?.status >= 500;
     const isNetworkError = error?.message?.includes('Network') || 
-                          error?.message?.includes('fetch');
+                          error?.message?.includes('fetch') ||
+                          error?.message?.includes('NetworkError');
 
     return (
       <div style={{ 
@@ -423,8 +425,11 @@ export default function Portal() {
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '5px' }}>
                 <p><strong>Public ID:</strong> {publicId}</p>
                 <p><strong>URL:</strong> {window.location.href}</p>
-                <p><strong>Error:</strong> {JSON.stringify(error, null, 2)}</p>
-                <p><strong>Data:</strong> {JSON.stringify(data, null, 2)}</p>
+                <p><strong>Error Message:</strong> {error?.message || 'No error message'}</p>
+                <p><strong>Response Status:</strong> {responseError?.status || 'No status'}</p>
+                <p><strong>Response Data:</strong> {JSON.stringify(responseError?.data || 'No response data', null, 2)}</p>
+                <p><strong>Full Error Object:</strong> {JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}</p>
+                <p><strong>Data Object:</strong> {JSON.stringify(data, null, 2)}</p>
               </div>
             </details>
           )}
