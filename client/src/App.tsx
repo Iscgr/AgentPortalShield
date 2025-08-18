@@ -6,6 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UnifiedAuthProvider, useUnifiedAuth } from "@/contexts/unified-auth-context";
+import { useMobileOptimizations } from "@/hooks/use-mobile-optimizations";
 
 // Layout components
 import Sidebar from "@/components/layout/sidebar";
@@ -194,14 +195,19 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { isMobile, shouldReduceMotion } = useMobileOptimizations();
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <UnifiedAuthProvider>
-          <div className="rtl">
-            <Toaster />
-            <AuthenticatedRouter />
-          </div>
+          <Router>
+            <div className={`min-h-screen bg-background ${isMobile ? 'mobile-optimized' : ''} ${shouldReduceMotion ? 'reduce-motion' : ''}`}>
+              <Routes>
+                {/* Existing routes will be rendered here by AuthenticatedRouter */}
+              </Routes>
+            </div>
+          </Router>
         </UnifiedAuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
