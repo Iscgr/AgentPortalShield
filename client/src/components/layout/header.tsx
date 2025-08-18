@@ -27,7 +27,16 @@ export default function Header({ onMenuClick }: HeaderProps) {
     retry: false
   });
 
-  const isTelegramConnected = (telegramBotToken as any)?.value && (telegramBotToken as any).value.length > 0;
+  const { data: telegramChatId } = useQuery({
+    queryKey: ["/api/settings/telegram_chat_id"],
+    retry: false
+  });
+
+  const isTelegramConnected = 
+    (telegramBotToken as any)?.value && 
+    (telegramBotToken as any).value.length > 0 &&
+    (telegramChatId as any)?.value && 
+    (telegramChatId as any).value.length > 0;
 
   const handleLogout = async () => {
     try {

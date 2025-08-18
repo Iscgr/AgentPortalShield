@@ -23,7 +23,7 @@ interface MulterRequest extends Request {
  * یک endpoint واحد برای تمام نیازهای ایجاد فاکتور
  */
 export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, storage: any) {
-  
+
   /**
    * POST /api/invoices/generate-standard
    * Endpoint استاندارد برای ایجاد فاکتور از JSON
@@ -31,7 +31,7 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
   app.post("/api/invoices/generate-standard", requireAuth, upload.single('usageFile'), async (req: MulterRequest, res: Response) => {
     try {
       console.log('🚀 SHERLOCK v18.4: STANDARDIZED Invoice Generation Started');
-      
+
       // بررسی فایل
       if (!req.file) {
         return res.status(400).json({ 
@@ -60,16 +60,16 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
         size: req.file.size,
         dataLength: jsonData.length
       });
-      
+
       // Parse استاندارد
       const usageRecords = parseStandardJsonData(jsonData);
       console.log(`📊 Parsed ${usageRecords.length} usage records`);
-      
+
       // Validation استاندارد
       const { valid, invalid } = validateStandardUsageData(usageRecords);
-      
+
       console.log(`✅ Validation Results: ${valid.length} valid, ${invalid.length} invalid`);
-      
+
       if (valid.length === 0) {
         return res.status(400).json({ 
           success: false,
@@ -86,7 +86,7 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
       if (batchName && periodStart && periodEnd) {
         console.log('🗂️ Creating invoice batch...');
         const batchCode = await storage.generateBatchCode(periodStart);
-        
+
         currentBatch = await storage.createInvoiceBatch({
           batchName,
           batchCode,
@@ -97,7 +97,7 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
           uploadedBy: (req.session as any)?.user?.username || 'admin',
           uploadedFileName: req.file.originalname
         });
-        
+
         console.log('✅ Batch created:', currentBatch.id);
       }
 
@@ -105,7 +105,7 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
       const invoiceDate = invoiceDateMode === 'custom' && customInvoiceDate 
         ? customInvoiceDate.trim()
         : null;
-      
+
       // پردازش استاندارد
       const processedInvoices = processStandardUsageData(valid, invoiceDate);
       console.log(`🔄 Processed ${processedInvoices.length} invoices`);
@@ -113,20 +113,20 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
       // ایجاد فاکتورها در دیتابیس
       const createdInvoices = [];
       const newRepresentatives = [];
-      
+
       for (const processedInvoice of processedInvoices) {
         try {
           // جستجو یا ایجاد نماینده
           let representative = await storage.getRepresentativeByPanelUsername(processedInvoice.representativeCode) ||
                              await storage.getRepresentativeByCode(processedInvoice.representativeCode);
-          
+
           if (!representative) {
             console.log(`➕ Creating new representative: ${processedInvoice.representativeCode}`);
-            
+
             // ایجاد نماینده جدید با defaultSalesPartner
             const { db } = await import("../db");
             const defaultSalesPartnerId = await getOrCreateDefaultSalesPartner(db);
-            
+
             const newRepData = {
               name: `فروشگاه ${processedInvoice.representativeCode}`,
               code: processedInvoice.representativeCode,
@@ -135,14 +135,14 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
               salesPartnerId: defaultSalesPartnerId,
               isActive: true
             };
-            
+
             representative = await storage.createRepresentative(newRepData);
             newRepresentatives.push(representative);
           }
 
           // ایجاد فاکتور
           console.log(`📝 Creating invoice for: ${representative.name}`);
-          
+
           const invoice = await storage.createInvoice({
             representativeId: representative.id,
             batchId: currentBatch ? currentBatch.id : null,
@@ -152,12 +152,24 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
             status: "unpaid",
             usageData: processedInvoice.usageData
           });
-          
+
           createdInvoices.push(invoice);
-          
+
           // بروزرسانی اطلاعات مالی نماینده
           await storage.updateRepresentativeFinancials(representative.id);
-          
+
+          // Create portal link for this invoice
+          const publicId = generatePublicId(processedInvoice.representativeCode);
+          const baseUrl = process.env.NODE_ENV === 'production' 
+            ? (process.env.REPL_SLUG 
+                ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+                : `${req.protocol}://${req.get('host')}`)
+            : `${req.protocol}://${req.get('host')}`;
+
+          const portalLink = `${baseUrl}/portal/${publicId}`;
+          console.log(`🔗 SHERLOCK v32.0: Generated portal link: ${portalLink}`);
+
+
         } catch (error) {
           console.error(`❌ Error processing invoice for ${processedInvoice.representativeCode}:`, error);
         }
@@ -212,18 +224,18 @@ export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, st
 async function getOrCreateDefaultSalesPartner(db: any): Promise<number> {
   const { salesPartners } = await import("../../shared/schema");
   const { eq } = await import("drizzle-orm");
-  
+
   try {
     const existing = await db
       .select()
       .from(salesPartners)
       .where(eq(salesPartners.name, 'Default Partner'))
       .limit(1);
-    
+
     if (existing.length > 0) {
       return existing[0].id;
     }
-    
+
     const [newPartner] = await db
       .insert(salesPartners)
       .values({
@@ -231,7 +243,7 @@ async function getOrCreateDefaultSalesPartner(db: any): Promise<number> {
         isActive: true
       })
       .returning();
-    
+
     return newPartner.id;
   } catch (error) {
     console.error('Error with sales partner:', error);

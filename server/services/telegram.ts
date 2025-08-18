@@ -23,6 +23,13 @@ export async function sendInvoiceToTelegram(
       ? ` (ارسال مجدد - ${message.sendCount || 1})` 
       : '';
     
+    // ✅ SHERLOCK v32.0: Ensure production portal link generation
+    const productionPortalLink = message.portalLink.includes('localhost') || message.portalLink.includes('127.0.0.1')
+      ? message.portalLink.replace(/localhost:\d+|127\.0\.0\.1:\d+/, process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` : 'your-production-domain.com')
+      : message.portalLink;
+    
+    console.log(`🔗 SHERLOCK v32.0: Portal link generation - Original: ${message.portalLink}, Production: ${productionPortalLink}`);
+    
     // Replace template variables with actual data
     let messageText = template
       .replace(/{representative_name}/g, message.representativeName)
@@ -31,7 +38,7 @@ export async function sendInvoiceToTelegram(
       .replace(/{amount}/g, message.amount)
       .replace(/{issue_date}/g, message.issueDate)
       .replace(/{status}/g, message.status)
-      .replace(/{portal_link}/g, message.portalLink)
+      .replace(/{portal_link}/g, productionPortalLink)
       .replace(/{invoice_number}/g, message.invoiceNumber)
       .replace(/{resend_indicator}/g, resendIndicator);
 
