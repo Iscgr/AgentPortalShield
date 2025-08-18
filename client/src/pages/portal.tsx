@@ -1,6 +1,7 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
+import { getQueryFn } from "@/lib/queryClient";
 
 // Type definitions for portal data
 interface Invoice {
@@ -264,6 +265,7 @@ export default function Portal() {
 
   const { data, isLoading, error } = useQuery<PortalData>({
     queryKey: [`/api/portal/${publicId}`],
+    queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!publicId,
   });
 
@@ -314,16 +316,66 @@ export default function Portal() {
     console.error('PublicId:', publicId);
     console.error('Current URL:', window.location.href);
 
-    // تشخیص نوع خطا - Fixed for TanStack Query error format
+    // تشخیص نوع خطا - Enhanced for TanStack Query error format  
     const responseError = (error as any)?.response || (error as any)?.cause?.response;
+    const isQueryFnError = error?.message?.includes('Missing queryFn');
     const isNotFound = responseError?.status === 404 || 
                       error?.message?.includes('404') ||
-                      (!data && !error);
+                      (!data && !error && !isQueryFnError);
     
     const isServerError = responseError?.status >= 500;
     const isNetworkError = error?.message?.includes('Network') || 
                           error?.message?.includes('fetch') ||
                           error?.message?.includes('NetworkError');
+    
+    // خطای خاص queryFn
+    if (isQueryFnError) {
+      return (
+        <div style={{ 
+          minHeight: '100vh', 
+          background: 'linear-gradient(135deg, #7f1d1d, #991b1b)', 
+          color: 'white', 
+          padding: '40px',
+          fontFamily: 'Tahoma, sans-serif',
+          direction: 'rtl',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{ 
+            background: 'rgba(255, 255, 255, 0.1)', 
+            padding: '40px', 
+            borderRadius: '15px',
+            maxWidth: '600px',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>🔧</div>
+            <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+              خطای تنظیمات Query!
+            </h1>
+            <p style={{ fontSize: '16px', marginBottom: '15px', lineHeight: '1.6' }}>
+              مشکل در تنظیمات درخواست API. لطفاً صفحه را مجدداً بارگذاری کنید.
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              style={{
+                background: 'linear-gradient(135deg, #1e40af, #3730a3)',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                marginTop: '10px'
+              }}
+            >
+              🔄 بارگذاری مجدد
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={{ 
