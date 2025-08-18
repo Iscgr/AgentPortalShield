@@ -15,19 +15,20 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Enhanced connection configuration with retry logic and connection pooling
-export const pool = new Pool({ 
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 5, // Limit concurrent connections for stability
-  maxUses: 1000, // Connection reuse limit
-  allowExitOnIdle: false, // Keep connections alive
-  idleTimeoutMillis: 30000, // 30 second idle timeout
+  // SHERLOCK v32.2: Optimized connection pool
+  max: 20, // Maximum pool size
+  idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
+  connectionTimeoutMillis: 5000, // Connection timeout
+  maxUses: 7500, // Retire connections after 7500 uses
 });
 
 // Enhanced database instance with better error handling and performance monitoring
-export const db = drizzle({ 
-  client: pool, 
+export const db = drizzle({
+  client: pool,
   schema,
-  logger: process.env.NODE_ENV === 'development' 
+  logger: process.env.NODE_ENV === 'development'
 });
 
 // Performance monitoring for slow queries

@@ -12,9 +12,15 @@ export function performanceMonitoringMiddleware(req: Request, res: Response, nex
   const originalJson = res.json;
   let hasError = false;
 
-  // Override res.json to log response time and errors
+  // SHERLOCK v32.2: Memory monitoring and cleanup
+  const originalJson = res.json;
   res.json = function(body: any) {
     const duration = Date.now() - startTime;
+    
+    // Memory leak prevention for large responses
+    if (body && typeof body === 'object' && JSON.stringify(body).length > 1000000) {
+      console.warn(`⚠️ Large response detected: ${JSON.stringify(body).length} bytes for ${req.url}`);
+    }
     
     // Check for error responses
     if (res.statusCode >= 400) {

@@ -269,6 +269,28 @@ export class UnifiedFinancialEngine {
     return result;
   }
 
+  // SHERLOCK v32.2: Batch processing optimization
+  private static batchCache = new Map<number, any>();
+  private static batchSize = 20;
+
+  static async calculateBatch(representativeIds: number[]): Promise<Map<number, any>> {
+    const results = new Map();
+
+    // Process in chunks to avoid overwhelming the database
+    for (let i = 0; i < representativeIds.length; i += this.batchSize) {
+      const chunk = representativeIds.slice(i, i + this.batchSize);
+      const chunkResults = await Promise.all(
+        chunk.map(id => this.calculateRepresentative(id))
+      );
+
+      chunk.forEach((id, index) => {
+        results.set(id, chunkResults[index]);
+      });
+    }
+
+    return results;
+  }
+
   /**
    * ✅ SHERLOCK v23.0: محاسبه صحیح آمار کلی سیستم
    */

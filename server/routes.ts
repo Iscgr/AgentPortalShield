@@ -454,7 +454,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ✅ SHERLOCK v32.0: Representatives management with UNIFIED FINANCIAL ENGINE
   app.get("/api/representatives", authMiddleware, async (req, res) => {
     try {
-      console.log('🔍 SHERLOCK v32.0: Fetching representatives data with unified financial calculations');
+      console.log('🔍 SHERLOCK v32.2: Fetching representatives data with optimized batch processing');
+      
+      // SHERLOCK v32.2: Error boundary for large datasets
+      const startTime = Date.now();
+      const timeout = 30000; // 30 second timeout
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), timeout);
+      });
 
       // Get base representatives data
       const representatives = await storage.getRepresentatives();
