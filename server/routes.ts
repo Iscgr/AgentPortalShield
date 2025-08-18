@@ -631,6 +631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public Portal API
+  // ✅ SHERLOCK v32.0: Portal endpoint using Unified Financial Engine for consistency
   app.get("/api/portal/:publicId", async (req, res) => {
     try {
       const { publicId } = req.params;
@@ -644,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Basic validation
       if (!publicId || publicId.trim() === '') {
         console.log('❌ Invalid publicId - empty or null');
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'شناسه پرتال نامعتبر است',
           details: 'publicId خالی یا نامعتبر'
         });
@@ -662,13 +663,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const totalReps = await db.select().from(representatives).limit(5);
         console.log('Sample representatives:', totalReps.map(r => ({ id: r.id, code: r.code, publicId: r.publicId })));
 
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: 'نماینده یافت نشد',
           details: `پرتالی با شناسه "${publicId}" در سیستم موجود نیست`,
           publicId: publicId
         });
       }
       const rep = representative[0];
+
+      // ✅ استفاده از Unified Financial Engine برای محاسبات دقیق
+      const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
 
       const invoices = await storage.getInvoicesByRepresentative(rep.id);
       const payments = await storage.getPaymentsByRepresentative(rep.id);
@@ -726,8 +730,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code: rep.code,
         panelUsername: rep.panelUsername,
         ownerName: rep.ownerName,
-        totalDebt: rep.totalDebt,
-        totalSales: rep.totalSales,
+        // Don't expose stored totalDebt and totalSales, use calculated ones
+        // totalDebt: rep.totalDebt,
+        // totalSales: rep.totalSales,
         credit: rep.credit,
         portalConfig,
         invoices: sortedInvoices.map(inv => ({
@@ -747,9 +752,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const dateA = new Date(a.paymentDate);
           const dateB = new Date(b.paymentDate);
           return dateB.getTime() - dateA.getTime();
-        })
+        }),
+
+        // ✅ اطلاعات اضافی برای نمایش در پرتال
+        financialMeta: {
+          paymentRatio: financialData.paymentRatio,
+          debtLevel: financialData.debtLevel,
+          lastCalculation: financialData.calculationTimestamp,
+          accuracyGuaranteed: financialData.accuracyGuaranteed
+        }
       };
 
+      // ✅ استفاده از داده‌های محاسبه شده از Unified Financial Engine
       res.json(publicData);
     } catch (error) {
       console.error('Portal API error:', error);
