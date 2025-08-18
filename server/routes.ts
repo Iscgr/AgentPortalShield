@@ -2046,6 +2046,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test Telegram connection status
+  app.get("/api/test-telegram-status", authMiddleware, async (req, res) => {
+    try {
+      const botToken = await storage.getSetting('telegram_bot_token');
+      const chatId = await storage.getSetting('telegram_chat_id');
+      
+      const isConnected = 
+        botToken?.value && botToken.value.length > 0 &&
+        chatId?.value && chatId.value.length > 0;
+      
+      res.json({ 
+        connected: isConnected,
+        botTokenExists: !!(botToken?.value && botToken.value.length > 0),
+        chatIdExists: !!(chatId?.value && chatId.value.length > 0)
+      });
+    } catch (error) {
+      res.status(500).json({ error: "خطا در بررسی وضعیت تلگرام" });
+    }
+  });
+
   app.put("/api/settings/:key", authMiddleware, async (req, res) => {
     try {
       const { value } = req.body;

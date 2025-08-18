@@ -32,11 +32,35 @@ export default function Header({ onMenuClick }: HeaderProps) {
     retry: false
   });
 
+  // Backup check using CRM settings API
+  const { data: crmTelegramSettings } = useQuery({
+    queryKey: ["/api/crm/settings/TELEGRAM"],
+    retry: false
+  });
+
+  // Real-time Telegram status check
+  const { data: telegramStatus } = useQuery({
+    queryKey: ["/api/test-telegram-status"],
+    retry: false,
+    refetchInterval: 30000 // Check every 30 seconds
+  });
+
+  // Check multiple sources for Telegram connection status with priority
   const isTelegramConnected = 
-    (telegramBotToken as any)?.value && 
-    (telegramBotToken as any).value.length > 0 &&
-    (telegramChatId as any)?.value && 
-    (telegramChatId as any).value.length > 0;
+    // Priority 1: Real-time status check
+    (telegramStatus as any)?.connected ||
+    // Priority 2: Original settings check
+    ((telegramBotToken as any)?.value && 
+     (telegramBotToken as any).value.length > 0 &&
+     (telegramChatId as any)?.value && 
+     (telegramChatId as any).value.length > 0) ||
+    // Priority 3: Fallback to CRM settings
+    ((crmTelegramSettings as any)?.data?.some((setting: any) => 
+       setting.key === 'telegram_bot_token' && setting.value && setting.value.length > 0
+     ) &&
+     (crmTelegramSettings as any)?.data?.some((setting: any) => 
+       setting.key === 'telegram_chat_id' && setting.value && setting.value.length > 0
+     ));
 
   const handleLogout = async () => {
     try {
