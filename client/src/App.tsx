@@ -91,8 +91,9 @@ function AuthenticatedRouter() {
   const { isAuthenticated: adminAuthenticated, isLoading: adminIsLoading, user: adminUser } = useUnifiedAuth(); // Use unified auth hook
   const [location] = useLocation();
 
-  // Check if this is a public portal route
-  const isPublicPortal = location.startsWith('/portal/') || location.startsWith('/representative/');
+  // ✅ SHERLOCK v32.1: بهبود تشخیص پرتال عمومی با regex دقیق
+  const isPublicPortal = /^\/portal\/[^\/]+\/?$|^\/representative\/[^\/]+\/?$/.test(location);
+
   const isCrmRoute = location.startsWith('/crm');
 
   if (isPublicPortal) {

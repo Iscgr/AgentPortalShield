@@ -267,11 +267,30 @@ export default function Portal() {
     enabled: !!publicId,
   });
 
-  console.log('=== SHERLOCK v1.0 PORTAL DEBUG ===');
+  console.log('=== SHERLOCK v32.1 PORTAL DEBUG ===');
   console.log('publicId:', publicId);
+  console.log('Current location:', window.location.pathname);
   console.log('data:', data);
   console.log('isLoading:', isLoading);
   console.log('error:', error);
+  
+  // ✅ SHERLOCK v32.1: اضافه کردن validation برای publicId
+  if (!publicId || publicId.trim() === '') {
+    console.error('❌ SHERLOCK v32.1: publicId خالی یا نامعتبر است');
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #7f1d1d, #991b1b)', 
+        color: 'white', 
+        padding: '40px',
+        fontFamily: 'sans-serif',
+        direction: 'rtl'
+      }}>
+        <h1 style={{ fontSize: '24px', marginBottom: '20px' }}>شناسه پورتال نامعتبر!</h1>
+        <p>شناسه پورتال ارائه نشده است. لطفاً لینک صحیح پورتال را استفاده کنید.</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
