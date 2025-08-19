@@ -11,6 +11,9 @@ import { useMobileOptimizations } from "@/hooks/use-mobile-optimizations";
 // Layout components
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+// Import MobileNavigation
+import MobileNavigation from "@/components/layout/mobile-navigation";
+
 
 // Pages
 import Dashboard from "@/pages/dashboard";

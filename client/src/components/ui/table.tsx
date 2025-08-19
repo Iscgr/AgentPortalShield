@@ -1,19 +1,30 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
+import { useMobileDetection } from "@/hooks/use-mobile-detection"
 
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-sm", className)}
-      {...props}
-    />
-  </div>
-))
+>(({ className, ...props }, ref) => {
+  const { isMobile } = useMobileDetection()
+  
+  return (
+    <div className={cn(
+      "relative w-full overflow-auto",
+      isMobile && "overflow-x-auto -webkit-overflow-scrolling-touch"
+    )}>
+      <table
+        ref={ref}
+        className={cn(
+          "w-full caption-bottom text-sm",
+          isMobile && "min-w-[600px]",
+          className
+        )}
+        {...props}
+      />
+    </div>
+  )
+})
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<
