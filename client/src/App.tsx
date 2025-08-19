@@ -16,6 +16,8 @@ import MobileNavigation from "@/components/layout/mobile-navigation";
 import MobilePWAManager from "@/components/ui/mobile-pwa-manager";
 import MobileGestureHandler from "@/components/ui/mobile-gesture-handler";
 import MobilePerformanceMonitor from "@/components/ui/mobile-performance-monitor";
+import AdaptiveMobileManager from "@/components/ui/adaptive-mobile-manager";
+import IntelligentGestureSystem from "@/components/ui/intelligent-gesture-system";
 
 
 // Pages
@@ -214,26 +216,40 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile-specific components */}
         {isMobile && (
           <div className="mobile-features-bar p-2 bg-black/10 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <MobilePWAManager className="flex-1" />
-              <div className="w-48">
-                <MobilePerformanceMonitor />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <MobilePWAManager />
+              <MobilePerformanceMonitor />
+              <AdaptiveMobileManager />
             </div>
           </div>
         )}
         
-        <MobileGestureHandler
-          enablePullToRefresh={isMobile}
-          onPullToRefresh={handleRefresh}
-          onSwipeLeft={handleSwipeLeft}
-          onSwipeRight={handleSwipeRight}
+        <IntelligentGestureSystem
+          adaptiveThresholds={true}
+          learningEnabled={true}
+          onGestureDetected={(pattern) => {
+            // Handle intelligent gestures
+            if (pattern.type === 'swipe') {
+              if (pattern.direction === 'left') handleSwipeLeft();
+              if (pattern.direction === 'right') handleSwipeRight();
+            } else if (pattern.type === 'pull') {
+              handleRefresh();
+            }
+          }}
           className="min-h-screen"
         >
-          <main className="p-4 lg:p-6">
-            {children}
-          </main>
-        </MobileGestureHandler>
+          <MobileGestureHandler
+            enablePullToRefresh={isMobile}
+            onPullToRefresh={handleRefresh}
+            onSwipeLeft={handleSwipeLeft}
+            onSwipeRight={handleSwipeRight}
+            className="min-h-screen"
+          >
+            <main className="p-4 lg:p-6">
+              {children}
+            </main>
+          </MobileGestureHandler>
+        </IntelligentGestureSystem>
       </div>
     </div>
   );

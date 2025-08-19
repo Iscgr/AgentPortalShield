@@ -297,6 +297,137 @@
     overflow-x: hidden !important;
   }
 
+
+/* Adaptive Mobile Intelligence - CSS Variables for Bayesian Optimization */
+:root {
+  --adaptive-animation-duration: 0.2s;
+  --adaptive-blur-intensity: blur(6px);
+  --adaptive-shadow-intensity: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --adaptive-gesture-threshold: 50px;
+  --adaptive-touch-target: 44px;
+  --adaptive-performance-mode: balanced;
+}
+
+/* Adaptive Performance Modes */
+.adaptive-ultra-performance {
+  --adaptive-animation-duration: 0.3s;
+  --adaptive-blur-intensity: blur(12px);
+  --adaptive-shadow-intensity: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.adaptive-battery-saver {
+  --adaptive-animation-duration: 0.1s;
+  --adaptive-blur-intensity: blur(2px);
+  --adaptive-shadow-intensity: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.adaptive-balanced {
+  --adaptive-animation-duration: 0.2s;
+  --adaptive-blur-intensity: blur(6px);
+  --adaptive-shadow-intensity: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Apply adaptive variables to mobile components */
+@media (max-width: 768px) {
+  .admin-glass-card,
+  .clay-card,
+  .mobile-optimized .admin-glass-card {
+    backdrop-filter: var(--adaptive-blur-intensity) !important;
+    box-shadow: var(--adaptive-shadow-intensity) !important;
+    transition: all var(--adaptive-animation-duration) ease !important;
+  }
+
+  .mobile-optimized button,
+  .mobile-optimized .button,
+  .mobile-optimized a[role="button"] {
+    min-height: var(--adaptive-touch-target) !important;
+    min-width: var(--adaptive-touch-target) !important;
+  }
+
+  /* Intelligent gesture feedback */
+  .intelligent-gesture-container {
+    position: relative;
+  }
+
+  .intelligent-gesture-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    transition: background-color 0.1s ease;
+  }
+
+  .intelligent-gesture-container.gesture-detected::before {
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+
+  /* Adaptive loading states */
+  .adaptive-mobile-manager .animate-spin {
+    animation-duration: var(--adaptive-animation-duration);
+  }
+
+  /* Battery-optimized animations */
+  .adaptive-battery-saver * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.1s !important;
+  }
+
+  /* Ultra performance enhancements */
+  .adaptive-ultra-performance .admin-glass-card:hover {
+    transform: translateY(-2px) scale(1.01) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25) !important;
+  }
+}
+
+/* Bayesian evidence collection indicators */
+.evidence-collection-indicator {
+  position: fixed;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 40px;
+  background: linear-gradient(to bottom, #3b82f6, #1d4ed8);
+  border-radius: 2px;
+  opacity: 0.7;
+  z-index: 1000;
+}
+
+.evidence-collection-indicator.collecting {
+  animation: evidencePulse 2s ease-in-out infinite;
+}
+
+@keyframes evidencePulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Convergence status indicator */
+.convergence-status {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.convergence-status.converged {
+  background: rgba(34, 197, 94, 0.8);
+}
+
+.convergence-status.converging {
+  background: rgba(234, 179, 8, 0.8);
+}
+
   /* Mobile Dialog - Full screen approach with scrolling */
   @media (max-width: 640px) {
     .admin-dialog-stable {
