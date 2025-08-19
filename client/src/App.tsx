@@ -11,8 +11,11 @@ import { useMobileOptimizations } from "@/hooks/use-mobile-optimizations";
 // Layout components
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-// Import MobileNavigation
+// Import MobileNavigation and advanced mobile components
 import MobileNavigation from "@/components/layout/mobile-navigation";
+import MobilePWAManager from "@/components/ui/mobile-pwa-manager";
+import MobileGestureHandler from "@/components/ui/mobile-gesture-handler";
+import MobilePerformanceMonitor from "@/components/ui/mobile-performance-monitor";
 
 
 // Pages
@@ -181,17 +184,56 @@ function AuthenticatedRouter() {
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isMobile } = useMobileOptimizations();
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  const handleRefresh = async () => {
+    // Simulate refresh - reload page data
+    window.location.reload();
+  };
+
+  const handleSwipeLeft = () => {
+    if (isMobile) {
+      setIsSidebarOpen(true);
+    }
+  };
+
+  const handleSwipeRight = () => {
+    if (isMobile && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
+  };
 
   return (
     <div className="admin-panel-background dark">
       <Sidebar isOpen={isSidebarOpen} onToggle={toggleSidebar} />
       <div className="main-content lg:mr-80 mr-0 relative z-10">
         <Header onMenuClick={toggleSidebar} />
-        <main className="p-4 lg:p-6">
-          {children}
-        </main>
+        
+        {/* Mobile-specific components */}
+        {isMobile && (
+          <div className="mobile-features-bar p-2 bg-black/10 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <MobilePWAManager className="flex-1" />
+              <div className="w-48">
+                <MobilePerformanceMonitor />
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <MobileGestureHandler
+          enablePullToRefresh={isMobile}
+          onPullToRefresh={handleRefresh}
+          onSwipeLeft={handleSwipeLeft}
+          onSwipeRight={handleSwipeRight}
+          className="min-h-screen"
+        >
+          <main className="p-4 lg:p-6">
+            {children}
+          </main>
+        </MobileGestureHandler>
       </div>
     </div>
   );
