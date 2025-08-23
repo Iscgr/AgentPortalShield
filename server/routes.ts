@@ -42,6 +42,8 @@ import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
 
 // Import maintenance routes registration
 import { registerMaintenanceRoutes } from "./routes/maintenance-routes";
+// Import integration health routes for Phase 9
+import { registerIntegrationHealthRoutes } from "./routes/integration-health-routes";
 
 // Import unified statistics routes registration
 import { registerUnifiedStatisticsRoutes } from "./routes/unified-statistics-routes.js";
@@ -157,6 +159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register maintenance and monitoring routes
   registerMaintenanceRoutes(app);
+
+  // Register integration health routes for Phase 9
+  registerIntegrationHealthRoutes(app);
 
   // SHERLOCK v18.4: سیستم مالی یکپارچه واحد - تنها سیستم مالی فعال
   // Previously imported and used directly:
@@ -455,11 +460,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/representatives", authMiddleware, async (req, res) => {
     try {
       console.log('🔍 SHERLOCK v32.2: Fetching representatives data with optimized batch processing');
-      
+
       // SHERLOCK v32.2: Error boundary for large datasets
       const startTime = Date.now();
       const timeout = 30000; // 30 second timeout
-      
+
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Request timeout')), timeout);
       });
