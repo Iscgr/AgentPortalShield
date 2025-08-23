@@ -211,13 +211,10 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="main-content lg:mr-80 mr-0 relative z-10">
         <Header onMenuClick={toggleSidebar} />
         
-        {/* Mobile-specific components - Collapsible and conditional */}
+        {/* Mobile Optimization Panel - Single instance with intelligent display */}
         {isMobile && (
           <MobileOptimizationPanel />
         )}
-        
-        {/* Mobile Optimization Panel - Non-blocking overlay */}
-        <MobileOptimizationPanel />
         
         <IntelligentGestureSystem
           adaptiveThresholds={true}

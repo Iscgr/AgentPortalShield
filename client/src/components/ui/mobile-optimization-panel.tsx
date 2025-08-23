@@ -20,14 +20,49 @@ import { useMobileOptimizations } from '@/hooks/use-mobile-optimizations';
 export function MobileOptimizationPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(true);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false); // Default hidden for better UX
+  const [autoCollapsed, setAutoCollapsed] = useState(false);
   const { isMobile } = useMobileOptimizations();
 
+  // Auto-collapse after 5 seconds if opened
+  React.useEffect(() => {
+    if (isOpen && !isMinimized) {
+      const timer = setTimeout(() => {
+        setIsMinimized(true);
+        setAutoCollapsed(true);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isMinimized]);
+
   // Don't render if not mobile
-  if (!isMobile || !isVisible) return null;
+  if (!isMobile) return null;
 
   return (
-    <div className="fixed top-16 left-4 right-4 z-30 max-w-sm mx-auto">
+    <>
+      {/* Floating activation button when panel is hidden */}
+      {!isVisible && (
+        <div className="fixed bottom-20 right-4 z-40">
+          <Button 
+            variant="default" 
+            size="sm"
+            onClick={() => {
+              setIsVisible(true);
+              setIsOpen(true);
+              setIsMinimized(false);
+            }}
+            className="shadow-lg bg-blue-600 hover:bg-blue-700 rounded-full w-12 h-12 p-0"
+            title="نمایش پنل بهینه‌سازی موبایل"
+          >
+            <Smartphone className="w-5 h-5" />
+          </Button>
+        </div>
+      )}
+
+      {/* Main optimization panel */}
+      {isVisible && (
+        <div className="fixed top-16 left-4 right-4 z-30 max-w-sm mx-auto pointer-events-none">
+          <div className="pointer-events-auto">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <Card className="mobile-pwa-card border border-blue-500/20 shadow-lg">
           <CardHeader className="pb-2">
@@ -129,24 +164,10 @@ export function MobileOptimizationPanel() {
         </Card>
       </Collapsible>
 
-      {/* Floating restore button when panel is hidden */}
-      {!isVisible && (
-        <div className="fixed bottom-20 right-4 z-40">
-          <Button 
-            variant="default" 
-            size="sm"
-            onClick={() => {
-              setIsVisible(true);
-              setIsOpen(true);
-            }}
-            className="shadow-lg bg-blue-600 hover:bg-blue-700"
-          >
-            <Smartphone className="w-4 h-4 ml-1" />
-            بهینه‌سازی
-          </Button>
+      </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
