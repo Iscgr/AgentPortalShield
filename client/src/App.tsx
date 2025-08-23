@@ -13,10 +13,8 @@ import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 // Import MobileNavigation and advanced mobile components
 import MobileNavigation from "@/components/layout/mobile-navigation";
-import MobilePWAManager from "@/components/ui/mobile-pwa-manager";
+import MobileOptimizationPanel from "@/components/ui/mobile-optimization-panel";
 import MobileGestureHandler from "@/components/ui/mobile-gesture-handler";
-import MobilePerformanceMonitor from "@/components/ui/mobile-performance-monitor";
-import AdaptiveMobileManager from "@/components/ui/adaptive-mobile-manager";
 import IntelligentGestureSystem from "@/components/ui/intelligent-gesture-system";
 
 
@@ -213,16 +211,13 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="main-content lg:mr-80 mr-0 relative z-10">
         <Header onMenuClick={toggleSidebar} />
         
-        {/* Mobile-specific components */}
+        {/* Mobile-specific components - Collapsible and conditional */}
         {isMobile && (
-          <div className="mobile-features-bar p-2 bg-black/10 backdrop-blur-sm">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <MobilePWAManager />
-              <MobilePerformanceMonitor />
-              <AdaptiveMobileManager />
-            </div>
-          </div>
+          <MobileOptimizationPanel />
         )}
+        
+        {/* Mobile Optimization Panel - Non-blocking overlay */}
+        <MobileOptimizationPanel />
         
         <IntelligentGestureSystem
           adaptiveThresholds={true}
@@ -245,7 +240,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
             onSwipeRight={handleSwipeRight}
             className="min-h-screen"
           >
-            <main className="p-4 lg:p-6">
+            <main className="p-4 lg:p-6 relative z-10">
               {children}
             </main>
           </MobileGestureHandler>

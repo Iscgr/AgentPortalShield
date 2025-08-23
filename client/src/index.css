@@ -428,6 +428,39 @@
   background: rgba(234, 179, 8, 0.8);
 }
 
+/* Mobile Optimization Panel - Non-blocking overlay styles */
+.mobile-optimization-overlay {
+  position: fixed;
+  top: 4rem;
+  left: 1rem;
+  right: 1rem;
+  z-index: 30;
+  max-width: 24rem;
+  margin: 0 auto;
+  pointer-events: auto;
+}
+
+/* Ensure main content is not blocked */
+@media (max-width: 768px) {
+  .main-content {
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* Prevent mobile components from blocking interactions */
+  .mobile-optimization-panel {
+    pointer-events: auto;
+  }
+  
+  .mobile-optimization-panel.collapsed {
+    pointer-events: none;
+  }
+  
+  .mobile-optimization-panel.collapsed .mobile-optimization-trigger {
+    pointer-events: auto;
+  }
+}
+
   /* Mobile Dialog - Full screen approach with scrolling */
   @media (max-width: 640px) {
     .admin-dialog-stable {
