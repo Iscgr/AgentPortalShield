@@ -451,6 +451,18 @@
     z-index: 10;
     /* Ensure main content is always accessible */
     min-height: calc(100vh - 4rem);
+    /* Prevent mobile panel interference */
+    pointer-events: auto !important;
+    background: var(--background);
+  }
+  
+  /* Ensure mobile panels don't block content */
+  .mobile-optimization-overlay {
+    pointer-events: none !important;
+  }
+  
+  .mobile-optimization-overlay .mobile-optimization-panel {
+    pointer-events: auto !important;
   }
   
   /* Smart panel interaction management */
@@ -472,14 +484,20 @@
     pointer-events: auto;
   }
 
-  /* Intelligent floating button positioning */
+  /* Intelligent floating button positioning - Bottom right corner */
   .mobile-optimization-trigger {
     position: fixed;
-    bottom: 5rem;
+    bottom: 6rem; /* Above mobile navigation */
     right: 1rem;
     z-index: 50;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     backdrop-filter: blur(8px);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .mobile-optimization-trigger:hover {

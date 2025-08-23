@@ -20,20 +20,20 @@ import { useMobileOptimizations } from '@/hooks/use-mobile-optimizations';
 export function MobileOptimizationPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(true);
-  const [isVisible, setIsVisible] = useState(false); // Default hidden for better UX
+  const [isVisible, setIsVisible] = useState(false); // Hidden by default - only show on demand
   const [autoCollapsed, setAutoCollapsed] = useState(false);
   const { isMobile } = useMobileOptimizations();
 
-  // Auto-collapse after 5 seconds if opened
+  // Auto-hide panel after 8 seconds to prevent content blocking
   React.useEffect(() => {
-    if (isOpen && !isMinimized) {
+    if (isVisible && isOpen && !isMinimized) {
       const timer = setTimeout(() => {
-        setIsMinimized(true);
+        setIsVisible(false);
         setAutoCollapsed(true);
-      }, 5000);
+      }, 8000);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, isMinimized]);
+  }, [isVisible, isOpen, isMinimized]);
 
   // Don't render if not mobile
   if (!isMobile) return null;
@@ -59,9 +59,9 @@ export function MobileOptimizationPanel() {
         </div>
       )}
 
-      {/* Main optimization panel */}
+      {/* Main optimization panel - Non-blocking positioning */}
       {isVisible && (
-        <div className="fixed top-16 left-4 right-4 z-30 max-w-sm mx-auto pointer-events-none">
+        <div className="fixed bottom-20 left-4 right-4 z-30 max-w-sm mx-auto pointer-events-none">
           <div className="pointer-events-auto">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <Card className="mobile-pwa-card border border-blue-500/20 shadow-lg">

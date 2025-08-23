@@ -211,7 +211,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="main-content lg:mr-80 mr-0 relative z-10">
         <Header onMenuClick={toggleSidebar} />
         
-        {/* Mobile Optimization Panel - Single instance with intelligent display */}
+        {/* Mobile Optimization Panel - Single instance, non-blocking */}
         {isMobile && (
           <MobileOptimizationPanel />
         )}
