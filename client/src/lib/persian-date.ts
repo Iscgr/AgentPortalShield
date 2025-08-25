@@ -20,6 +20,25 @@ export function toEnglishDigits(str: string): string {
   return result;
 }
 
+export function normalizeDateFormat(dateStr: string): string {
+  // Convert Persian digits to English and ensure consistent format
+  const englishDate = toEnglishDigits(dateStr);
+  
+  // Handle different date formats
+  if (englishDate.includes('/')) {
+    const parts = englishDate.split('/');
+    if (parts.length === 3) {
+      // Ensure YYYY/MM/DD format with zero-padding
+      const year = parts[0];
+      const month = parts[1].padStart(2, '0');
+      const day = parts[2].padStart(2, '0');
+      return `${year}/${month}/${day}`;
+    }
+  }
+  
+  return englishDate;
+}
+
 export function getCurrentPersianDate(): string {
   const now = new Date();
   const persianDate = new Intl.DateTimeFormat('fa-IR', {

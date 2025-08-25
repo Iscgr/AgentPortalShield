@@ -1004,44 +1004,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "فیلدهای ضروری ناقص است" });
       }
 
-      // ✅ SHERLOCK v33.0: FIXED - Handle both auto and manual allocation
+      // ✅ SHERLOCK v33.1: Normalize Persian/English dates for consistency
+      const { toEnglishDigits } = await import("../../client/src/lib/persian-date");
+      const normalizedPaymentDate = toEnglishDigits(paymentDate);
+      
+      console.log(`📅 تطبیق تاریخ: ورودی="${paymentDate}" -> عادی‌سازی شده="${normalizedPaymentDate}"`);
+
+      // ✅ SHERLOCK v33.1: CRITICAL FIX - Proper manual allocation logic
       let isAllocated = false;
       let invoiceId = null;
 
-      // Create the payment
+      // Determine allocation status before creating payment
+      if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
+        isAllocated = true;
+        invoiceId = parseInt(selectedInvoiceId);
+        console.log(`💰 SHERLOCK v33.1: Manual allocation planned - Payment to Invoice ${selectedInvoiceId}`);
+      } else if (selectedInvoiceId === "auto") {
+        console.log(`🔄 SHERLOCK v33.1: Auto-allocation planned for Representative ${representativeId}`);
+      }
+
+      // Create the payment with proper allocation status
       const newPayment = await storage.createPayment({
         representativeId,
         amount,
-        paymentDate,
+        paymentDate: normalizedPaymentDate, // Use normalized date
         description,
-        isAllocated: false, // Initially false, will be updated after allocation
-        invoiceId: null     // Initially null, will be updated after allocation
+        isAllocated: isAllocated,
+        invoiceId: invoiceId
       });
 
-      // ✅ CRITICAL FIX: Handle manual allocation to specific invoice
-      if (selectedInvoiceId && selectedInvoiceId !== "auto") {
-        console.log(`💰 SHERLOCK v33.0: Manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
+      // ✅ CRITICAL FIX: Execute allocation after payment creation
+      if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
+        console.log(`💰 SHERLOCK v33.1: Executing manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
 
-        // Allocate payment to specific invoice
-        await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
-
-        console.log(`✅ SHERLOCK v33.0: Payment ${newPayment.id} successfully allocated to Invoice ${selectedInvoiceId}`);
+        try {
+          // Allocate payment to specific invoice
+          await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
+          
+          // Update invoice status after allocation
+          const calculatedStatus = await storage.calculateInvoicePaymentStatus(parseInt(selectedInvoiceId));
+          await storage.updateInvoice(parseInt(selectedInvoiceId), { status: calculatedStatus });
+          
+          console.log(`✅ SHERLOCK v33.1: Payment ${newPayment.id} successfully allocated to Invoice ${selectedInvoiceId}, status: ${calculatedStatus}`);
+        } catch (allocationError) {
+          console.error(`❌ SHERLOCK v33.1: Manual allocation failed for Payment ${newPayment.id}:`, allocationError);
+          // Update payment to unallocated if allocation fails
+          await storage.updatePayment(newPayment.id, { isAllocated: false, invoiceId: null });
+        }
       }
       // Auto-allocate if requested
       else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v33.0: Auto-allocation - Payment ${newPayment.id} for Representative ${representativeId}`);
+        console.log(`🔄 SHERLOCK v33.1: Executing auto-allocation - Payment ${newPayment.id} for Representative ${representativeId}`);
         await storage.autoAllocatePaymentToInvoices(newPayment.id, representativeId);
       }
-      // ✅ ENHANCED: If no allocation specified, payment remains unallocated (valid scenario)
+      // If no allocation specified, payment remains unallocated
       else {
-        console.log(`📝 SHERLOCK v33.0: Payment ${newPayment.id} created without allocation (manual later)`);
+        console.log(`📝 SHERLOCK v33.1: Payment ${newPayment.id} created without allocation (manual later)`);
       }
 
       // Update representative financials
       await storage.updateRepresentativeFinancials(representativeId);
 
-      // ✅ ENHANCED: Fetch updated payment with allocation status
+      // ✅ ENHANCED: Fetch updated payment with current allocation status
       const updatedPayment = await storage.getPayment(newPayment.id);
+
+      // Log final status for debugging
+      console.log(`🔍 SHERLOCK v33.1: Final payment status - ID: ${updatedPayment.id}, Allocated: ${updatedPayment.isAllocated}, Invoice: ${updatedPayment.invoiceId}`);
 
       res.json(updatedPayment);
     } catch (error) {
