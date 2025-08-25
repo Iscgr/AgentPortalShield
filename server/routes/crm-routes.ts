@@ -484,9 +484,16 @@ export function registerCrmRoutes(app: Express, authMiddleware: any, storage: IS
 
       const payment = await storageInstance.createPayment(validatedData);
 
-      // Auto-allocate to oldest unpaid invoice if representativeId provided
-      if (validatedData.representativeId) {
+      // ✅ SHERLOCK v29.0: CRITICAL FIX - Only auto-allocate if NOT manually allocated
+      // If user selected a specific invoice (manual allocation), skip auto-allocation
+      if (validatedData.representativeId && !validatedData.invoiceId && !validatedData.isAllocated) {
+        console.log(`🔄 Auto-allocating payment ${payment.id} for representative ${validatedData.representativeId}`);
         await storageInstance.autoAllocatePaymentToInvoices(payment.id, validatedData.representativeId);
+      } else if (validatedData.invoiceId && validatedData.isAllocated) {
+        console.log(`✅ Manual allocation: Payment ${payment.id} pre-allocated to invoice ${validatedData.invoiceId}`);
+        // Manual allocation already handled - payment created with correct invoiceId and isAllocated=true
+        // Use public allocatePaymentToInvoice method to ensure invoice status consistency
+        await storageInstance.allocatePaymentToInvoice(payment.id, validatedData.invoiceId);
       }
 
       // ✅ SHERLOCK v24.0: Force immediate sync and cache invalidation
