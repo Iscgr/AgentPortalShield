@@ -943,7 +943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the activity for audit trail
       await storage.createActivityLog({
         type: "payment_deleted",
-        description: `پرداخت ${paymentId} با مبلغ ${payment.amount} تومان از نماینده ${payment.representativeId} حذف شد`,
+        description: `پرداخت ${payment.id} با مبلغ ${payment.amount} تومان از نماینده ${payment.representativeId} حذف شد`,
         relatedId: payment.representativeId,
         metadata: {
           paymentId: paymentId,
@@ -997,21 +997,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/payments", authMiddleware, async (req, res) => {
     try {
-      const validatedData = insertPaymentSchema.parse(req.body);
-      const payment = await storage.createPayment(validatedData);
+      const { representativeId, amount, paymentDate, description, selectedInvoiceId } = req.body;
 
-      // Auto-allocate to oldest unpaid invoice if representativeId provided
-      if (validatedData.representativeId) {
-        await storage.autoAllocatePaymentToInvoices(payment.id, validatedData.representativeId);
+      // Basic validation
+      if (!representativeId || !amount || !paymentDate) {
+        return res.status(400).json({ error: "فیلدهای ضروری ناقص است" });
       }
 
-      res.json(payment);
+      // ✅ SHERLOCK v33.0: FIXED - Handle both auto and manual allocation
+      let isAllocated = false;
+      let invoiceId = null;
+
+      // Create the payment
+      const newPayment = await storage.createPayment({
+        representativeId,
+        amount,
+        paymentDate,
+        description,
+        isAllocated: false, // Initially false, will be updated after allocation
+        invoiceId: null     // Initially null, will be updated after allocation
+      });
+
+      // ✅ CRITICAL FIX: Handle manual allocation to specific invoice
+      if (selectedInvoiceId && selectedInvoiceId !== "auto") {
+        console.log(`💰 SHERLOCK v33.0: Manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
+
+        // Allocate payment to specific invoice
+        await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
+
+        console.log(`✅ SHERLOCK v33.0: Payment ${newPayment.id} successfully allocated to Invoice ${selectedInvoiceId}`);
+      }
+      // Auto-allocate if requested
+      else if (selectedInvoiceId === "auto") {
+        console.log(`🔄 SHERLOCK v33.0: Auto-allocation - Payment ${newPayment.id} for Representative ${representativeId}`);
+        await storage.autoAllocatePaymentToInvoices(newPayment.id, representativeId);
+      }
+      // ✅ ENHANCED: If no allocation specified, payment remains unallocated (valid scenario)
+      else {
+        console.log(`📝 SHERLOCK v33.0: Payment ${newPayment.id} created without allocation (manual later)`);
+      }
+
+      // Update representative financials
+      await storage.updateRepresentativeFinancials(representativeId);
+
+      // ✅ ENHANCED: Fetch updated payment with allocation status
+      const updatedPayment = await storage.getPayment(newPayment.id);
+
+      res.json(updatedPayment);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "داده‌های ورودی نامعتبر", details: error.errors });
-      } else {
-        res.status(500).json({ error: "خطا در ایجاد پرداخت" });
-      }
+      console.error('Error creating payment:', error);
+      res.status(500).json({ error: "خطا در ایجاد پرداخت" });
     }
   });
 
