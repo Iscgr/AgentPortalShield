@@ -13,9 +13,6 @@ import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 // Import MobileNavigation and advanced mobile components
 import MobileNavigation from "@/components/layout/mobile-navigation";
-import MobileOptimizationPanel from "@/components/ui/mobile-optimization-panel";
-import MobileGestureHandler from "@/components/ui/mobile-gesture-handler";
-import IntelligentGestureSystem from "@/components/ui/intelligent-gesture-system";
 
 
 // Pages
@@ -188,74 +185,28 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
-  const handleRefresh = async () => {
-    // Simulate refresh - reload page data
-    window.location.reload();
-  };
-
-  const handleSwipeLeft = () => {
-    if (isMobile) {
-      setIsSidebarOpen(true);
-    }
-  };
-
-  const handleSwipeRight = () => {
-    if (isMobile && isSidebarOpen) {
-      setIsSidebarOpen(false);
-    }
-  };
-
   return (
     <div className="admin-panel-background dark">
       <Sidebar isOpen={isSidebarOpen} onToggle={toggleSidebar} />
       <div className="main-content lg:mr-80 mr-0 relative z-10">
         <Header onMenuClick={toggleSidebar} />
-        
-        {/* Mobile Optimization Panel - Single instance, non-blocking */}
-        {isMobile && (
-          <MobileOptimizationPanel />
-        )}
-        
-        <IntelligentGestureSystem
-          adaptiveThresholds={true}
-          learningEnabled={true}
-          onGestureDetected={(pattern) => {
-            // Handle intelligent gestures
-            if (pattern.type === 'swipe') {
-              if (pattern.direction === 'left') handleSwipeLeft();
-              if (pattern.direction === 'right') handleSwipeRight();
-            } else if (pattern.type === 'pull') {
-              handleRefresh();
-            }
-          }}
-          className="min-h-screen"
-        >
-          <MobileGestureHandler
-            enablePullToRefresh={isMobile}
-            onPullToRefresh={handleRefresh}
-            onSwipeLeft={handleSwipeLeft}
-            onSwipeRight={handleSwipeRight}
-            className="min-h-screen"
-          >
-            <main className="p-4 lg:p-6 relative z-10">
-              {children}
-            </main>
-          </MobileGestureHandler>
-        </IntelligentGestureSystem>
+        <main className="p-4 lg:p-6 relative z-10">
+          {children}
+        </main>
       </div>
     </div>
   );
 }
 
 function App() {
-  const { isMobile, shouldReduceMotion } = useMobileOptimizations();
+  const { isMobile } = useMobileOptimizations();
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <UnifiedAuthProvider>
           <Router>
-            <div className={`min-h-screen bg-background ${isMobile ? 'mobile-optimized' : ''} ${shouldReduceMotion ? 'reduce-motion' : ''}`}>
+            <div className={`min-h-screen bg-background ${isMobile ? 'mobile-optimized' : ''}`}>
               <AuthenticatedRouter />
             </div>
           </Router>

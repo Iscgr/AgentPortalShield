@@ -298,212 +298,60 @@
   }
 
 
-/* Adaptive Mobile Intelligence - CSS Variables for Bayesian Optimization */
-:root {
-  --adaptive-animation-duration: 0.2s;
-  --adaptive-blur-intensity: blur(6px);
-  --adaptive-shadow-intensity: 0 4px 16px rgba(0, 0, 0, 0.15);
-  --adaptive-gesture-threshold: 50px;
-  --adaptive-touch-target: 44px;
-  --adaptive-performance-mode: balanced;
-}
-
-/* Adaptive Performance Modes */
-.adaptive-ultra-performance {
-  --adaptive-animation-duration: 0.3s;
-  --adaptive-blur-intensity: blur(12px);
-  --adaptive-shadow-intensity: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-
-.adaptive-battery-saver {
-  --adaptive-animation-duration: 0.1s;
-  --adaptive-blur-intensity: blur(2px);
-  --adaptive-shadow-intensity: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.adaptive-balanced {
-  --adaptive-animation-duration: 0.2s;
-  --adaptive-blur-intensity: blur(6px);
-  --adaptive-shadow-intensity: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-/* Apply adaptive variables to mobile components */
-@media (max-width: 768px) {
-  .admin-glass-card,
-  .clay-card,
-  .mobile-optimized .admin-glass-card {
-    backdrop-filter: var(--adaptive-blur-intensity) !important;
-    box-shadow: var(--adaptive-shadow-intensity) !important;
-    transition: all var(--adaptive-animation-duration) ease !important;
-  }
-
-  .mobile-optimized button,
-  .mobile-optimized .button,
-  .mobile-optimized a[role="button"] {
-    min-height: var(--adaptive-touch-target) !important;
-    min-width: var(--adaptive-touch-target) !important;
-  }
-
-  /* Intelligent gesture feedback */
-  .intelligent-gesture-container {
-    position: relative;
-  }
-
-  .intelligent-gesture-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    transition: background-color 0.1s ease;
-  }
-
-  .intelligent-gesture-container.gesture-detected::before {
-    background-color: rgba(59, 130, 246, 0.1);
-  }
-
-  /* Adaptive loading states */
-  .adaptive-mobile-manager .animate-spin {
-    animation-duration: var(--adaptive-animation-duration);
-  }
-
-  /* Battery-optimized animations */
-  .adaptive-battery-saver * {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.1s !important;
-  }
-
-  /* Ultra performance enhancements */
-  .adaptive-ultra-performance .admin-glass-card:hover {
-    transform: translateY(-2px) scale(1.01) !important;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25) !important;
-  }
-}
-
-/* Bayesian evidence collection indicators */
-.evidence-collection-indicator {
-  position: fixed;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 40px;
-  background: linear-gradient(to bottom, #3b82f6, #1d4ed8);
-  border-radius: 2px;
-  opacity: 0.7;
-  z-index: 1000;
-}
-
-.evidence-collection-indicator.collecting {
-  animation: evidencePulse 2s ease-in-out infinite;
-}
-
-@keyframes evidencePulse {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
-}
-
-/* Convergence status indicator */
-.convergence-status {
-  position: fixed;
-  bottom: 100px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 12px;
-  z-index: 1000;
-  backdrop-filter: blur(10px);
-}
-
-.convergence-status.converged {
-  background: rgba(34, 197, 94, 0.8);
-}
-
-.convergence-status.converging {
-  background: rgba(234, 179, 8, 0.8);
-}
-
-/* Mobile Optimization Panel - Enhanced non-blocking styles */
-.mobile-optimization-overlay {
-  position: fixed;
-  top: 4rem;
-  left: 1rem;
-  right: 1rem;
-  z-index: 30;
-  max-width: 24rem;
-  margin: 0 auto;
-  pointer-events: none; /* Non-blocking by default */
-}
-
-.mobile-optimization-overlay > * {
-  pointer-events: auto; /* Allow interaction with panel content */
-}
-
-/* Enhanced mobile content protection */
+/* Essential Mobile Optimizations */
 @media (max-width: 768px) {
   .main-content {
     position: relative;
     z-index: 10;
-    /* Ensure main content is always accessible */
     min-height: calc(100vh - 4rem);
-    /* Prevent mobile panel interference */
-    pointer-events: auto !important;
     background: var(--background);
-  }
-  
-  /* Ensure mobile panels don't block content */
-  .mobile-optimization-overlay {
-    pointer-events: none !important;
-  }
-  
-  .mobile-optimization-overlay .mobile-optimization-panel {
-    pointer-events: auto !important;
-  }
-  
-  /* Smart panel interaction management */
-  .mobile-optimization-panel {
-    pointer-events: auto;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-  }
-  
-  .mobile-optimization-panel.auto-collapsed {
-    opacity: 0.7;
-    transform: scale(0.95);
-  }
-  
-  .mobile-optimization-panel.collapsed {
-    pointer-events: none;
-  }
-  
-  .mobile-optimization-panel.collapsed .mobile-optimization-trigger {
-    pointer-events: auto;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
   }
 
-  /* Intelligent floating button positioning - Bottom right corner */
-  .mobile-optimization-trigger {
-    position: fixed;
-    bottom: 6rem; /* Above mobile navigation */
-    right: 1rem;
-    z-index: 50;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    backdrop-filter: blur(8px);
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  /* Touch-friendly interactive elements */
+  .mobile-optimized button,
+  .mobile-optimized .button,
+  .mobile-optimized a[role="button"] {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    padding: 10px 16px !important;
+    font-size: 16px !important;
   }
 
-  .mobile-optimization-trigger:hover {
-    transform: scale(1.05);
-    transition: transform 0.2s ease;
+  /* Form optimizations */
+  .mobile-optimized input,
+  .mobile-optimized textarea,
+  .mobile-optimized select {
+    min-height: 44px !important;
+    font-size: 16px !important;
+    padding: 10px 12px !important;
   }
+
+  /* Card spacing */
+  .mobile-optimized .stat-card,
+  .mobile-optimized .admin-glass-card,
+  .mobile-optimized .clay-card {
+    margin: 0.5rem 0 !important;
+    padding: 1rem !important;
+  }
+
+  /* Grid responsiveness */
+  .mobile-optimized .grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Table responsiveness */
+  .mobile-optimized .table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Text sizing */
+  .mobile-optimized h1 { font-size: 1.5rem !important; }
+  .mobile-optimized h2 { font-size: 1.25rem !important; }
+  .mobile-optimized h3 { font-size: 1.125rem !important; }
 }
 
   /* Mobile Dialog - Full screen approach with scrolling */
