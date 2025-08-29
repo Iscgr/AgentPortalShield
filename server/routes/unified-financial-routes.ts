@@ -353,7 +353,7 @@ router.get('/total-debt', requireAuth, async (req, res) => {
    * ✅ PHASE 9C2.4: Fallback individual calculation method
    * Used when optimization flag is disabled
    */
-  private async calculateAllRepresentativesIndividual(): Promise<any[]> {
+  async calculateAllRepresentativesIndividual(): Promise<any[]> {
     const startTime = performance.now();
     console.log('🔄 PHASE 9C2.4: Individual calculation fallback initiated');
 

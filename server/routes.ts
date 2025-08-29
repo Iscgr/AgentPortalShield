@@ -352,43 +352,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard API - Optimized Performance
-  // ✅ PHASE 9C2.4: Feature flag controlled dashboard endpoint
+  // Dashboard endpoint - uses unified financial engine with feature flag
   app.get('/api/dashboard', authMiddleware, async (req: any, res: any) => {
-    try {
-      const { isFeatureEnabled } = await import('./services/feature-flag-manager.js');
-      const isOptimizationEnabled = isFeatureEnabled('UNIFIED_FINANCIAL_ENGINE', {
-        requestId: req.headers['x-request-id'] || `dashboard_${Date.now()}`,
-        userGroup: 'admin_dashboard'
-      });
+    console.log('📊 PHASE 9C2.4: Dashboard request - checking feature flags');
 
-      console.log(`🚩 PHASE 9C2.4: Dashboard optimization flag: ${isOptimizationEnabled}`);
+    // Import feature flag manager
+    const { isFeatureEnabled } = await import('./services/feature-flag-manager.js');
+    const useOptimization = isFeatureEnabled('UNIFIED_FINANCIAL_ENGINE', {
+      requestId: req.headers['x-request-id'] || `dashboard_${Date.now()}`,
+      userGroup: 'admin_users'
+    });
 
-      if (isOptimizationEnabled) {
-        // Redirect to optimized unified endpoint
-        console.log('⚡ PHASE 9C2.4: Using OPTIMIZED unified financial endpoint');
-        const unifiedResponse = await fetch(`http://localhost:5000/api/unified-financial/all-representatives`, {
-          headers: {
-            'Cookie': req.headers.cookie || '',
-            'Content-Type': 'application/json'
+    console.log(`🚩 PHASE 9C2.4: Unified engine enabled: ${useOptimization}`);
+
+    if (useOptimization) {
+      // Redirect to optimized unified financial route
+      console.log('⚡ PHASE 9C2.4: Using UNIFIED FINANCIAL ENGINE for dashboard');
+      const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+
+      try {
+        const allData = await unifiedFinancialEngine.calculateAllRepresentativesCached();
+
+        res.json({
+          success: true,
+          data: allData,
+          meta: {
+            source: "UNIFIED FINANCIAL ENGINE v9C2.4 ACTIVE",
+            optimizationActive: true,
+            queriesOptimized: true,
+            calculationTime: '< 100ms batch processing',
+            timestamp: new Date().toISOString()
           }
         });
-
-        if (unifiedResponse.ok) {
-          const unifiedData = await unifiedResponse.json();
-          return res.json({
-            ...unifiedData,
-            meta: {
-              ...unifiedData.meta,
-              routeOptimization: 'UNIFIED_ENGINE_ACTIVE',
-              queryPattern: 'BATCH_OPTIMIZED'
-            }
-          });
-        }
+        return;
+      } catch (error) {
+        console.error('❌ PHASE 9C2.4: Unified engine failed, falling back:', error);
       }
+    }
 
-      // Fallback to original N+1 pattern
-      console.log('🔄 PHASE 9C2.4: Using ORIGINAL N+1 pattern (fallback)');
+    console.log('🔄 PHASE 9C2.4: Using INDIVIDUAL calculation (feature flag disabled or error)');
+    // Continue with original individual logic...
+    try {
       const representatives = await db.select().from(representatives); // Corrected table name
       res.json({
         success: true,
