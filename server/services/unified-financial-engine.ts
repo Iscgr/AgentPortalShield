@@ -537,11 +537,11 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ SHERLOCK v33.0: Optimized bulk calculation with batch processing
+   * ✅ ATOMOS PHASE 7: Optimized bulk calculation with enhanced monitoring
    */
   async calculateAllRepresentatives(): Promise<RepresentativeFinancialData[]> {
     const startTime = performance.now();
-    console.log('🚀 ATOMOS-OPTIMIZED: Starting batch calculation...');
+    console.log('🚀 ATOMOS PHASE 7: Starting batch calculation with N+1 elimination...');
 
     // Single query for all representatives
     const representativesData = await db.select().from(representatives).orderBy(desc(representatives.createdAt));
@@ -588,7 +588,8 @@ export class UnifiedFinancialEngine {
       debtDataQuery
     ]);
 
-    console.log(`📊 ATOMOS-OPTIMIZED: Batch queries completed - Invoices: ${invoiceResults.length}, Payments: ${paymentResults.length}, Debts: ${debtResults.length}`);
+    console.log(`📊 ATOMOS PHASE 7: Batch queries completed - Invoices: ${invoiceResults.length}, Payments: ${paymentResults.length}, Debts: ${debtResults.length}`);
+    console.log(`🎯 ATOMOS PHASE 7: N+1 ELIMINATED - Using 3 batch queries instead of ${representativesData.length * 4 + 1} individual queries`);
 
     // Create lookup maps for O(1) access
     const invoiceMap = new Map(invoiceResults.map(inv => [inv.representativeId, inv]));
@@ -627,9 +628,10 @@ export class UnifiedFinancialEngine {
     const processingTime = Math.round(endTime - startTime);
     const queryReduction = Math.round((1 - 3 / (representativesData.length * 4 + 1)) * 100);
 
-    console.log(`✅ ATOMOS-OPTIMIZED: Batch calculation completed in ${processingTime}ms`);
-    console.log(`🎯 ATOMOS-OPTIMIZED: Query reduction: ${queryReduction}% (3 queries vs ${representativesData.length * 4 + 1} individual queries)`);
-    console.log(`📈 ATOMOS-OPTIMIZED: Performance improvement: ${Math.round(1391/processingTime*100)/100}x faster`);
+    console.log(`✅ ATOMOS PHASE 7: Batch calculation completed in ${processingTime}ms`);
+    console.log(`🎯 ATOMOS PHASE 7: Query reduction: ${queryReduction}% (3 queries vs ${representativesData.length * 4 + 1} individual queries)`);
+    console.log(`📈 ATOMOS PHASE 7: Performance improvement: ${Math.round(1391/processingTime*100)/100}x faster`);
+    console.log(`🚀 ATOMOS PHASE 7: N+1 PATTERN ELIMINATED SUCCESSFULLY`);
 
     return results;
   }

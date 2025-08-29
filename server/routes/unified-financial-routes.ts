@@ -214,29 +214,13 @@ router.get('/all-representatives', requireAuth, async (req, res) => {
   try {
     console.log('📊 ATOMOS-MONITOR: Dashboard request initiated');
 
-    // ✅ PHASE 9C2.4: Feature flag integration
-    const { isFeatureEnabled } = await import('../services/feature-flag-manager.js');
-    const isOptimizationEnabled = isFeatureEnabled('UNIFIED_FINANCIAL_ENGINE', {
-      requestId: req.headers['x-request-id'] || `req_${Date.now()}`,
-      userGroup: 'dashboard_users'
-    });
+    // ✅ ATOMOS PHASE 7: Force enable batch optimization
+    console.log('🚀 ATOMOS PHASE 7: Batch optimization FORCE ENABLED');
 
-    console.log(`🚩 PHASE 9C2.4: Optimization flag status: ${isOptimizationEnabled}`);
-
-    let allData;
-    let optimizationUsed = false;
-
-    if (isOptimizationEnabled) {
-      // Use optimized batch calculation
-      allData = await unifiedFinancialEngine.calculateAllRepresentativesCached();
-      optimizationUsed = true;
-      console.log('⚡ PHASE 9C2.4: Using BATCH OPTIMIZATION for dashboard');
-    } else {
-      // Fallback to individual calculation (current behavior)
-      allData = await calculateAllRepresentativesIndividual();
-      optimizationUsed = true;
-      console.log('🔄 PHASE 9C2.4: Using INDIVIDUAL CALCULATION (fallback)');
-    }
+    // Use optimized batch calculation directly
+    const allData = await unifiedFinancialEngine.calculateAllRepresentativesCached();
+    const optimizationUsed = true;
+    console.log('⚡ ATOMOS PHASE 7: Using BATCH OPTIMIZATION for dashboard');
 
     const requestEnd = performance.now();
     const totalTime = Math.round(requestEnd - requestStart);
