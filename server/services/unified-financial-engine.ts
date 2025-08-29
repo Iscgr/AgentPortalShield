@@ -269,10 +269,16 @@ export class UnifiedFinancialEngine {
     return result;
   }
 
-  // ✅ SHERLOCK v33.0: Enhanced batch processing with intelligent caching
+  /**
+   * ✅ SHERLOCK v33.0: Enhanced batch processing with intelligent caching
+   */
   private static batchCache = new Map<string, { data: any; timestamp: number }>();
   private static readonly BATCH_CACHE_TTL = 60 * 1000; // 1 minute for batch results
   private static batchSize = 20;
+
+  // ✅ ADMIN PANEL OPTIMIZATION: Debt query cache to reduce repeated queries
+  private static debtQueryCache = new Map<number, { debt: number; timestamp: number }>();
+  private static readonly DEBT_CACHE_TTL = 30 * 1000; // 30 seconds for debt queries
 
   static async calculateBatch(representativeIds: number[]): Promise<Map<number, any>> {
     const results = new Map();
@@ -688,6 +694,15 @@ export class UnifiedFinancialEngine {
     console.log(`🚀 SHERLOCK v23.0: Ultra-optimized debtor calculation for ${limit} records`);
     const startTime = Date.now();
 
+    // Check cache first for debt calculation
+    const cachedDebtors = UnifiedFinancialEngine.debtQueryCache.get(limit);
+    const now = Date.now();
+
+    if (cachedDebtors && UnifiedFinancialEngine.isCacheValid(`debt_limit_${limit}`, cachedDebtors.timestamp, UnifiedFinancialEngine.DEBT_CACHE_TTL)) {
+      console.log(`⚡ Cache hit for debtor list with limit ${limit}`);
+      return cachedDebtors.debt; // Debt here is the array of UnifiedFinancialData
+    }
+
     try {
       // OPTIMIZATION 1: Batch process in smaller chunks to reduce memory usage
       const BATCH_SIZE = Math.min(20, limit);
@@ -706,6 +721,8 @@ export class UnifiedFinancialEngine {
       console.log(`⚡ Pre-filtered to ${highDebtReps.length} candidates in ${Date.now() - startTime}ms`);
 
       if (highDebtReps.length === 0) {
+        // Cache empty result as well
+        UnifiedFinancialEngine.debtQueryCache.set(limit, { debt: [], timestamp: now });
         return [];
       }
 
@@ -717,7 +734,18 @@ export class UnifiedFinancialEngine {
 
         const batchPromises = batch.map(async (rep) => {
           try {
+            // Use cached representative calculation if available and valid
+            const cachedRepData = UnifiedFinancialEngine.queryCache.get(`rep_calc_${rep.id}`);
+            if (cachedRepData && UnifiedFinancialEngine.isCacheValid(`rep_calc_${rep.id}`, cachedRepData.timestamp, UnifiedFinancialEngine.QUERY_CACHE_TTL)) {
+              return cachedRepData.data;
+            }
+
+            // If not cached or invalid, calculate and cache
             const data = await this.calculateRepresentative(rep.id);
+            UnifiedFinancialEngine.queryCache.set(`rep_calc_${rep.id}`, {
+              data: data,
+              timestamp: Date.now()
+            });
             return data.actualDebt > 0 ? data : null;
           } catch (error) {
             console.warn(`Batch calculation failed for rep ${rep.id}:`, error);
@@ -741,12 +769,17 @@ export class UnifiedFinancialEngine {
         .sort((a, b) => b.actualDebt - a.actualDebt)
         .slice(0, limit);
 
+      // Cache the final result
+      UnifiedFinancialEngine.debtQueryCache.set(limit, { debt: sortedDebtors, timestamp: now });
+
       console.log(`✅ SHERLOCK v23.0: Generated ${sortedDebtors.length} debtors in ${Date.now() - startTime}ms`);
 
       return sortedDebtors;
 
     } catch (error) {
       console.error(`❌ SHERLOCK v23.0: Error in debtor calculation:`, error);
+      // Cache the error state or an empty array to prevent repeated failures
+      UnifiedFinancialEngine.debtQueryCache.set(limit, { debt: [], timestamp: now });
       return [];
     }
   }
