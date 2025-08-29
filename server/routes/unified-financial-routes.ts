@@ -1,6 +1,6 @@
 /**
  * SHERLOCK v18.2 UNIFIED FINANCIAL ROUTES
- * 
+ *
  * تنها سیستم routing مالی - جایگزین تمام endpoints موازی
  */
 
@@ -14,6 +14,8 @@ import { invoices } from '../../shared/schema.js'; // Assuming invoices schema i
 import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
 import { storage } from '../storage.js';
 import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
+import { performance } from 'perf_hooks'; // Import performance for timing
+import { isFeatureEnabled } from '../utils/featureFlags.js'; // Assuming feature flag utility exists
 
 const router = Router();
 
@@ -135,12 +137,12 @@ router.get('/debtors', requireAuth, async (req, res) => {
 
           if (financialData.actualDebt > 1000) {
             // ✅ Calculate overdue indicators
-            const isOverdue = financialData.debtLevel === 'HIGH' || 
+            const isOverdue = financialData.debtLevel === 'HIGH' ||
                             financialData.debtLevel === 'CRITICAL' ||
                             financialData.actualDebt > 3000000 ||
                             financialData.paymentRatio < 0.5;
 
-            const daysSinceLastActivity = financialData.lastActivity 
+            const daysSinceLastActivity = financialData.lastActivity
               ? Math.floor((Date.now() - new Date(financialData.lastActivity).getTime()) / (1000 * 60 * 60 * 24))
               : null;
 
@@ -579,7 +581,7 @@ router.get('/session-health', requireAuth, (req, res) => {
         req.session.cookie.secure = false; // Allow HTTP for development
       }
 
-      // ✅ SHERLOCK v25.1: Update last activity with safe property access  
+      // ✅ SHERLOCK v25.1: Update last activity with safe property access
       const now = new Date().toISOString();
       if (req.session.user) {
         (req.session.user as any).lastActivity = now;
@@ -693,7 +695,7 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
 
     // Enhanced validation for invoice edits
     if (reason === "invoice_edit" && !validationPassed) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Validation required for invoice edits',
         code: 'VALIDATION_REQUIRED'
       });
@@ -752,10 +754,10 @@ router.post("/representative/:code/sync", requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Enhanced financial sync error:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'خطا در همگام‌سازی مالی پیشرفته',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -801,9 +803,9 @@ router.post('/notify-ui-update', requireAuth, async (req, res) => {
 
   } catch (error) {
     console.error('❌ UI notification error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'خطا در ارسال اعلان بروزرسانی UI' 
+    res.status(500).json({
+      success: false,
+      error: 'خطا در ارسال اعلان بروزرسانی UI'
     });
   }
 });
@@ -847,7 +849,7 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
         success: false,
         error: "شناسه نمایندگان ارسال نشده است",
         details: "representativeIds field is required",
-        debug: { 
+        debug: {
           receivedKeys: Object.keys(req.body),
           expectedFormats: ['[1,2,3]', '{"representativeIds": [1,2,3]}']
         }
@@ -860,7 +862,7 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
         success: false,
         error: "فرمت شناسه نمایندگان نامعتبر است",
         details: "representativeIds must be an array",
-        debug: { 
+        debug: {
           receivedType: typeof representativeIds,
           receivedValue: representativeIds
         }
@@ -891,7 +893,7 @@ router.post('/batch-calculate', requireAuth, async (req, res) => {
 
         const result = await Promise.race([
           unifiedFinancialEngine.calculateRepresentative(numericId),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Calculation timeout')), 10000)
           )
         ]);
@@ -1051,8 +1053,8 @@ router.post('/validate-system-integrity', requireAuth, async (req, res) => {
         details: {
           queryDuration: perfTestDuration,
           performanceThreshold: 2000,
-          performanceRating: perfTestDuration < 500 ? "EXCELLENT" : 
-                            perfTestDuration < 1000 ? "GOOD" : 
+          performanceRating: perfTestDuration < 500 ? "EXCELLENT" :
+                            perfTestDuration < 1000 ? "GOOD" :
                             perfTestDuration < 2000 ? "ACCEPTABLE" : "SLOW"
         }
       });
@@ -1208,8 +1210,8 @@ router.get('/atomic-validation', requireAuth, async (req, res) => {
     res.json({
       success: true,
       validation: validationResults,
-      recommendation: validationResults.systemHealth === "EXCELLENT" ? 
-        "سیستم آماده تولید است" : 
+      recommendation: validationResults.systemHealth === "EXCELLENT" ?
+        "سیستم آماده تولید است" :
         "نیاز به بررسی و اصلاح مشکلات شناسایی شده"
     });
 
@@ -1243,8 +1245,8 @@ router.post('/validate-consistency', requireAuth, async (req, res) => {
     res.json({
       success: true,
       validation: validationResult,
-      recommendation: validationResult.isValid ? 
-        "✅ سیستم مالی ثبات کامل دارد" : 
+      recommendation: validationResult.isValid ?
+        "✅ سیستم مالی ثبات کامل دارد" :
         `⚠️ ${validationResult.summary.inconsistentCount} ناسازگاری یافت شد و اصلاح شد`,
       nextValidation: new Date(Date.now() + (6 * 60 * 60 * 1000)).toISOString() // 6 hours
     });
@@ -1277,7 +1279,7 @@ router.post('/perform-system-correction', requireAuth, async (req, res) => {
       corrections: correctionResult.corrections,
       errors: correctionResult.errors,
       duration: correctionResult.duration,
-      message: correctionResult.success ? 
+      message: correctionResult.success ?
         `✅ سیستم اصلاح شد - ${correctionResult.corrections} اصلاحیه اعمال شد` :
         "⚠️ هیچ اصلاحیه‌ای لازم نبود یا خطا رخ داد",
       timestamp: new Date().toISOString()
@@ -1475,8 +1477,8 @@ router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) =>
         calculatedAmount,
         difference,
         isConsistent,
-        message: isConsistent 
-          ? "✅ مبلغ فاکتور با جزئیات مطابقت دارد" 
+        message: isConsistent
+          ? "✅ مبلغ فاکتور با جزئیات مطابقت دارد"
           : `⚠️ عدم تطابق ${difference.toLocaleString()} تومان`
       },
       timestamp: new Date().toISOString()
@@ -1504,12 +1506,12 @@ router.get('/health', requireAuth, async (req, res) => {
     const globalSummary = await engine.calculateGlobalSummary();
 
     // ✅ SHERLOCK v28.0: Extract accurate values from standardized endpoint
-    const accurateOverdueAmount = overdueAnalysis.success ? 
-      overdueAnalysis.data.totals.totalOverdueAmount : 
+    const accurateOverdueAmount = overdueAnalysis.success ?
+      overdueAnalysis.data.totals.totalOverdueAmount :
       globalSummary.totalOverdueAmount;
 
-    const totalUnpaidAmount = overdueAnalysis.success ? 
-      overdueAnalysis.data.totals.totalUnpaidAmount : 
+    const totalUnpaidAmount = overdueAnalysis.success ?
+      overdueAnalysis.data.totals.totalUnpaidAmount :
       globalSummary.totalUnpaidAmount;
 
     console.log(`🎯 SHERLOCK v28.0: CORRECTED overdue calculation: ${accurateOverdueAmount.toLocaleString()} تومان`);

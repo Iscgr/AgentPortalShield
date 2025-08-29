@@ -44,6 +44,7 @@ import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
 import { registerMaintenanceRoutes } from "./routes/maintenance-routes";
 // Import integration health routes for Phase 9
 import { registerIntegrationHealthRoutes } from "./routes/integration-health-routes";
+import featureFlagRoutes from './routes/feature-flag-routes.js';
 
 // Import unified statistics routes registration
 import { registerUnifiedStatisticsRoutes } from "./routes/unified-statistics-routes.js";
@@ -162,6 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register integration health routes for Phase 9
   registerIntegrationHealthRoutes(app);
+  app.use('/api/feature-flags', featureFlagRoutes);
 
   // SHERLOCK v18.4: سیستم مالی یکپارچه واحد - تنها سیستم مالی فعال
   // Previously imported and used directly:
