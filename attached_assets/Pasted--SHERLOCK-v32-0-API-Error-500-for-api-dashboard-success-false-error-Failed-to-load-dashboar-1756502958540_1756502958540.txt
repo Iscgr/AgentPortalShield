@@ -1,0 +1,25 @@
+
+SHERLOCK v32.0: API Error 500 for /api/dashboard: {"success":false,"error":"Failed to load dashboard"}
+SHERLOCK v32.0: API Request failed for /api/dashboard: 
+Error {}
+
+SHERLOCK v32.0: Fetching URL: /api/dashboard
+SHERLOCK v32.0 DEBUG: Response status for /api/dashboard: 500
+SHERLOCK v32.0: API Error 500 for /api/dashboard: {"success":false,"error":"Failed to load dashboard"}
+t@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630
+value@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766
+8988/value/this.asyncTimer<@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+SHERLOCK v32.0: API Request failed for /api/dashboard: 
+Error {}
+
+t@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630
+value@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766
+8988/value/this.asyncTimer<@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+SHERLOCK v32.0: Fetching URL: /api/dashboard
+SHERLOCK v32.0 DEBUG: Response status for /api/dashboard: 500
+SHERLOCK v32.0: API Error 500 for /api/dashboard: {"success":false,"error":"Failed to load dashboard"}
+t@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630
+value@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766
+8988/value/this.asyncTimer<@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+SHERLOCK v32.0: API Request failed for /api/dashboard: 
+Error {}
