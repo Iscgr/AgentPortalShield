@@ -544,15 +544,15 @@ export class UnifiedFinancialEngine {
     console.log('🚀 ATOMOS-OPTIMIZED: Starting batch calculation...');
 
     // Single query for all representatives
-    const representatives = await db.select().from(representatives).orderBy(desc(representatives.createdAt));
+    const representativesData = await db.select().from(representatives).orderBy(desc(representatives.createdAt));
 
-    if (representatives.length === 0) {
+    if (representativesData.length === 0) {
       console.log('✅ ATOMOS-OPTIMIZED: No representatives found, returning empty array');
       return [];
     }
 
-    const repIds = representatives.map(rep => rep.id);
-    console.log(`🔍 ATOMOS-OPTIMIZED: Processing ${representatives.length} representatives with batch queries...`);
+    const repIds = representativesData.map(rep => rep.id);
+    console.log(`🔍 ATOMOS-OPTIMIZED: Processing ${representativesData.length} representatives with batch queries...`);
 
     // Batch query 1: All invoice data in single query with GROUP BY
     const invoiceDataQuery = db.select({
@@ -596,7 +596,7 @@ export class UnifiedFinancialEngine {
     const debtMap = new Map(debtResults.map(debt => [debt.id, debt]));
 
     // Process all representatives in memory (no additional DB calls)
-    const results: RepresentativeFinancialData[] = representatives.map(rep => {
+    const results: RepresentativeFinancialData[] = representativesData.map(rep => {
       const invoiceData = invoiceMap.get(rep.id);
       const paymentData = paymentMap.get(rep.id);
       const debtData = debtMap.get(rep.id);
@@ -625,10 +625,10 @@ export class UnifiedFinancialEngine {
 
     const endTime = performance.now();
     const processingTime = Math.round(endTime - startTime);
-    const queryReduction = Math.round((1 - 3 / (representatives.length * 4 + 1)) * 100);
+    const queryReduction = Math.round((1 - 3 / (representativesData.length * 4 + 1)) * 100);
 
     console.log(`✅ ATOMOS-OPTIMIZED: Batch calculation completed in ${processingTime}ms`);
-    console.log(`🎯 ATOMOS-OPTIMIZED: Query reduction: ${queryReduction}% (3 queries vs ${representatives.length * 4 + 1} individual queries)`);
+    console.log(`🎯 ATOMOS-OPTIMIZED: Query reduction: ${queryReduction}% (3 queries vs ${representativesData.length * 4 + 1} individual queries)`);
     console.log(`📈 ATOMOS-OPTIMIZED: Performance improvement: ${Math.round(1391/processingTime*100)/100}x faster`);
 
     return results;
