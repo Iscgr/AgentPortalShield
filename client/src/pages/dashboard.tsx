@@ -329,7 +329,40 @@ export default function Dashboard() {
     queryFn: () => apiRequest("/api/dashboard"),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
-    select: (data: any) => data?.value || data
+    select: (data: any) => {
+      console.log('🔍 SHERLOCK v32.2: Raw API response structure:', data);
+      
+      // Extract from the correct API response structure
+      const summary = data?.data?.summary || data?.summary || data?.value || data;
+      const representatives = data?.data?.representatives || {};
+      const invoices = data?.data?.invoices || {};
+      
+      console.log('🔍 SHERLOCK v32.2: Extracted summary:', summary);
+      
+      return {
+        totalRevenue: parseFloat(summary?.totalSystemPaid || '0'),
+        totalDebt: parseFloat(summary?.totalSystemDebt || summary?.totalDebt || '0'),
+        totalCredit: parseFloat(summary?.totalCredit || '0'),
+        totalOutstanding: parseFloat(summary?.totalOutstanding || '0'),
+        totalRepresentatives: parseInt(summary?.totalRepresentatives || representatives?.total || '0'),
+        activeRepresentatives: parseInt(summary?.activeRepresentatives || representatives?.active || '0'),
+        inactiveRepresentatives: parseInt(summary?.inactiveRepresentatives || representatives?.inactive || '0'),
+        riskRepresentatives: parseInt(summary?.riskRepresentatives || '0'),
+        totalInvoices: parseInt(summary?.totalInvoices || invoices?.total || '0'),
+        paidInvoices: parseInt(summary?.paidInvoices || invoices?.paid || '0'),
+        unpaidInvoices: parseInt(summary?.unpaidInvoices || invoices?.unpaid || '0'),
+        overdueInvoices: parseInt(summary?.overdueInvoices || invoices?.overdue || '0'),
+        unsentTelegramInvoices: parseInt(summary?.unsentTelegramInvoices || '0'),
+        totalSalesPartners: parseInt(summary?.totalSalesPartners || '0'),
+        activeSalesPartners: parseInt(summary?.activeSalesPartners || '0'),
+        systemIntegrityScore: parseInt(summary?.systemIntegrityScore || '0'),
+        lastReconciliationDate: summary?.lastReconciliationDate || '',
+        problematicRepresentativesCount: parseInt(summary?.problematicRepresentativesCount || '0'),
+        responseTime: summary?.responseTime || 0,
+        cacheStatus: summary?.cacheStatus || 'UNKNOWN',
+        lastUpdated: summary?.lastUpdated || new Date().toISOString()
+      };
+    }
   });
 
   const { data: telegramConfig } = useQuery({
@@ -365,6 +398,14 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // Debug: Log processed dashboard data
+  console.log('🔍 SHERLOCK v32.2: Final dashboard data:', {
+    totalRevenue: dashboardData.totalRevenue,
+    totalDebt: dashboardData.totalDebt,
+    activeRepresentatives: dashboardData.activeRepresentatives,
+    totalRepresentatives: dashboardData.totalRepresentatives
+  });
 
   return (
     <div className="space-y-6">
