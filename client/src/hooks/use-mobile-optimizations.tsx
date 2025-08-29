@@ -143,6 +143,5 @@ export function useMobileOptimizations() {
   return {
     isMobile,
     touchOptimized: isMobile
-  }; 0
   };
 }
