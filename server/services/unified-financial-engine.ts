@@ -269,8 +269,9 @@ export class UnifiedFinancialEngine {
     return result;
   }
 
-  // SHERLOCK v32.2: Batch processing optimization
-  private static batchCache = new Map<number, any>();
+  // ✅ SHERLOCK v33.0: Enhanced batch processing with intelligent caching
+  private static batchCache = new Map<string, { data: any; timestamp: number }>();
+  private static readonly BATCH_CACHE_TTL = 60 * 1000; // 1 minute for batch results
   private static batchSize = 20;
 
   static async calculateBatch(representativeIds: number[]): Promise<Map<number, any>> {
@@ -289,6 +290,32 @@ export class UnifiedFinancialEngine {
     }
 
     return results;
+  }
+
+  /**
+   * ✅ SHERLOCK v33.0: Smart cache for all representatives calculation
+   */
+  async calculateAllRepresentativesCached(): Promise<UnifiedFinancialData[]> {
+    const cacheKey = 'all_representatives_optimized';
+    const cached = UnifiedFinancialEngine.batchCache.get(cacheKey);
+    const now = Date.now();
+
+    // Check cache validity
+    if (cached && UnifiedFinancialEngine.isCacheValid(cacheKey, cached.timestamp, UnifiedFinancialEngine.BATCH_CACHE_TTL)) {
+      console.log('⚡ SHERLOCK v33.0: Cache hit for all representatives calculation');
+      return cached.data;
+    }
+
+    // Calculate fresh data
+    const freshData = await this.calculateAllRepresentatives();
+
+    // Cache the result
+    UnifiedFinancialEngine.batchCache.set(cacheKey, {
+      data: freshData,
+      timestamp: now
+    });
+
+    return freshData;
   }
 
   /**
@@ -479,16 +506,98 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * Bulk calculation for all representatives
+   * ✅ SHERLOCK v33.0: Optimized bulk calculation with batch processing
    */
   async calculateAllRepresentatives(): Promise<UnifiedFinancialData[]> {
+    console.log("🚀 SHERLOCK v33.0: Starting optimized batch calculation...");
+    const startTime = Date.now();
+
+    // OPTIMIZATION 1: Single query for all representative data
     const allReps = await db.select({
-      id: representatives.id
+      id: representatives.id,
+      name: representatives.name,
+      code: representatives.code
     }).from(representatives).where(eq(representatives.isActive, true));
 
-    const results = await Promise.all(
-      allReps.map(rep => this.calculateRepresentative(rep.id))
-    );
+    if (allReps.length === 0) {
+      return [];
+    }
+
+    const repIds = allReps.map(rep => rep.id);
+
+    // OPTIMIZATION 2: Batch queries for all financial data
+    const [invoiceData, paymentData] = await Promise.all([
+      // Single query for all invoice totals
+      db.select({
+        representativeId: invoices.representativeId,
+        count: sql<number>`COUNT(*)`,
+        totalSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
+        lastDate: sql<string>`MAX(created_at)`
+      }).from(invoices)
+      .where(sql`${invoices.representativeId} = ANY(${repIds})`)
+      .groupBy(invoices.representativeId),
+
+      // Single query for all payment totals
+      db.select({
+        representativeId: payments.representativeId,
+        count: sql<number>`COUNT(*)`,
+        totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+        lastDate: sql<string>`MAX(payment_date)`
+      }).from(payments)
+      .where(sql`${payments.representativeId} = ANY(${repIds})`)
+      .groupBy(payments.representativeId)
+    ]);
+
+    // OPTIMIZATION 3: Create lookup maps for O(1) access
+    const invoiceMap = new Map(invoiceData.map(inv => [inv.representativeId, inv]));
+    const paymentMap = new Map(paymentData.map(pay => [pay.representativeId, pay]));
+
+    // OPTIMIZATION 4: Process results in memory (no additional DB calls)
+    const results = allReps.map(rep => {
+      const invoice = invoiceMap.get(rep.id) || { count: 0, totalSales: 0, lastDate: null };
+      const payment = paymentMap.get(rep.id) || { count: 0, totalPaid: 0, lastDate: null };
+
+      // Standard financial calculations
+      const totalSales = invoice.totalSales;
+      const totalPaid = payment.totalPaid;
+      const actualDebt = Math.max(0, totalSales - totalPaid);
+      const totalUnpaid = actualDebt;
+
+      // Performance metrics
+      const paymentRatio = totalSales > 0 ? (totalPaid / totalSales) * 100 : 0;
+
+      // Debt level classification
+      let debtLevel: 'HEALTHY' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+      if (actualDebt === 0) debtLevel = 'HEALTHY';
+      else if (actualDebt <= 100000) debtLevel = 'MODERATE';
+      else if (actualDebt <= 500000) debtLevel = 'HIGH';
+      else debtLevel = 'CRITICAL';
+
+      return {
+        representativeId: rep.id,
+        representativeName: rep.name,
+        representativeCode: rep.code,
+
+        // Financial data
+        totalSales,
+        totalPaid,
+        totalUnpaid,
+        actualDebt,
+
+        paymentRatio: Math.round(paymentRatio * 100) / 100,
+        debtLevel,
+
+        invoiceCount: invoice.count,
+        paymentCount: payment.count,
+        lastTransactionDate: invoice.lastDate || payment.lastDate || null,
+
+        calculationTimestamp: new Date().toISOString(),
+        accuracyGuaranteed: true
+      };
+    });
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ SHERLOCK v33.0: Batch calculation complete - ${results.length} representatives in ${duration}ms (${Math.round(duration/results.length)}ms avg)`);
 
     return results;
   }
