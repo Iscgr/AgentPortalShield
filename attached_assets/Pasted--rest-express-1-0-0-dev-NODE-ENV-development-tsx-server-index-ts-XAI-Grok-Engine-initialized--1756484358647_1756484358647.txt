@@ -1,0 +1,28 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+✅ XAI Grok Engine initialized successfully
+✅ PHASE 9: Integration health routes registered
+4:12:03 PM [express] Checking database connection...
+4:12:04 PM [database] Database connection successful
+Query: select "id", "username", "password_hash", "role", "permissions", "is_active", "last_login_at", "created_at" from "admin_users" where "admin_users"."username" = $1 limit $2 -- params: ["mgr", 1]
+Query: update "admin_users" set "password_hash" = $1, "role" = $2, "is_active" = $3 where "admin_users"."username" = $4 -- params: ["$2b$12$OFYZeSy1mMJw62SvFj0/QOldS2hqkYS.9PLod6UvWHkQmLtzDPAFy", "SUPER_ADMIN", true, "mgr"]
+🔄 Admin user 'mgr' password reset successfully
+Query: select "id", "username", "password_hash", "full_name", "email", "role", "permissions", "is_active", "last_login_at", "created_at", "updated_at" from "crm_users" where "crm_users"."username" = $1 limit $2 -- params: ["crm", 1]
+Query: update "crm_users" set "password_hash" = $1, "role" = $2, "is_active" = $3 where "crm_users"."username" = $4 -- params: ["$2b$12$p5rAXbC6iRfcpdSYFp6hqOPwXBZLIFS1FAsedI8X2mLKpo2jmCvOG", "CRM_MANAGER", true, "crm"]
+🔄 CRM user 'crm' password reset successfully
+✅ XAI Grok Engine initialized successfully
+✅ Settings routes registered successfully
+✅ Standardized Invoice Routes Registered
+✅ Maintenance routes registered successfully
+✅ Integration health routes registered for Phase 9
+✅ Batch Rollback Routes Registered
+4:12:05 PM [error] Uncaught Exception: listen EADDRINUSE: address already in use 0.0.0.0:5000
+Error: listen EADDRINUSE: address already in use 0.0.0.0:5000
+    at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+    at listenInCluster (node:net:1965:12)
+    at doListen (node:net:2139:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
+Memory usage: { rss: 200.39, heapTotal: 66.84, heapUsed: 64.68, external: 4.83 }
+Memory usage: { rss: 200.39, heapTotal: 66.84, heapUsed: 64.7, external: 4.83 }
