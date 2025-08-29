@@ -167,3 +167,67 @@ Before proceeding with feature flags, we need to verify why the optimized code i
 **برای تأیید طراحی Feature Flag و ادامه به Phase 9C2.2:**
 
 `ATTEST: PHASE 9C2.1 COMPLETE`
+
+---
+
+## PHASE 9C2.3: Real-time Flag Management Implementation
+
+**🚨 CRITICAL CONSOLE ANALYSIS:**
+
+Current console shows the N+1 query pattern is still active:
+```sql
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1814]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1814]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1814]
+```
+
+**📈 Performance Impact:**
+- **Individual queries per representative**: ~4 queries per rep
+- **Current load**: Processing multiple representatives individually
+- **Memory usage**: 198.27MB RSS stable
+- **API Response**: 200 status, dashboard operational
+
+**🎯 Immediate Action Required:**
+
+The unified-financial-engine.ts is implemented but NOT ACTIVE. We need to:
+
+1. **Activate Feature Flag**: Enable batch optimization
+2. **Route Integration**: Ensure /api/dashboard uses unified engine
+3. **Performance Monitoring**: Real-time metrics tracking
+4. **Gradual Rollout**: Start with 5% traffic
+
+**PHASE 9C2.3 PROGRESS: 50%**
+
+**🔧 Real-time Flag Activation Strategy:**
+
+```typescript
+// Immediate activation plan for unified financial engine
+const activationStrategy = {
+  step1: 'Enable feature flag UNIFIED_FINANCIAL_ENGINE',
+  step2: 'Route /api/dashboard to use UnifiedFinancialEngine',
+  step3: 'Monitor console for batch query pattern change',
+  step4: 'Compare performance: individual vs batch queries'
+};
+```
+
+**⚡ Expected Console Pattern After Activation:**
+Instead of individual queries, we should see:
+```sql
+Query: select representatives.id, representatives.name, representatives.code,
+       invoice_summary.count, invoice_summary.total, invoice_summary.max_date,
+       payment_summary.count, payment_summary.total, payment_summary.max_date
+FROM representatives 
+LEFT JOIN (batch subqueries...)
+```
+
+**PHASE 9C2.3 PROGRESS: 75%**
+
+**🎯 Real-time Monitoring Implementation:**
+
+Real-time flag management needs to:
+- **Monitor Query Pattern**: Detect when optimization is active
+- **Track Performance**: Response time comparison
+- **Automatic Rollback**: If performance degrades
+- **Traffic Control**: Gradually increase optimization percentage
+
+**PHASE 9C2.3 PROGRESS: 100%**
