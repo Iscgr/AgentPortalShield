@@ -372,7 +372,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         <StatCard
           title="کل درآمدها"
-          value={formatCurrency(dashboardData.totalRevenue)}
+          value={formatCurrency(dashboardData.totalRevenue || 0)}
           subtitle="مبلغ پرداخت شده - تومان"
           icon={TrendingUp}
           colorClass="text-green-600"
@@ -381,7 +381,7 @@ export default function Dashboard() {
 
         <StatCard
           title="مطالبات معوق"
-          value={formatCurrency(dashboardData.totalDebt)}
+          value={formatCurrency(dashboardData.totalDebt || 0)}
           subtitle="مانده بدهی - تومان"
           icon={AlertTriangle}
           colorClass="text-red-600"
@@ -390,7 +390,7 @@ export default function Dashboard() {
 
         <StatCard
           title="نمایندگان فعال"
-          value={toPersianDigits(dashboardData.activeRepresentatives.toString())}
+          value={toPersianDigits((dashboardData.activeRepresentatives || 0).toString())}
           subtitle="آخرین آپلود فایل ریزجزئیات"
           icon={Users}
           colorClass="text-blue-600"
@@ -399,7 +399,7 @@ export default function Dashboard() {
 
         <StatCard
           title="فاکتورهای ارسال نشده"
-          value={toPersianDigits((dashboardData.unsentTelegramInvoices || 0).toString())}
+          value={toPersianDigits(((dashboardData.unsentTelegramInvoices || 0)).toString())}
           subtitle="نیازمند ارسال به تلگرام"
           icon={FileText}
           colorClass="text-orange-600"
