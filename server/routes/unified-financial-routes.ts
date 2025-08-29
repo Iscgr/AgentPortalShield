@@ -208,13 +208,20 @@ router.get('/debtors', requireAuth, async (req, res) => {
  * جایگزین /api/representatives و سایر endpoints
  */
 router.get('/all-representatives', requireAuth, async (req, res) => {
+  const requestStart = performance.now();
   try {
-    const startTime = Date.now();
-    
+    console.log('📊 ATOMOS-MONITOR: Dashboard request initiated');
     // Use optimized cached calculation
     const allData = await unifiedFinancialEngine.calculateAllRepresentativesCached();
-    
-    const calculationTime = Date.now() - startTime;
+    const requestEnd = performance.now();
+    const totalTime = Math.round(requestEnd - requestStart);
+
+    console.log(`✅ ATOMOS-MONITOR: Dashboard completed in ${totalTime}ms`);
+
+    // Performance headers for monitoring
+    res.header('X-Performance-Time', totalTime.toString());
+    res.header('X-Query-Pattern', 'BATCH_OPTIMIZED');
+    res.header('X-Representative-Count', allData.length.toString());
 
     res.json({
       success: true,
@@ -222,14 +229,16 @@ router.get('/all-representatives', requireAuth, async (req, res) => {
       meta: {
         source: "UNIFIED FINANCIAL ENGINE v33.0 OPTIMIZED",
         count: allData.length,
-        calculationTime,
+        calculationTime: totalTime,
         optimizationApplied: true,
         queriesReduced: "95%",
         timestamp: new Date().toISOString()
       }
     });
   } catch (error) {
-    console.error('Error getting all representatives data:', error);
+    const requestEnd = performance.now();
+    const totalTime = Math.round(requestEnd - requestStart);
+    console.error(`❌ ATOMOS-MONITOR: Dashboard failed in ${totalTime}ms:`, error);
     res.status(500).json({
       success: false,
       error: "خطا در دریافت اطلاعات نمایندگان"
