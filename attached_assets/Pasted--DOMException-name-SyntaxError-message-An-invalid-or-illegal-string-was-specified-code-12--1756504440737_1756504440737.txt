@@ -1,0 +1,31 @@
+
+DOMException {name: "SyntaxError", message: "An invalid or illegal string was specified", code: 12, result: 2152923148, filename: "https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/dev…", …}
+
+🔓 SHERLOCK v26.0: Simplified auth check - bypassing validation
+✅ SHERLOCK v26.0: Auto-authenticated as admin user
+SHERLOCK v32.0: Fetching URL: /api/dashboard
+SHERLOCK v32.0 DEBUG: Response status for /api/dashboard: 200
+SHERLOCK v32.0: Successful API response for /api/dashboard
+can't access property "toString", dashboardData.activeRepresentatives is undefined
+can't access property "toString", dashboardData.activeRepresentatives is undefined
+The above error occurred in the <Dashboard> component:
+
+Dashboard@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/src/pages/dashboard.tsx:478:54
+Route@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=5a8d0596:323:13
+Switch@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=5a8d0596:379:14
+main
+div
+div
+AdminLayout@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/src/App.tsx?v=ehyjiy4gkhso2ESbIsuDU:306:21
+AuthenticatedRouter@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/src/App.tsx?v=ehyjiy4gkhso2ESbIsuDU:126:95
+div
+Router@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=5a8d0596:291:14
+UnifiedAuthProvider@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/src/contexts/unified-auth-context.tsx:23:36
+Provider@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PLT6GTVM.js?v=5a8d0596:38:47
+TooltipProvider@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=5a8d0596:66:7
+QueryClientProvider@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=5a8d0596:2804:27
+App@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/src/App.tsx?v=ehyjiy4gkhso2ESbIsuDU:345:24
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+can't access property "toString", dashboardData.activeRepresentatives is undefined
