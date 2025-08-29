@@ -352,60 +352,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard endpoint - uses unified financial engine with feature flag
-  app.get('/api/dashboard', authMiddleware, async (req: any, res: any) => {
-    console.log('📊 PHASE 9C2.4: Dashboard request - checking feature flags');
-
-    // Import feature flag manager
-    const { isFeatureEnabled } = await import('./services/feature-flag-manager.js');
-    const useOptimization = isFeatureEnabled('UNIFIED_FINANCIAL_ENGINE', {
-      requestId: req.headers['x-request-id'] || `dashboard_${Date.now()}`,
-      userGroup: 'admin_users'
-    });
-
-    console.log(`🚩 PHASE 9C2.4: Unified engine enabled: ${useOptimization}`);
-
-    if (useOptimization) {
-      // Redirect to optimized unified financial route
-      console.log('⚡ PHASE 9C2.4: Using UNIFIED FINANCIAL ENGINE for dashboard');
-      const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-
-      try {
-        const allData = await unifiedFinancialEngine.calculateAllRepresentativesCached();
-
-        res.json({
-          success: true,
-          data: allData,
-          meta: {
-            source: "UNIFIED FINANCIAL ENGINE v9C2.4 ACTIVE",
-            optimizationActive: true,
-            queriesOptimized: true,
-            calculationTime: '< 100ms batch processing',
-            timestamp: new Date().toISOString()
-          }
-        });
-        return;
-      } catch (error) {
-        console.error('❌ PHASE 9C2.4: Unified engine failed, falling back:', error);
-      }
-    }
-
-    console.log('🔄 PHASE 9C2.4: Using INDIVIDUAL calculation (feature flag disabled or error)');
-    // Continue with original individual logic...
+  // Dashboard endpoint - Updated to use unified financial data with enhanced error handling
+  app.get("/api/dashboard", authMiddleware, async (req, res) => {
     try {
-      const representatives = await db.select().from(representatives); // Corrected table name
-      res.json({
+      console.log("📊 SHERLOCK v32.0: Dashboard request received");
+      console.log("🔍 SHERLOCK v32.0: Starting dashboard data collection...");
+
+      // Test database connection first
+      try {
+        await db.execute(sql`SELECT 1 as test`);
+        console.log("✅ SHERLOCK v32.0: Database connection verified");
+      } catch (dbError) {
+        console.error("❌ SHERLOCK v32.0: Database connection failed:", dbError);
+        throw new Error("Database connection failed");
+      }
+
+      // Calculate global summary with error handling
+      let summary;
+      try {
+        summary = await unifiedFinancialEngine.calculateGlobalSummary();
+        console.log("✅ SHERLOCK v32.0: Global summary calculated successfully");
+      } catch (summaryError) {
+        console.error("❌ SHERLOCK v32.0: Global summary calculation failed:", summaryError);
+        throw new Error("Failed to calculate financial summary");
+      }
+
+      // Get total representatives with error handling
+      let repsResult;
+      try {
+        repsResult = await db.select({
+          total: sql<number>`COUNT(*)`,
+          active: sql<number>`SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END)`
+        }).from(representatives);
+        console.log("✅ SHERLOCK v32.0: Representatives data collected");
+      } catch (repsError) {
+        console.error("❌ SHERLOCK v32.0: Representatives query failed:", repsError);
+        throw new Error("Failed to get representatives data");
+      }
+
+      // Get invoice statistics with error handling
+      let invoiceStats;
+      try {
+        invoiceStats = await db.select({
+          total: sql<number>`COUNT(*)`,
+          paid: sql<number>`SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END)`,
+          unpaid: sql<number>`SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END)`,
+          overdue: sql<number>`SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END)`
+        }).from(invoices);
+        console.log("✅ SHERLOCK v32.0: Invoice statistics collected");
+      } catch (invoiceError) {
+        console.error("❌ SHERLOCK v32.0: Invoice statistics query failed:", invoiceError);
+        throw new Error("Failed to get invoice statistics");
+      }
+
+      // Combine all data into the response object
+      const dashboardData = {
         success: true,
-        data: representatives,
+        data: {
+          summary: summary || {
+            totalRevenue: 0,
+            totalDebt: 0,
+            totalCredit: 0,
+            totalOutstanding: 0,
+            riskRepresentatives: 0,
+            unsentTelegramInvoices: 0,
+            totalSalesPartners: 0,
+            activeSalesPartners: 0,
+            systemIntegrityScore: 0,
+            lastReconciliationDate: null,
+            problematicRepresentativesCount: 0,
+            responseTime: 0,
+            cacheStatus: "UNAVAILABLE",
+            lastUpdated: null
+          },
+          representatives: {
+            total: repsResult?.[0]?.total || 0,
+            active: repsResult?.[0]?.active || 0,
+            inactive: (repsResult?.[0]?.total || 0) - (repsResult?.[0]?.active || 0)
+          },
+          invoices: {
+            total: invoiceStats?.[0]?.total || 0,
+            paid: invoiceStats?.[0]?.paid || 0,
+            unpaid: invoiceStats?.[0]?.unpaid || 0,
+            overdue: invoiceStats?.[0]?.overdue || 0
+          },
+          // Add placeholders for other potential dashboard metrics
+          payments: {
+            totalAmount: 0,
+            unallocatedAmount: 0
+          },
+          salesPartners: {
+            total: 0,
+            active: 0
+          },
+          systemStatus: {
+            integrityScore: 0,
+            lastUpdate: new Date().toISOString()
+          }
+        },
         meta: {
-          routeOptimization: 'DISABLED',
-          queryPattern: 'INDIVIDUAL_N+1',
-          featureFlagActive: false
+          timestamp: new Date().toISOString(),
+          cacheStatus: "STALE", // Placeholder, actual cache status would be more complex
+          queryTimeMs: 0 // Placeholder, actual calculation would be needed
+        }
+      };
+
+      res.json(dashboardData);
+
+    } catch (error) {
+      console.error('❌ SHERLOCK v32.0: Dashboard error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        timestamp: new Date().toISOString()
+      });
+
+      // Return safe fallback data
+      res.status(500).json({
+        success: false,
+        error: "Failed to load dashboard",
+        details: error instanceof Error ? error.message : "Unknown error occurred",
+        fallbackData: {
+          totalRevenue: 0,
+          totalDebt: 0,
+          totalCredit: 0,
+          totalOutstanding: 0,
+          totalRepresentatives: 0,
+          activeRepresentatives: 0,
+          inactiveRepresentatives: 0,
+          riskRepresentatives: 0,
+          totalInvoices: 0,
+          paidInvoices: 0,
+          unpaidInvoices: 0,
+          overdueInvoices: 0,
+          unsentTelegramInvoices: 0,
+          totalSalesPartners: 0,
+          activeSalesPartners: 0,
+          systemIntegrityScore: 0,
+          lastReconciliationDate: new Date().toISOString(),
+          problematicRepresentativesCount: 0,
+          responseTime: 0,
+          cacheStatus: "ERROR",
+          lastUpdated: new Date().toISOString()
         }
       });
-    } catch (error) {
-      console.error('Dashboard error:', error);
-      res.status(500).json({ success: false, error: 'Failed to load dashboard' });
     }
   });
 

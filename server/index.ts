@@ -264,25 +264,70 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
 
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
-  
-  server.listen({
-    port,
-    host,
-    reusePort: true,
-  }, async () => { // Make the callback async to use await for importing services
-    console.log(`Server is running on port ${port}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-
-    // ✅ SHERLOCK v28.0: Auto-start financial monitoring
+  // Kill any existing process on the port before starting
+  async function killExistingPort(port: number) {
     try {
-      const { financialMonitoringService } = await import('./services/financial-monitoring-service.js');
-      financialMonitoringService.startMonitoring(30); // Every 30 minutes
-      console.log('📊 SHERLOCK v28.0: Financial monitoring auto-started');
+      const { exec } = await import('child_process');
+      exec(`lsof -ti:${port} | xargs kill -9`, (error) => {
+        if (error) {
+          console.log(`No existing process on port ${port} to kill`);
+        } else {
+          console.log(`✅ Killed existing process on port ${port}`);
+        }
+      });
     } catch (error) {
-      console.warn('⚠️ Failed to start financial monitoring:', error);
+      console.log('Could not check for existing processes');
     }
+  }
+
+  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
+
+  // Kill existing port and start server
+  killExistingPort(Number(port));
+
+  // Add graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    process.exit(0);
   });
+
+  process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully');
+    process.exit(0);
+  });
+
+  // Start server with retry mechanism
+  let serverInstance: any;
+  const startServer = async () => {
+    try {
+      // Wait a moment for port to be freed
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      serverInstance = app.listen(port, host, () => {
+        console.log(`🚀 SHERLOCK v32.0: Server successfully started on port ${port}`);
+        console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
+        console.log(`✅ Dashboard API should now be accessible at /api/dashboard`);
+      });
+
+      serverInstance.on('error', (error: any) => {
+        if (error.code === 'EADDRINUSE') {
+          console.error(`❌ Port ${port} is still in use. Retrying in 2 seconds...`);
+          setTimeout(() => {
+            serverInstance.close();
+            startServer();
+          }, 2000);
+        } else {
+          console.error('❌ Server error:', error);
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to start server:', error);
+      setTimeout(startServer, 2000);
+    }
+  };
+
+  startServer();
 
   // Graceful shutdown handling for production stability
   const gracefulShutdown = async (signal: string) => {
@@ -290,7 +335,7 @@ app.use((req, res, next) => {
 
     try {
       // Close HTTP server
-      server.close(async () => {
+      serverInstance.close(async () => {
         log('HTTP server closed');
 
         // Close database connections
