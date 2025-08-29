@@ -854,10 +854,10 @@ export const representativeSupportHistory = pgTable("representative_support_hist
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
-// Support Logs - Alias for DA VINCI v2.0 compatibility
+// Support Logs - Alias for DA VINCI v2.0 compatibility (PRIMARY)
 export const supportLogs = representativeSupportHistory;
 
-// Reminders - Alias for DA VINCI v2.0 compatibility
+// Reminders - Alias for DA VINCI v2.0 compatibility (PRIMARY)
 export const reminders = workspaceReminders;
 
 // Workspace Reminders (یادآورهای میز کار) - برای DA VINCI v2.0
@@ -902,11 +902,7 @@ export const representativeSupportLogs = pgTable("representative_support_logs", 
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
-// Support Logs - Alias for DA VINCI v2.0 compatibility
-export const supportLogs = representativeSupportLogs;
-
-// Reminders - Alias for DA VINCI v2.0 compatibility
-export const reminders = workspaceReminders;
+// Note: supportLogs and reminders aliases already defined above
 
 // AI Test Results (نتایج تست AI) - برای نمایش لاگ‌های تست
 export const aiTestResults = pgTable("ai_test_results", {
