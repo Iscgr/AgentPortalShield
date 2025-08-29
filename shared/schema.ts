@@ -88,6 +88,7 @@ export const telegramSendHistory = pgTable("telegram_send_history", {
 export const payments = pgTable('payments', {
   id: serial('id').primaryKey(),
   representativeId: integer('representative_id').references(() => representatives.id),
+  invoiceId: integer('invoice_id').references(() => invoices.id), // Missing field added
   amount: text('amount').notNull(),
   paymentDate: timestamp('payment_date').notNull(),
 
@@ -1152,55 +1153,55 @@ export const dataIntegrityConstraintsRelations = relations(dataIntegrityConstrai
   })
 }));
 
-// DA VINCI v2.0 Relations
-// export const taskReportsRelations = relations(taskReports, ({ one }) => ({
-//   task: one(workspaceTasks, {
-//     fields: [taskReports.taskId],
-//     references: [workspaceTasks.id]
-//   }),
-//   staff: one(supportStaff, {
-//     fields: [taskReports.staffId],
-//     references: [supportStaff.id]
-//   }),
-//   representative: one(representatives, {
-//     fields: [taskReports.representativeId],
-//     references: [representatives.id]
-//   })
-// }));
+// DA VINCI v2.0 Relations - Fixed and Uncommented
+export const taskReportsRelations = relations(taskReports, ({ one }) => ({
+  task: one(workspaceTasks, {
+    fields: [taskReports.taskId],
+    references: [workspaceTasks.id]
+  }),
+  staff: one(supportStaff, {
+    fields: [taskReports.staffId],
+    references: [supportStaff.id]
+  }),
+  representative: one(representatives, {
+    fields: [taskReports.representativeId],
+    references: [representatives.id]
+  })
+}));
 
-// export const supportLogsRelations = relations(supportLogs, ({ one }) => ({
-//   representative: one(representatives, {
-//     fields: [supportLogs.representativeId],
-//     references: [representatives.id]
-//   }),
-//   staff: one(supportStaff, {
-//     fields: [supportLogs.staffId],
-//     references: [supportStaff.id]
-//   }),
-//   task: one(workspaceTasks, {
-//     fields: [supportLogs.taskId],
-//     references: [workspaceTasks.id]
-//   }),
-//   report: one(taskReports, {
-//     fields: [supportLogs.reportId],
-//     references: [taskReports.id]
-//   })
-// }));
+export const representativeSupportHistoryRelations = relations(representativeSupportHistory, ({ one }) => ({
+  representative: one(representatives, {
+    fields: [representativeSupportHistory.representativeId],
+    references: [representatives.id]
+  }),
+  staff: one(supportStaff, {
+    fields: [representativeSupportHistory.staffId],
+    references: [supportStaff.id]
+  })
+}));
 
-// export const remindersRelations = relations(reminders, ({ one }) => ({
-//   staff: one(supportStaff, {
-//     fields: [reminders.staffId],
-//     references: [supportStaff.id]
-//   }),
-//   representative: one(representatives, {
-//     fields: [reminders.representativeId],
-//     references: [representatives.id]
-//   }),
-//   task: one(workspaceTasks, {
-//     fields: [reminders.taskId],
-//     references: [workspaceTasks.id]
-//   })
-// }));
+export const workspaceRemindersRelations = relations(workspaceReminders, ({ one }) => ({
+  staff: one(supportStaff, {
+    fields: [workspaceReminders.staffId],
+    references: [supportStaff.id]
+  }),
+  representative: one(representatives, {
+    fields: [workspaceReminders.representativeId],
+    references: [representatives.id]
+  })
+}));
+
+export const workspaceTasksRelations = relations(workspaceTasks, ({ one, many }) => ({
+  staff: one(supportStaff, {
+    fields: [workspaceTasks.staffId],
+    references: [supportStaff.id]
+  }),
+  representative: one(representatives, {
+    fields: [workspaceTasks.representativeId],
+    references: [representatives.id]
+  }),
+  reports: many(taskReports)
+}));
 
 // Insert Schemas
 export const insertRepresentativeSchema = createInsertSchema(representatives).omit({
