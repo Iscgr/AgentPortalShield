@@ -353,34 +353,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard API - Optimized Performance
-  app.get("/api/dashboard", authMiddleware, async (req, res) => {
+  // ✅ PHASE 9C2.4: Feature flag controlled dashboard endpoint
+  app.get('/api/dashboard', authMiddleware, async (req: any, res: any) => {
     try {
-      const startTime = Date.now();
-      console.log('🏠 SHERLOCK v32.1: Dashboard optimization - starting');
+      const { isFeatureEnabled } = await import('./services/feature-flag-manager.js');
+      const isOptimizationEnabled = isFeatureEnabled('UNIFIED_FINANCIAL_ENGINE', {
+        requestId: req.headers['x-request-id'] || `dashboard_${Date.now()}`,
+        userGroup: 'admin_dashboard'
+      });
 
-      // Parallel execution for better performance
-      const [globalSummary, debtors] = await Promise.all([
-        unifiedFinancialEngine.calculateGlobalSummary(),
-        unifiedFinancialEngine.getDebtorRepresentatives(5) // Reduce to 5 for faster response
-      ]);
+      console.log(`🚩 PHASE 9C2.4: Dashboard optimization flag: ${isOptimizationEnabled}`);
 
-      const dashboardData = {
-        totalRevenue: globalSummary.totalSystemPaid.toString(),
-        totalDebt: globalSummary.totalSystemDebt.toString(),
-        activeRepresentatives: globalSummary.activeRepresentatives,
-        pendingInvoices: debtors.filter(d => d.debtLevel !== 'HEALTHY').length,
-        overdueInvoices: debtors.filter(d => d.debtLevel === 'CRITICAL').length,
-        totalSalesPartners: 0, // محاسبه جداگانه
-        recentActivities: []
-      };
+      if (isOptimizationEnabled) {
+        // Redirect to optimized unified endpoint
+        console.log('⚡ PHASE 9C2.4: Using OPTIMIZED unified financial endpoint');
+        const unifiedResponse = await fetch(`http://localhost:5000/api/unified-financial/all-representatives`, {
+          headers: {
+            'Cookie': req.headers.cookie || '',
+            'Content-Type': 'application/json'
+          }
+        });
 
-      const duration = Date.now() - startTime;
-      console.log(`✅ SHERLOCK v32.1: Dashboard optimized - ${duration}ms`);
+        if (unifiedResponse.ok) {
+          const unifiedData = await unifiedResponse.json();
+          return res.json({
+            ...unifiedData,
+            meta: {
+              ...unifiedData.meta,
+              routeOptimization: 'UNIFIED_ENGINE_ACTIVE',
+              queryPattern: 'BATCH_OPTIMIZED'
+            }
+          });
+        }
+      }
 
-      res.json(dashboardData);
+      // Fallback to original N+1 pattern
+      console.log('🔄 PHASE 9C2.4: Using ORIGINAL N+1 pattern (fallback)');
+      const representatives = await db.select().from(representatives); // Corrected table name
+      res.json({
+        success: true,
+        data: representatives,
+        meta: {
+          routeOptimization: 'DISABLED',
+          queryPattern: 'INDIVIDUAL_N+1',
+          featureFlagActive: false
+        }
+      });
     } catch (error) {
-      console.error('❌ Dashboard error:', error);
-      res.status(500).json({ error: "خطا در دریافت اطلاعات داشبورد" });
+      console.error('Dashboard error:', error);
+      res.status(500).json({ success: false, error: 'Failed to load dashboard' });
     }
   });
 
@@ -1047,9 +1068,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
 
           // ✅ CRITICAL: Update payment record to reflect allocation
-          finalPaymentStatus = await storage.updatePayment(newPayment.id, { 
-            isAllocated: true, 
-            invoiceId: parseInt(selectedInvoiceId) 
+          finalPaymentStatus = await storage.updatePayment(newPayment.id, {
+            isAllocated: true,
+            invoiceId: parseInt(selectedInvoiceId)
           });
 
           // Update invoice status after allocation

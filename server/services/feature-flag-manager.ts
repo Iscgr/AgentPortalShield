@@ -29,11 +29,11 @@ class FeatureFlagManager {
     // Initialize with safe defaults - all optimizations OFF initially
     this.flags = {
       UNIFIED_FINANCIAL_ENGINE: {
-        enabled: false,
-        percentage: 0,
+        enabled: true,  // ✅ PHASE 9C2.4: ACTIVATED FOR TESTING
+        percentage: 5,  // Start with 5% traffic
         conditions: [],
         lastModified: new Date().toISOString(),
-        modifiedBy: 'system_init'
+        modifiedBy: 'phase_9c2_4_activation'
       },
 
       BATCH_QUERY_OPTIMIZATION: {
