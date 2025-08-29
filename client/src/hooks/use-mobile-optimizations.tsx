@@ -129,7 +129,7 @@ export function useMobileOptimizations() {
             `;
       
       document.head.appendChild(style);
-      document.body.classList.add('mobile-optimized');zed');
+      document.body.classList.add('mobile-optimized');
 
       return () => {
         if (style.parentNode) {
