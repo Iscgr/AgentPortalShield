@@ -289,10 +289,11 @@ export default function Representatives() {
         throw new Error("خطا در دریافت نمایندگان");
       }
     },
-    retry: 3,
-    retryDelay: 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: false
+    staleTime: 5 * 60 * 1000, // 5 minutes - data is considered fresh
+    cacheTime: 30 * 60 * 1000, // 30 minutes - cache retention
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on component mount if data exists
+    enabled: true, // Always enabled but controlled by stale time
   });
 
   // ✅ SHERLOCK v32.1: Optimized batch processing to prevent 400 errors
@@ -406,10 +407,10 @@ export default function Representatives() {
   // SHERLOCK v27.0: Enhanced financial data with fallback rendering
   const enhancedReps = useMemo(() => {
     if (!representatives) return [];
-    
+
     // Use enhanced reps data if available, otherwise fallback to original representatives
     const repsData = enhancedRepsData || representatives;
-    
+
     return repsData.map(rep => {
       // Use data from enhancedRepsData if available
       const actualDebt = rep.financialData?.actualDebt ?? parseFloat(rep.totalDebt || '0');
