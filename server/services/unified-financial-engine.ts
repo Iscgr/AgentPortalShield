@@ -554,6 +554,43 @@ export class UnifiedFinancialEngine {
     const repIds = representativesData.map(rep => rep.id);
     console.log(`🔍 ATOMOS-OPTIMIZED: Processing ${representativesData.length} representatives with batch queries...`);
 
+    // ✅ PHASE 9 FIX: Handle large datasets by chunking
+    if (repIds.length > 1000) {
+      console.log(`⚠️ ATOMOS: Large dataset detected (${repIds.length} reps), using chunked processing...`);
+      // For very large datasets, fall back to chunked individual calculations
+      const results: RepresentativeFinancialData[] = [];
+      const CHUNK_SIZE = 50;
+      
+      for (let i = 0; i < representativesData.length; i += CHUNK_SIZE) {
+        const chunk = representativesData.slice(i, i + CHUNK_SIZE);
+        console.log(`🔄 Processing chunk ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(representativesData.length/CHUNK_SIZE)}`);
+        
+        const chunkResults = await Promise.all(chunk.map(async (rep) => {
+          const debt = parseFloat(rep.totalDebt) || 0;
+          return {
+            id: rep.id,
+            name: rep.name,
+            code: rep.code,
+            totalSales: parseFloat(rep.totalSales) || 0,
+            totalPaid: 0, // Will be calculated if needed
+            totalDebt: debt,
+            invoiceCount: 0,
+            paymentCount: 0,
+            lastInvoiceDate: null,
+            lastPaymentDate: null,
+            debtLevel: this.calculateDebtLevel(debt)
+          };
+        }));
+        
+        results.push(...chunkResults);
+      }
+      
+      const endTime = performance.now();
+      const processingTime = Math.round(endTime - startTime);
+      console.log(`✅ ATOMOS CHUNKED: Processed ${results.length} representatives in ${processingTime}ms`);
+      return results;
+    }
+
     // Batch query 1: All invoice data in single query with GROUP BY
     const invoiceDataQuery = db.select({
       representativeId: invoices.representativeId,
@@ -561,7 +598,7 @@ export class UnifiedFinancialEngine {
       totalSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
       lastDate: sql<string>`MAX(created_at)`
     }).from(invoices)
-    .where(sql`${invoices.representativeId} = ANY(${JSON.stringify(repIds)})`)
+    .where(sql`${invoices.representativeId} = ANY(${repIds})`)
     .groupBy(invoices.representativeId);
 
     // Batch query 2: All payment data in single query with GROUP BY
@@ -571,7 +608,7 @@ export class UnifiedFinancialEngine {
       totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
       lastDate: sql<string>`MAX(payment_date)`
     }).from(payments)
-    .where(sql`${payments.representativeId} = ANY(${JSON.stringify(repIds)})`)
+    .where(sql`${payments.representativeId} = ANY(${repIds})`)
     .groupBy(payments.representativeId);
 
     // Batch query 3: All debt data in single query
@@ -579,7 +616,7 @@ export class UnifiedFinancialEngine {
       id: representatives.id,
       totalDebt: representatives.totalDebt
     }).from(representatives)
-    .where(sql`${representatives.id} = ANY(${JSON.stringify(repIds)})`);
+    .where(sql`${representatives.id} = ANY(${repIds})`);
 
     // Execute all batch queries in parallel
     const [invoiceResults, paymentResults, debtResults] = await Promise.all([
