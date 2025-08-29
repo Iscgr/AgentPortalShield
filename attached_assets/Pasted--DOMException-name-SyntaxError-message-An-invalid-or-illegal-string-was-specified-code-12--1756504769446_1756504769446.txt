@@ -1,0 +1,63 @@
+
+DOMException {name: "SyntaxError", message: "An invalid or illegal string was specified", code: 12, result: 2152923148, filename: "https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/dev…", …}
+
+    ABORT_ERR: 20
+    DATA_CLONE_ERR: 25
+    DOMSTRING_SIZE_ERR: 2
+    HIERARCHY_REQUEST_ERR: 3
+    INDEX_SIZE_ERR: 1
+    INUSE_ATTRIBUTE_ERR: 10
+    INVALID_ACCESS_ERR: 15
+    INVALID_CHARACTER_ERR: 5
+    INVALID_MODIFICATION_ERR: 13
+    INVALID_NODE_TYPE_ERR: 24
+    INVALID_STATE_ERR: 11
+    NAMESPACE_ERR: 14
+    NETWORK_ERR: 19
+    NOT_FOUND_ERR: 8
+    NOT_SUPPORTED_ERR: 9
+    NO_DATA_ALLOWED_ERR: 6
+    NO_MODIFICATION_ALLOWED_ERR: 7
+    QUOTA_EXCEEDED_ERR: 22
+    SECURITY_ERR: 18
+    SYNTAX_ERR: 12
+    TIMEOUT_ERR: 23
+    TYPE_MISMATCH_ERR: 17
+    URL_MISMATCH_ERR: 21
+    VALIDATION_ERR: 16
+    WRONG_DOCUMENT_ERR: 4
+    code: 12
+    get code: ƒ code()
+    columnNumber: 0
+    get columnNumber: ƒ columnNumber()
+    data: null
+    get data: ƒ data()
+    filename: "https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js"
+    get filename: ƒ filename()
+    lineNumber: 2
+    get lineNumber: ƒ lineNumber()
+    message: "An invalid or illegal string was specified"
+    get message: ƒ message()
+    name: "SyntaxError"
+    get name: ƒ name()
+    result: 2152923148
+    get result: ƒ result()
+    stack: "t@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:218737↵setupWebSocket@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@vite/client:536:19↵fallback@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@vite/client:509:16↵setupWebSocket/<@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/@vite/client:555:7↵"
+    get stack: ƒ stack()
+    set stack: ƒ stack()
+    constructor: ƒ DOMException()
+    Symbol(Symbol.toStringTag): undefined
+    [[Prototype]]: Object
+
+
+t@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630
+value@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766
+8988/value/this.asyncTimer<@https://6df5df6a-a51b-4cee-96d1-55579a825ab7-00-3txw9pqslon4v.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+SHERLOCK v32.0 DEBUG: Response status for /api/dashboard: 200
+SHERLOCK v32.0: Successful API response for /api/dashboard
+🔍 SHERLOCK v32.2: Raw API response structure: 
+Object {success: true, data: {…}, meta: {…}}
+🔍 SHERLOCK v32.2: Extracted summary: 
+Object {totalRepresentatives: "288", activeRepresentatives: "288", totalSystemSales: "366292890.00", totalSystemPaid: "144465500.00", totalSystemDebt: 221827390, …}
+🔍 SHERLOCK v32.2: Raw API response structure: 
+Object {success: true, data: {…}, meta: {…}}
