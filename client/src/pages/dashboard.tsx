@@ -407,6 +407,25 @@ export default function Dashboard() {
     totalRepresentatives: dashboardData.totalRepresentatives
   });
 
+  // Filter out harmless Replit development environment errors
+  useEffect(() => {
+    const originalError = console.error;
+    console.error = function(message, ...args) {
+      // Suppress known Replit development environment errors
+      if (typeof message === 'object' && 
+          message?.name === 'SyntaxError' && 
+          message?.message?.includes('invalid or illegal string') &&
+          message?.filename?.includes('eruda.js')) {
+        return; // Ignore Replit development environment errors
+      }
+      originalError.call(console, message, ...args);
+    };
+
+    return () => {
+      console.error = originalError;
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Financial Overview Cards */}
