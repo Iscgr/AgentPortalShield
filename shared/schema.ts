@@ -85,16 +85,48 @@ export const telegramSendHistory = pgTable("telegram_send_history", {
 });
 
 // Payments (پرداخت‌ها)
-export const payments = pgTable("payments", {
-  id: serial("id").primaryKey(),
-  representativeId: integer("representative_id").notNull(),
-  invoiceId: integer("invoice_id"), // null if not assigned to specific invoice
-  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-  paymentDate: text("payment_date").notNull(), // Persian date
-  description: text("description"),
-  isAllocated: boolean("is_allocated").default(false), // آیا تخصیص یافته
-  createdAt: timestamp("created_at").defaultNow()
+export const payments = pgTable('payments', {
+  id: serial('id').primaryKey(),
+  representativeId: integer('representative_id').references(() => representatives.id),
+  amount: text('amount').notNull(),
+  paymentDate: timestamp('payment_date').notNull(),
+
+  // Enhanced allocation system
+  isAllocated: boolean('is_allocated').default(false),
+  allocatedAmount: text('allocated_amount').default('0'), // مبلغ تخصیص یافته
+  remainingAmount: text('remaining_amount').default('0'), // مبلغ باقی‌مانده
+
+  // Multiple allocation support
+  allocations: json('allocations').$type<PaymentAllocation[]>(), // تخصیص‌های متعدد
+
+  // Allocation method tracking
+  allocationMethod: text('allocation_method').$type<'AUTO_FIFO' | 'AUTO_LIFO' | 'MANUAL' | 'MIXED'>(),
+
+  // Audit trail
+  allocationHistory: json('allocation_history').$type<AllocationHistoryEntry[]>(),
+
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
 });
+
+// Supporting types for enhanced allocation
+interface PaymentAllocation {
+  invoiceId: number;
+  allocatedAmount: number;
+  allocationDate: string;
+  allocationMethod: 'AUTO' | 'MANUAL';
+  allocatedBy: string; // user ID or 'SYSTEM'
+}
+
+interface AllocationHistoryEntry {
+  timestamp: string;
+  action: 'ALLOCATE' | 'DEALLOCATE' | 'REALLOCATE';
+  invoiceId: number;
+  amount: number;
+  method: string;
+  performedBy: string;
+  reason?: string;
+}
 
 // Activity Log (لاگ فعالیت‌ها)
 export const activityLogs = pgTable("activity_logs", {
@@ -108,6 +140,7 @@ export const activityLogs = pgTable("activity_logs", {
 
 // SHERLOCK v2.0 - Removed duplicate table definition
 // Consolidated into representativeLevels table below (line 308)
+
 
 // CRM Cultural Profiles (پروفایل‌های فرهنگی)
 export const crmCulturalProfiles = pgTable("crm_cultural_profiles", {
@@ -123,12 +156,6 @@ export const crmCulturalProfiles = pgTable("crm_cultural_profiles", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
-
-
-
-
-
-
 
 
 
@@ -226,7 +253,7 @@ export const aiConfiguration = pgTable("ai_configuration", {
   id: serial("id").primaryKey(),
   configName: text("config_name").notNull().unique(),
   configCategory: text("config_category").notNull(), // "GENERAL", "PERSIAN_CULTURAL", "BEHAVIOR", "GROQ_SETTINGS", "SECURITY"
-  
+
   // General AI Settings
   aiEnabled: boolean("ai_enabled").default(true),
   defaultModel: text("default_model").default("groq/llama-3.1-8b-instant"),
@@ -235,7 +262,7 @@ export const aiConfiguration = pgTable("ai_configuration", {
   topP: decimal("top_p", { precision: 3, scale: 2 }).default("0.9"),
   frequencyPenalty: decimal("frequency_penalty", { precision: 3, scale: 2 }).default("0.0"),
   presencePenalty: decimal("presence_penalty", { precision: 3, scale: 2 }).default("0.0"),
-  
+
   // Persian Cultural Intelligence
   culturalSensitivity: decimal("cultural_sensitivity", { precision: 3, scale: 2 }).default("0.95"), // 0-1 scale
   religiousSensitivity: decimal("religious_sensitivity", { precision: 3, scale: 2 }).default("0.9"),
@@ -243,7 +270,7 @@ export const aiConfiguration = pgTable("ai_configuration", {
   languageFormality: text("language_formality").default("RESPECTFUL"), // "FORMAL", "RESPECTFUL", "CASUAL"
   persianPoetryIntegration: boolean("persian_poetry_integration").default(true),
   culturalMetaphors: boolean("cultural_metaphors").default(true),
-  
+
   // Behavior Tuning
   proactivityLevel: decimal("proactivity_level", { precision: 3, scale: 2 }).default("0.8"), // How proactive AI should be
   confidenceThreshold: decimal("confidence_threshold", { precision: 3, scale: 2 }).default("0.75"),
@@ -251,7 +278,7 @@ export const aiConfiguration = pgTable("ai_configuration", {
   creativityLevel: decimal("creativity_level", { precision: 3, scale: 2 }).default("0.6"),
   riskTolerance: decimal("risk_tolerance", { precision: 3, scale: 2 }).default("0.3"),
   contextWindowMemory: integer("context_window_memory").default(10), // Number of conversations to remember
-  
+
   // Advanced Groq Settings
   groqModelVariant: text("groq_model_variant").default("llama-3.1-8b-instant"),
   groqApiEndpoint: text("groq_api_endpoint").default("https://api.groq.com/openai/v1"),
@@ -259,31 +286,31 @@ export const aiConfiguration = pgTable("ai_configuration", {
   requestTimeoutMs: integer("request_timeout_ms").default(30000),
   retryAttempts: integer("retry_attempts").default(3),
   rateLimitRpm: integer("rate_limit_rpm").default(30), // Requests per minute
-  
+
   // Security & Privacy
   dataEncryption: boolean("data_encryption").default(true),
   accessLogging: boolean("access_logging").default(true),
   sensitiveDataRedaction: boolean("sensitive_data_redaction").default(true),
   emergencyStopEnabled: boolean("emergency_stop_enabled").default(true),
   auditTrail: boolean("audit_trail").default(true),
-  
+
   // Performance & Monitoring
   responseTimeLimit: integer("response_time_limit").default(5000), // milliseconds
   qualityThreshold: decimal("quality_threshold", { precision: 3, scale: 2 }).default("0.8"),
   errorRateThreshold: decimal("error_rate_threshold", { precision: 3, scale: 2 }).default("0.05"),
   performanceMetrics: json("performance_metrics").default({}),
-  
+
   // Custom Instructions & Prompts
   systemPrompt: text("system_prompt"),
   culturalPrompts: json("cultural_prompts").default([]),
   behaviorPrompts: json("behavior_prompts").default([]),
   specialInstructions: json("special_instructions").default([]),
-  
+
   // Integration Settings
   telegramIntegration: boolean("telegram_integration").default(false),
   xaiIntegration: boolean("xai_integration").default(false),
   customApiEndpoints: json("custom_api_endpoints").default([]),
-  
+
   isActive: boolean("is_active").default(true),
   lastModifiedBy: text("last_modified_by"),
   configVersion: integer("config_version").default(1),
@@ -410,33 +437,33 @@ export const crmPerformanceAnalytics = pgTable("crm_performance_analytics", {
   period: text("period").notNull(), // "DAILY", "WEEKLY", "MONTHLY", "QUARTERLY"
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
-  
+
   // Task Performance
   tasksAssigned: integer("tasks_assigned").default(0),
   tasksCompleted: integer("tasks_completed").default(0),
   tasksOverdue: integer("tasks_overdue").default(0),
   averageCompletionTime: integer("average_completion_time"), // in hours
-  
+
   // Quality Metrics
   averageQualityScore: decimal("average_quality_score", { precision: 5, scale: 2 }),
   communicationQuality: decimal("communication_quality", { precision: 5, scale: 2 }),
   customerSatisfaction: decimal("customer_satisfaction", { precision: 5, scale: 2 }),
-  
+
   // Relationship Metrics
   relationshipScore: integer("relationship_score"), // 1-100
   responseTime: integer("response_time"), // average response time in hours
   proactiveActions: integer("proactive_actions"), // self-initiated actions
-  
+
   // Improvement Tracking
   improvementAreas: json("improvement_areas"),
   strengthAreas: json("strength_areas"),
   recommendedActions: json("recommended_actions"),
-  
+
   // AI Analysis
   aiInsights: json("ai_insights"),
   predictedTrends: json("predicted_trends"),
   personalizedRecommendations: json("personalized_recommendations"),
-  
+
   createdAt: timestamp("created_at").defaultNow()
 });
 
@@ -487,47 +514,47 @@ export const supportStaff = pgTable("support_staff", {
   username: text("username").notNull().unique(),
   email: text("email"),
   phone: text("phone"),
-  
+
   // Work Schedule
   dailyWorkHours: integer("daily_work_hours").default(8), // ساعت کاری در روز
   weeklyHolidays: json("weekly_holidays").default([]), // روزهای تعطیل در هفته
   workStartTime: text("work_start_time").default("09:00"), // شروع کار
   workEndTime: text("work_end_time").default("17:00"), // پایان کار
-  
+
   // Work Details
   jobDescription: text("job_description"),
   workingStyle: text("working_style"), // نحوه کار
   specialSkills: json("special_skills").default([]),
-  
-  // Psychological Profile  
+
+  // Psychological Profile
   personalityTraits: json("personality_traits").default([]), // ویژگی‌های شخصیتی
   psychologicalProfile: json("psychological_profile").default({}), // پروفایل روانشناختی
   communicationStyle: text("communication_style"), // سبک ارتباطی
   motivationFactors: json("motivation_factors").default([]), // عوامل انگیزشی
   stressLevel: text("stress_level"), // سطح استرس
   workPreferences: json("work_preferences").default({}), // ترجیحات کاری
-  
+
   // Performance Metrics
   performanceScore: decimal("performance_score", { precision: 5, scale: 2 }).default("0"),
   taskCompletionRate: decimal("task_completion_rate", { precision: 5, scale: 2 }).default("0"),
   customerSatisfactionRate: decimal("customer_satisfaction_rate", { precision: 5, scale: 2 }).default("0"),
-  
+
   // AI Integration
   aiInteractionStyle: text("ai_interaction_style"), // نحوه تعامل با AI
   aiPersonalizationData: json("ai_personalization_data").default({}),
   lastAiAnalysis: timestamp("last_ai_analysis"),
-  
+
   isActive: boolean("is_active").default(true),
   hiredAt: timestamp("hired_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
-// AI Knowledge Database (دیتابیس دانش AI) - برای DA VINCI v1.0  
+// AI Knowledge Database (دیتابیس دانش AI) - برای DA VINCI v1.0
 export const aiKnowledgeDatabase = pgTable("ai_knowledge_database", {
   id: serial("id").primaryKey(),
   category: text("category").notNull(), // "REPRESENTATIVE_BEHAVIOR", "COMMON_QUESTIONS", "CONCERNS", "SOLUTIONS"
-  
+
   // Representative Behavior Data
   representativeStatus: text("representative_status"), // "ACTIVE", "INACTIVE", "TERMINATED"
   behaviorType: text("behavior_type"), // "POSITIVE", "NEGATIVE", "NEUTRAL", "PROBLEMATIC"
@@ -535,25 +562,25 @@ export const aiKnowledgeDatabase = pgTable("ai_knowledge_database", {
   testedApproaches: json("tested_approaches").default([]), // روش‌های تست شده
   approachResults: json("approach_results").default([]), // نتایج روش‌ها
   successRate: decimal("success_rate", { precision: 5, scale: 2 }),
-  
+
   // Common Questions & Concerns
   questionCategory: text("question_category"), // "TECHNICAL", "FINANCIAL", "PROCEDURAL", "GENERAL"
   questionText: text("question_text"),
   recommendedAnswer: text("recommended_answer"),
   alternativeAnswers: json("alternative_answers").default([]),
-  
+
   // General Knowledge
   title: text("title"),
   content: text("content"),
   tags: json("tags").default([]),
   applicableScenarios: json("applicable_scenarios").default([]),
-  
+
   // Metadata
   sourceType: text("source_type"), // "MANAGER_INPUT", "HISTORICAL_DATA", "AI_ANALYSIS"
   confidence: decimal("confidence", { precision: 5, scale: 2 }).default("0"),
   usageCount: integer("usage_count").default(0),
   effectivenessScore: decimal("effectiveness_score", { precision: 5, scale: 2 }),
-  
+
   isActive: boolean("is_active").default(true),
   createdBy: text("created_by"),
   lastUsedAt: timestamp("last_used_at"),
@@ -566,39 +593,39 @@ export const offersIncentives = pgTable("offers_incentives", {
   id: serial("id").primaryKey(),
   offerName: text("offer_name").notNull(),
   offerType: text("offer_type").notNull(), // "FINANCIAL", "VOLUME_BASED", "TIME_LIMITED", "COMBO"
-  
+
   // Financial Details
   monetaryValue: decimal("monetary_value", { precision: 15, scale: 2 }), // مبلغ ریالی
   volumeBonus: json("volume_bonus").default({}), // پاداش حجمی
   timeFrame: text("time_frame"), // مدت زمان
-  
+
   // Eligibility Criteria
   eligibilityCriteria: json("eligibility_criteria").default({}),
   minPurchaseAmount: decimal("min_purchase_amount", { precision: 15, scale: 2 }),
   maxUsagePerRepresentative: integer("max_usage_per_representative"),
-  
+
   // Conditions & Terms
   terms: text("terms"),
   restrictions: json("restrictions").default([]),
   validFrom: timestamp("valid_from"),
   validUntil: timestamp("valid_until"),
-  
+
   // Financial Impact Assessment
   costPerOffer: decimal("cost_per_offer", { precision: 15, scale: 2 }),
   maxTotalCost: decimal("max_total_cost", { precision: 15, scale: 2 }),
   budgetAllocated: decimal("budget_allocated", { precision: 15, scale: 2 }),
   budgetUsed: decimal("budget_used", { precision: 15, scale: 2 }).default("0"),
-  
+
   // Performance Tracking
   timesOffered: integer("times_offered").default(0),
   timesAccepted: integer("times_accepted").default(0),
   acceptanceRate: decimal("acceptance_rate", { precision: 5, scale: 2 }),
   averageImpact: json("average_impact").default({}),
-  
+
   // AI Integration
   aiRecommendationScore: decimal("ai_recommendation_score", { precision: 5, scale: 2 }),
   aiUsagePatterns: json("ai_usage_patterns").default({}),
-  
+
   isActive: boolean("is_active").default(true),
   createdBy: text("created_by"),
   approvedBy: text("approved_by"),
@@ -613,42 +640,42 @@ export const managerTasks = pgTable("manager_tasks", {
   taskId: text("task_id").notNull().unique(), // UUID
   title: text("title").notNull(),
   description: text("description").notNull(),
-  
+
   // Task Assignment
   assignedStaffId: integer("assigned_staff_id"), // کارمند مشخص شده
   assignedStaffName: text("assigned_staff_name"), // نام کارمند برای نمایش
-  
+
   // Task Details
   taskType: text("task_type").notNull(), // "DAILY_CALLS", "DEBT_COLLECTION", "FOLLOW_UP", "CUSTOM"
   frequency: text("frequency").notNull(), // "DAILY", "WEEKLY", "MONTHLY", "ONE_TIME"
   priority: text("priority").default("MEDIUM"), // "LOW", "MEDIUM", "HIGH", "URGENT"
-  
+
   // Specific Instructions
   dailyTarget: integer("daily_target"), // هدف روزانه (مثل 7 تماس)
   targetCriteria: json("target_criteria").default({}), // معیارهای هدف
   specificInstructions: text("specific_instructions"),
-  
+
   // Schedule & Timing
   startDate: timestamp("start_date").defaultNow(),
   endDate: timestamp("end_date"), // null برای وظایف دائمی
   scheduleDetails: json("schedule_details").default({}),
-  
+
   // AI Processing
   aiProcessed: boolean("ai_processed").default(false),
   aiInstructions: text("ai_instructions"), // دستورات AI برای کارمند
   aiContext: json("ai_context").default({}),
   lastAiProcessing: timestamp("last_ai_processing"),
-  
+
   // Performance Tracking
   totalExecutions: integer("total_executions").default(0),
   successfulExecutions: integer("successful_executions").default(0),
   lastExecutionDate: timestamp("last_execution_date"),
   averageCompletionTime: integer("average_completion_time"), // بر حسب دقیقه
-  
+
   // Status & Lifecycle
   status: text("status").default("ACTIVE"), // "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"
   isRecurring: boolean("is_recurring").default(true),
-  
+
   createdBy: text("created_by").notNull(),
   pausedBy: text("paused_by"),
   pausedAt: timestamp("paused_at"),
@@ -663,36 +690,36 @@ export const managerTaskExecutions = pgTable("manager_task_executions", {
   taskId: text("task_id").notNull(),
   executionId: text("execution_id").notNull().unique(), // UUID
   executionDate: text("execution_date").notNull(), // Persian date
-  
+
   // Staff Assignment
   assignedStaffId: integer("assigned_staff_id").notNull(),
   assignedStaffName: text("assigned_staff_name").notNull(),
-  
+
   // Execution Details
   generatedInstructions: text("generated_instructions"), // دستورات تولید شده
   targetList: json("target_list").default([]), // لیست اهداف (نمایندگان، فروشگاه‌ها، ...)
   targetCount: integer("target_count").default(0),
-  
+
   // AI Generation Process
   aiModel: text("ai_model"), // مدل AI استفاده شده
   aiPrompt: text("ai_prompt"), // prompt استفاده شده
   aiResponse: text("ai_response"), // پاسخ کامل AI
   aiConfidence: decimal("ai_confidence", { precision: 5, scale: 2 }),
   processingTime: integer("processing_time"), // زمان پردازش بر حسب میلی‌ثانیه
-  
+
   // Execution Status
   status: text("status").default("GENERATED"), // "GENERATED", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "FAILED"
   assignedAt: timestamp("assigned_at"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
-  
+
   // Results
   actualExecuted: integer("actual_executed"), // تعداد واقعی انجام شده
   successCount: integer("success_count"),
   failureCount: integer("failure_count"),
   executionNotes: text("execution_notes"),
   staffFeedback: text("staff_feedback"),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -708,20 +735,20 @@ export const workspaceTasks = pgTable("workspace_tasks", {
   description: text("description").notNull(),
   priority: text("priority").notNull(), // "URGENT", "HIGH", "MEDIUM", "LOW"
   status: text("status").default("ASSIGNED"), // "ASSIGNED", "READ", "IN_PROGRESS", "COMPLETED", "VERIFIED"
-  
+
   // Persian datetime tracking
   assignedAt: text("assigned_at").notNull(), // Persian date/time
   deadline: text("deadline").notNull(), // Persian date/time
   readAt: text("read_at"), // When staff marked as read
   completedAt: text("completed_at"), // When staff marked as completed
-  
+
   // AI-generated context
   aiContext: json("ai_context").notNull(),
-  
+
   // Manager workspace source
   managerTaskId: text("manager_task_id"),
   generatedFromSettings: json("generated_from_settings").notNull(),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -734,12 +761,12 @@ export const taskReports = pgTable("task_reports", {
   representativeId: integer("representative_id").notNull(),
   content: text("content").notNull(), // Staff's detailed report
   submittedAt: text("submitted_at").notNull(), // Persian datetime
-  
+
   // AI analysis results
   aiAnalysis: json("ai_analysis"),
-  
+
   status: text("status").default("PENDING_REVIEW"), // "PENDING_REVIEW", "AI_PROCESSED", "MANAGER_APPROVED"
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -749,23 +776,23 @@ export const taskReportsAnalysis = pgTable("task_reports_analysis", {
   id: text("id").primaryKey(),
   reportId: text("report_id").notNull(),
   representativeId: integer("representative_id").notNull(),
-  
+
   // AI-extracted insights
   keyInsights: json("key_insights").notNull(), // Array of key insights
   culturalContext: json("cultural_context").notNull(), // Cultural factors
   priorityLevel: text("priority_level").notNull(), // "LOW", "MEDIUM", "HIGH", "URGENT"
   nextContactDate: text("next_contact_date"), // Persian date
-  
+
   // Follow-up actions generated by AI
   followUpActions: json("follow_up_actions").notNull(), // Array of follow-up actions
-  
+
   // Representative profile updates
   representativeUpdates: json("representative_updates").notNull(), // Suggested profile updates
-  
+
   // AI confidence and metadata
   aiConfidence: integer("ai_confidence").default(75), // 1-100
-  processingModel: text("processing_model").default("XAI_GROK"), 
-  
+  processingModel: text("processing_model").default("XAI_GROK"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -775,27 +802,27 @@ export const workspaceAiReminders = pgTable("workspace_ai_reminders", {
   id: text("id").primaryKey(),
   staffId: integer("staff_id").notNull(),
   representativeId: integer("representative_id").notNull(),
-  
+
   // Reminder content
   title: text("title").notNull(),
   description: text("description").notNull(),
   context: text("context"), // Background context from reports
-  
+
   // Scheduling
   scheduledFor: text("scheduled_for").notNull(), // Persian datetime
   scheduledTime: text("scheduled_time").default("07:00"), // Time in HH:MM format
-  
+
   // Source tracking
   sourceType: text("source_type").notNull(), // "AI_GENERATED", "MANUAL", "FOLLOW_UP"
   sourceId: text("source_id"), // ID of source (report, task, etc.)
-  
+
   // Status
   status: text("status").default("ACTIVE"), // "ACTIVE", "COMPLETED", "DISMISSED"
   completedAt: text("completed_at"), // Persian datetime
-  
+
   // Priority
   priority: text("priority").default("MEDIUM"), // "LOW", "MEDIUM", "HIGH", "URGENT"
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -805,27 +832,33 @@ export const representativeSupportHistory = pgTable("representative_support_hist
   id: text("id").primaryKey(),
   representativeId: integer("representative_id").notNull(),
   staffId: integer("staff_id").notNull(),
-  
+
   // Interaction details
   interactionType: text("interaction_type").notNull(), // "CALL", "EMAIL", "VISIT", "TASK_COMPLETION"
   interactionDate: text("interaction_date").notNull(), // Persian date
-  
+
   // Content
   summary: text("summary").notNull(),
   details: text("details"),
   outcome: text("outcome"), // "POSITIVE", "NEGATIVE", "NEUTRAL", "NEEDS_FOLLOW_UP"
-  
+
   // Related entities
   relatedTaskId: text("related_task_id"),
   relatedReportId: text("related_report_id"),
-  
+
   // AI analysis
   aiInsights: json("ai_insights"),
   emotionalTone: text("emotional_tone"), // "POSITIVE", "NEUTRAL", "NEGATIVE"
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
+
+// Support Logs - Alias for DA VINCI v2.0 compatibility
+export const supportLogs = representativeSupportHistory;
+
+// Reminders - Alias for DA VINCI v2.0 compatibility
+export const reminders = workspaceReminders;
 
 // Workspace Reminders (یادآورهای میز کار) - برای DA VINCI v2.0
 export const workspaceReminders = pgTable("workspace_reminders", {
@@ -835,13 +868,13 @@ export const workspaceReminders = pgTable("workspace_reminders", {
   type: text("type").notNull(), // "FOLLOW_UP_CALL", "ISSUE_CHECK", "OFFER_RENEWAL", "CUSTOM"
   message: text("message").notNull(),
   scheduledFor: text("scheduled_for").notNull(), // Persian datetime
-  
+
   // Context from previous interactions
   context: json("context").notNull(),
-  
+
   priority: text("priority").notNull(), // "HIGH", "MEDIUM", "LOW"
   status: text("status").default("ACTIVE"), // "ACTIVE", "SNOOZED", "COMPLETED"
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -854,17 +887,17 @@ export const representativeSupportLogs = pgTable("representative_support_logs", 
   interactionDate: text("interaction_date").notNull(), // Persian date
   taskId: text("task_id"),
   reportId: text("report_id"),
-  
+
   summary: text("summary").notNull(),
   issues: json("issues"),
   resolution: text("resolution"),
   nextSteps: json("next_steps"),
-  
+
   // Performance tracking
   responseTime: integer("response_time"), // Minutes to first contact
   satisfactionLevel: text("satisfaction_level"), // "HIGH", "MEDIUM", "LOW"
   followUpRequired: boolean("follow_up_required").default(false),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -872,7 +905,7 @@ export const representativeSupportLogs = pgTable("representative_support_logs", 
 // Support Logs - Alias for DA VINCI v2.0 compatibility
 export const supportLogs = representativeSupportLogs;
 
-// Reminders - Alias for DA VINCI v2.0 compatibility  
+// Reminders - Alias for DA VINCI v2.0 compatibility
 export const reminders = workspaceReminders;
 
 // AI Test Results (نتایج تست AI) - برای نمایش لاگ‌های تست
@@ -880,32 +913,32 @@ export const aiTestResults = pgTable("ai_test_results", {
   id: serial("id").primaryKey(),
   testId: text("test_id").notNull().unique(), // UUID
   testType: text("test_type").notNull(), // "API_KEY_TEST", "AI_CONFIG_TEST", "KNOWLEDGE_TEST", "OFFER_TEST"
-  
+
   // Test Context
   relatedEntityType: text("related_entity_type"), // "SETTING", "STAFF", "KNOWLEDGE", "OFFER"
   relatedEntityId: integer("related_entity_id"),
   testParameters: json("test_parameters").default({}),
-  
+
   // Test Execution
   testStarted: timestamp("test_started").defaultNow(),
   testCompleted: timestamp("test_completed"),
   testDuration: integer("test_duration"), // بر حسب میلی‌ثانیه
-  
+
   // Results
   testStatus: text("test_status").notNull(), // "SUCCESS", "FAILED", "PARTIAL", "ERROR"
   responseData: json("response_data").default({}),
   errorMessage: text("error_message"),
   warningMessages: json("warning_messages").default([]),
-  
+
   // Debug Information
   debugLogs: json("debug_logs").default([]),
   networkLogs: json("network_logs").default([]),
   performanceMetrics: json("performance_metrics").default({}),
-  
+
   // Analysis
   aiAnalysis: text("ai_analysis"),
   recommendations: json("recommendations").default([]),
-  
+
   initiatedBy: text("initiated_by"),
   createdAt: timestamp("created_at").defaultNow()
 });
@@ -1123,7 +1156,7 @@ export const dataIntegrityConstraintsRelations = relations(dataIntegrityConstrai
   })
 }));
 
-// DA VINCI v2.0 Relations  
+// DA VINCI v2.0 Relations
 // export const taskReportsRelations = relations(taskReports, ({ one }) => ({
 //   task: one(workspaceTasks, {
 //     fields: [taskReports.taskId],
@@ -1397,7 +1430,6 @@ export type TelegramSendHistory = typeof telegramSendHistory.$inferSelect;
 export type InsertTelegramSendHistory = z.infer<typeof insertTelegramSendHistorySchema>;
 
 
-
 // DA VINCI v2.0 Insert Schemas
 export const insertWorkspaceTaskSchema = createInsertSchema(workspaceTasks).omit({
   id: true,
@@ -1457,7 +1489,6 @@ export const insertRepresentativeSupportLogSchema = createInsertSchema(represent
   createdAt: true,
   updatedAt: true
 });
-
 
 
 // DA VINCI v2.0 Types
