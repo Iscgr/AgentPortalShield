@@ -213,7 +213,7 @@ router.get('/all-representatives', requireAuth, async (req, res) => {
   const requestStart = performance.now();
   try {
     console.log('📊 ATOMOS-MONITOR: Dashboard request initiated');
-    
+
     // ✅ PHASE 9C2.4: Feature flag integration
     const { isFeatureEnabled } = await import('../services/feature-flag-manager.js');
     const isOptimizationEnabled = isFeatureEnabled('UNIFIED_FINANCIAL_ENGINE', {
@@ -233,7 +233,8 @@ router.get('/all-representatives', requireAuth, async (req, res) => {
       console.log('⚡ PHASE 9C2.4: Using BATCH OPTIMIZATION for dashboard');
     } else {
       // Fallback to individual calculation (current behavior)
-      allData = await this.calculateAllRepresentativesIndividual();
+      allData = await calculateAllRepresentativesIndividual();
+      optimizationUsed = true;
       console.log('🔄 PHASE 9C2.4: Using INDIVIDUAL CALCULATION (fallback)');
     }
 
@@ -347,50 +348,6 @@ router.get('/total-debt', requireAuth, async (req, res) => {
           moderate: summary.moderateReps,
           high: summary.highRiskReps,
           critical: summary.criticalReps
-
-
-  /**
-   * ✅ PHASE 9C2.4: Fallback individual calculation method
-   * Used when optimization flag is disabled
-   */
-  async calculateAllRepresentativesIndividual(): Promise<any[]> {
-    const startTime = performance.now();
-    console.log('🔄 PHASE 9C2.4: Individual calculation fallback initiated');
-
-    const reps = await db.select({
-      id: representatives.id,
-      name: representatives.name,
-      code: representatives.code,
-      totalDebt: representatives.totalDebt
-    }).from(representatives);
-
-    const results = await Promise.all(reps.map(async (rep) => {
-      try {
-        const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
-        return {
-          id: rep.id,
-          name: rep.name,
-          code: rep.code,
-          totalSales: financialData.totalSales,
-          totalPaid: financialData.totalPaid,
-          totalDebt: financialData.actualDebt,
-          debtLevel: financialData.debtLevel
-        };
-      } catch (error) {
-        console.warn(`Individual calc failed for rep ${rep.id}:`, error);
-        return null;
-      }
-    }));
-
-    const validResults = results.filter(Boolean);
-    const endTime = performance.now();
-    
-    console.log(`⚠️ PHASE 9C2.4: Individual calculation completed in ${Math.round(endTime - startTime)}ms`);
-    console.log(`📊 PHASE 9C2.4: Processed ${validResults.length} representatives with N+1 pattern`);
-    
-    return validResults;
-  }
-
         }
       },
       meta: {
@@ -407,6 +364,48 @@ router.get('/total-debt', requireAuth, async (req, res) => {
     });
   }
 });
+
+/**
+ * ✅ PHASE 9C2.4: Fallback individual calculation method
+ * Used when optimization flag is disabled
+ */
+async function calculateAllRepresentativesIndividual(): Promise<any[]> {
+  const startTime = performance.now();
+  console.log('🔄 PHASE 9C2.4: Individual calculation fallback initiated');
+
+  const reps = await db.select({
+    id: representatives.id,
+    name: representatives.name,
+    code: representatives.code,
+    totalDebt: representatives.totalDebt
+  }).from(representatives);
+
+  const results = await Promise.all(reps.map(async (rep) => {
+    try {
+      const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
+      return {
+        id: rep.id,
+        name: rep.name,
+        code: rep.code,
+        totalSales: financialData.totalSales,
+        totalPaid: financialData.totalPaid,
+        totalDebt: financialData.actualDebt,
+        debtLevel: financialData.debtLevel
+      };
+    } catch (error) {
+      console.warn(`Individual calc failed for rep ${rep.id}:`, error);
+      return null;
+    }
+  }));
+
+  const validResults = results.filter(Boolean);
+  const endTime = performance.now();
+
+  console.log(`⚠️ PHASE 9C2.4: Individual calculation completed in ${Math.round(endTime - startTime)}ms`);
+  console.log(`📊 PHASE 9C2.4: Processed ${validResults.length} representatives with N+1 pattern`);
+
+  return validResults;
+}
 
 /**
  * ✅ SHERLOCK v23.0: محاسبه دستی مجموع بدهی و تایید صحت
