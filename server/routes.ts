@@ -1007,7 +1007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ✅ SHERLOCK v33.1: Normalize Persian/English dates for consistency
       const { toEnglishDigits } = await import("../../client/src/lib/persian-date");
       const normalizedPaymentDate = toEnglishDigits(paymentDate);
-      
+
       console.log(`📅 تطبیق تاریخ: ورودی="${paymentDate}" -> عادی‌سازی شده="${normalizedPaymentDate}"`);
 
       // ✅ SHERLOCK v33.2: ENHANCED ALLOCATION LOGIC WITH FINANCIAL SYNC
@@ -1043,17 +1043,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Allocate payment to specific invoice
           await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
-          
+
           // ✅ CRITICAL: Update payment record to reflect allocation
           finalPaymentStatus = await storage.updatePayment(newPayment.id, { 
             isAllocated: true, 
             invoiceId: parseInt(selectedInvoiceId) 
           });
-          
+
           // Update invoice status after allocation
           const calculatedStatus = await storage.calculateInvoicePaymentStatus(parseInt(selectedInvoiceId));
           await storage.updateInvoice(parseInt(selectedInvoiceId), { status: calculatedStatus });
-          
+
           console.log(`✅ SHERLOCK v33.2: Payment ${newPayment.id} successfully allocated to Invoice ${selectedInvoiceId}, status: ${calculatedStatus}`);
         } catch (allocationError) {
           console.error(`❌ SHERLOCK v33.2: Manual allocation failed for Payment ${newPayment.id}:`, allocationError);
@@ -1079,10 +1079,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ✅ SHERLOCK v33.2: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
       console.log(`🔄 SHERLOCK v33.2: Starting comprehensive financial sync for representative ${representativeId}`);
-      
+
       // 1. Update representative financials
       await storage.updateRepresentativeFinancials(representativeId);
-      
+
       // 2. Force invalidate financial engine cache for immediate UI updates
       try {
         const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
