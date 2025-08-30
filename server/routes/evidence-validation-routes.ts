@@ -168,4 +168,35 @@ export function registerEvidenceValidationRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to perform multi-root resolution analysis' });
     }
   });
+
+  // ✅ ATOMOS PHASE 5E: Final Convergence Criteria Evaluation
+  app.get("/api/evidence/convergence-evaluation", async (req, res) => {
+    try {
+      console.log(`🎯 ATOMOS PHASE 5E: Executing Final Convergence Criteria Evaluation`);
+      
+      const { ConvergenceEvaluationEngine } = await import('../services/convergence-evaluation-engine');
+      const convergenceReport = ConvergenceEvaluationEngine.executePhase5EProtocol();
+      
+      res.json({
+        success: true,
+        phase: "5E_CONVERGENCE_EVALUATION",
+        convergenceReport,
+        timestamp: new Date().toISOString(),
+        atomosCompliance: {
+          allCriteriaStruct: convergenceReport.atomosCompliance,
+          overallScore: convergenceReport.overallConvergenceScore,
+          phase6Ready: convergenceReport.phase6ReadinessStatus,
+          qualityGates: {
+            name: 'ATOMOS_PROTOCOL_CONVERGENCE_VERIFICATION',
+            status: convergenceReport.phase6ReadinessStatus ? 'PASSED' : 'FAILED',
+            diagnosticQuality: convergenceReport.diagnosticQualityScore,
+            solutionReadiness: convergenceReport.solutionReadinessScore
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Convergence evaluation error:', error);
+      res.status(500).json({ error: 'Failed to perform convergence evaluation' });
+    }
+  });
 }
