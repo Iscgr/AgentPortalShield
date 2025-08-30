@@ -22,8 +22,8 @@ interface MulterRequest extends Request {
  * UNIFIED Invoice Generation Endpoint
  * یک endpoint واحد برای تمام نیازهای ایجاد فاکتور
  */
-export function registerStandardizedInvoiceRoutes(app: any, storage: any) {
-  const { unifiedAuthMiddleware } = require('../middleware/unified-auth');
+export async function registerStandardizedInvoiceRoutes(app: any, storage: any) {
+  const { unifiedAuthMiddleware } = await import('../middleware/unified-auth');
 
   /**
    * POST /api/invoices/generate-standard

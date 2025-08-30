@@ -191,7 +191,7 @@ app.use((req, res, next) => {
   registerUnifiedFinancialRoutes(app);
   registerUnifiedStatisticsRoutes(app);
   registerSettingsRoutes(app, storage);
-  registerStandardizedInvoiceRoutes(app, storage);
+  await registerStandardizedInvoiceRoutes(app, storage);
   registerMaintenanceRoutes(app);
   registerBatchRollbackRoutes(app, storage);
   registerWorkspaceRoutes(app, storage);
