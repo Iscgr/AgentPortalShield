@@ -74,11 +74,24 @@ function CrmProtectedRoutes() {
       <Route path="/crm">
         {() => (
           <Suspense fallback={
-            <div className="min-h-screen clay-background relative flex items-center justify-center">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
-                <p className="text-white text-lg">بارگذاری پنل CRM مدرن...</p>
-                <p className="text-blue-200 text-sm mt-2">معماری یکپارچه جدید</p>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">در حال بارگیری داشبورد CRM...</p>
+              </div>
+            </div>
+          }>
+            <ModernCrmDashboard />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/crm/:rest*">
+        {() => (
+          <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">در حال بارگیری داشبورد CRM...</p>
               </div>
             </div>
           }>
@@ -90,62 +103,36 @@ function CrmProtectedRoutes() {
   );
 }
 
+// Admin Routes Component  
+function AdminProtectedRoutes() {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [, setLocation] = useLocation();
 
-function AuthenticatedRouter() {
-  const { isAuthenticated: adminAuthenticated, isLoading: adminIsLoading, user: adminUser } = useUnifiedAuth(); // Use unified auth hook
-  const [location] = useLocation();
+  const { data: authData } = useQuery({
+    queryKey: ['/api/auth/check'],
+    refetchInterval: 30000, // Check every 30 seconds
+    retry: false,
+  });
 
-  // ✅ SHERLOCK v32.1: بهبود تشخیص پرتال عمومی با regex دقیق
-  const isPublicPortal = /^\/portal\/[^\/]+\/?$|^\/representative\/[^\/]+\/?$/.test(location);
+  useEffect(() => {
+    if (authData?.isAuthenticated) {
+      setIsAdmin(true);
+      setIsLoading(false);
+    } else {
+      setIsAdmin(false);
+      setIsLoading(false);
+      // Only redirect if on a protected route
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith('/admin') || currentPath.startsWith('/dashboard') || 
+          currentPath.startsWith('/invoices') || currentPath.startsWith('/representatives') ||
+          currentPath.startsWith('/financial-integrity')) {
+        setLocation('/admin-login');
+      }
+    }
+  }, [authData, setLocation]);
 
-  const isCrmRoute = location.startsWith('/crm');
-
-  if (isPublicPortal) {
-    // 🔒 SECURITY: Completely isolated public portal - no admin access
-    return (
-      <div className="dark public-portal-isolated">
-        <Switch>
-          <Route path="/portal/:publicId" component={Portal} />
-          <Route path="/representative/:publicId" component={Portal} />
-          <Route path="/portal/*">
-            {() => (
-              <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-red-400 text-6xl mb-4">⚠</div>
-                  <h1 className="text-2xl font-bold mb-2">پورتال یافت نشد</h1>
-                  <p className="text-gray-400">
-                    لینک پورتال نامعتبر است. لطفاً لینک صحیح را از مدیر سیستم دریافت کنید.
-                  </p>
-                </div>
-              </div>
-            )}
-          </Route>
-          <Route path="/representative/*">
-            {() => (
-              <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-red-400 text-6xl mb-4">⚠</div>
-                  <h1 className="text-2xl font-bold mb-2">پورتال یافت نشد</h1>
-                  <p className="text-gray-400">
-                    لینک پورتال نامعتبر است. لطفاً لینک صحیح را از مدیر سیستم دریافت کنید.
-                  </p>
-                </div>
-              </div>
-            )}
-          </Route>
-        </Switch>
-      </div>
-    );
-  }
-
-  // SHERLOCK v3.0 FIX: Always require login for CRM routes
-  if (isCrmRoute) {
-    // 🔒 SECURITY: CRM routes are protected by unified auth
-    return <CrmProtectedRoutes />;
-  }
-
-  // Show loading state while checking authentication
-  if (adminIsLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -156,50 +143,103 @@ function AuthenticatedRouter() {
     );
   }
 
-  // SHERLOCK v3.0 FIX: Show unified auth for non-authenticated users  
-  if (!adminAuthenticated) {
-    return <UnifiedAuth />;
+  if (!isAdmin) {
+    return <AdminLogin />;
   }
 
-  // Show admin panel if authenticated
   return (
-    <AdminLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/representatives" component={Representatives} />
-        <Route path="/invoices" component={Invoices} />
-        <Route path="/invoice-management" component={InvoiceManagement} />
-        <Route path="/sales-partners" component={SalesPartners} />
-        <Route path="/financial-integrity" component={FinancialIntegrityPage} />
-        <Route path="/settings" component={Settings} />
-        <Route component={NotFound} />
-      </Switch>
-    </AdminLayout>
-  );
-}
-
-function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isMobile } = useMobileOptimizations();
-
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-
-  return (
-    <div className="admin-panel-background dark">
-      <Sidebar isOpen={isSidebarOpen} onToggle={toggleSidebar} />
-      <div className="main-content lg:mr-80 mr-0 relative z-10">
-        <Header onMenuClick={toggleSidebar} />
-        <main className="p-4 lg:p-6 relative z-10">
-          {children}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Header />
+      <div className="flex">
+        <Sidebar />
+        <main className="flex-1 p-6">
+          <Switch>
+            <Route path="/dashboard" component={Dashboard} />
+            <Route path="/invoices" component={Invoices} />
+            <Route path="/invoice-management" component={InvoiceManagement} />
+            <Route path="/representatives" component={Representatives} />
+            <Route path="/sales-partners" component={SalesPartners} />
+            <Route path="/settings" component={Settings} />
+            <Route path="/financial-integrity" component={FinancialIntegrityPage} />
+            <Route path="/admin-login" component={AdminLogin} />
+            <Route>
+              {() => {
+                const [, setLocation] = useLocation();
+                useEffect(() => {
+                  setLocation('/dashboard');
+                }, [setLocation]);
+                return null;
+              }}
+            </Route>
+          </Switch>
         </main>
       </div>
+      <MobileNavigation />
     </div>
   );
 }
 
-function App() {
-  const { isMobile } = useMobileOptimizations();
+// Main Router Component
+function AuthenticatedRouter() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return (
+    <>
+      <Toaster />
+      <Switch>
+        {/* Public Portal Route - No Authentication Required */}
+        <Route path="/portal/:id?">
+          {(params) => (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+              <Portal representativeId={params.id} />
+            </div>
+          )}
+        </Route>
+
+        {/* Unified Authentication Route */}
+        <Route path="/">
+          {() => <UnifiedAuth />}
+        </Route>
+
+        {/* CRM Routes - Uses Unified Auth */}
+        <Route path="/crm/:rest*">
+          {() => <CrmProtectedRoutes />}
+        </Route>
+
+        {/* Admin Routes - Uses Traditional Auth */}
+        <Route path="/admin-login" component={AdminLogin} />
+        <Route path="/dashboard" component={() => <AdminProtectedRoutes />} />
+        <Route path="/invoices" component={() => <AdminProtectedRoutes />} />
+        <Route path="/invoice-management" component={() => <AdminProtectedRoutes />} />
+        <Route path="/representatives" component={() => <AdminProtectedRoutes />} />
+        <Route path="/sales-partners" component={() => <AdminProtectedRoutes />} />
+        <Route path="/settings" component={() => <AdminProtectedRoutes />} />
+        <Route path="/financial-integrity" component={() => <AdminProtectedRoutes />} />
+
+        {/* Catch-all for 404 */}
+        <Route component={NotFound} />
+      </Switch>
+    </>
+  );
+}
+
+export default function App() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Enhanced mobile detection and optimization
+  useMobileOptimizations();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -215,5 +255,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;

@@ -27,17 +27,13 @@ const app = express();
 // Fix for Replit GCE deployment - trust proxy for authentication
 app.set('trust proxy', true);
 
-// EMERGENCY: Simplified CORS - minimal headers only
+// EMERGENCY: Ultra-minimal CORS 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
-  
   next();
 });
 
@@ -62,11 +58,8 @@ const sessionMiddleware = session({
   rolling: true // Extend session on activity
 });
 
-// EMERGENCY: Disable session middleware temporarily
-app.use((req, res, next) => {
-  console.log('🚨 EMERGENCY: Session middleware disabled for debugging');
-  next();
-});
+// EMERGENCY: Completely skip session setup
+// Session middleware disabled
 
 // EMERGENCY: Performance monitoring disabled
 // app.use(performanceMonitoringMiddleware);
@@ -83,11 +76,39 @@ app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 // EMERGENCY: Timeout middleware disabled
 // app.use(timeoutMiddleware); // Temporarily disabled
 
-// EMERGENCY: Simple logging only
+// EMERGENCY: Deep debugging middleware
 app.use((req, res, next) => {
-  if (req.path.startsWith("/api")) {
-    console.log(`🔍 ${req.method} ${req.path}`);
-  }
+  console.log(`REQUEST: ${req.method} ${req.path}`);
+  
+  // Monitor response lifecycle
+  const originalSend = res.send;
+  const originalEnd = res.end;
+  const originalJson = res.json;
+  
+  res.send = function(data) {
+    console.log(`SEND CALLED: ${req.path} - Data type: ${typeof data}, Size: ${data ? String(data).length : 0}`);
+    return originalSend.call(this, data);
+  };
+  
+  res.end = function(data) {
+    console.log(`END CALLED: ${req.path} - Has data: ${!!data}`);
+    return originalEnd.call(this, data);
+  };
+  
+  res.json = function(data) {
+    console.log(`JSON CALLED: ${req.path}`);
+    return originalJson.call(this, data);
+  };
+  
+  // Monitor if response was finished
+  res.on('finish', () => {
+    console.log(`RESPONSE FINISHED: ${req.path} - Status: ${res.statusCode}`);
+  });
+  
+  res.on('close', () => {
+    console.log(`RESPONSE CLOSED: ${req.path}`);
+  });
+  
   next();
 });
 
@@ -146,6 +167,34 @@ app.use((req, res, next) => {
     });
 
   } else {
+    // EMERGENCY: Direct route to bypass Vite for root path
+    app.get('/', async (req, res) => {
+      console.log('ROOT ROUTE BYPASS - SERVING BUILT INDEX.HTML');
+      
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const indexPath = path.resolve(import.meta.dirname, '..', 'dist', 'public', 'index.html');
+        const html = fs.readFileSync(indexPath, 'utf-8');
+        res.setHeader('Content-Type', 'text/html');
+        res.status(200).send(html);
+      } catch (error) {
+        console.log('Error serving index.html:', error);
+        res.status(500).send('Error loading application');
+      }
+    });
+    
+    // EMERGENCY: Add test route first to isolate the problem
+    app.get('/test', (req, res) => {
+      console.log('TEST ROUTE HIT');
+      res.status(200).send('TEST ROUTE WORKS - Server is responding correctly!');
+    });
+    
+    app.get('/test-json', (req, res) => {
+      console.log('TEST JSON ROUTE HIT');
+      res.status(200).json({ message: 'JSON test works', timestamp: new Date().toISOString() });
+    });
+    
     // Development: Register routes BEFORE Vite setup
     console.log('🔧 Registering API routes BEFORE Vite setup...');
     // EMERGENCY: Disable auth middleware temporarily  
