@@ -51,6 +51,23 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.ssrFixStacktrace);
+
+  // Catch-all for client-side routing with strict API protection
+  app.get('*', (req, res, next) => {
+    // CRITICAL: Never interfere with API routes
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+
+    const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
+
+    if (acceptsHtml) {
+      req.url = '/';
+      vite.middlewares(req, res, next);
+    } else {
+      next();
+    }
+  });
 }
 
 export function serveStatic(app: Express) {

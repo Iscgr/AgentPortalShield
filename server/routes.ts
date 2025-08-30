@@ -352,7 +352,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard endpoint - Updated to use unified financial data with enhanced error handling
+  // CRITICAL: Dashboard endpoint with explicit route priority
+  console.log('📊 Registering /api/dashboard route...');
   app.get("/api/dashboard", authMiddleware, async (req, res) => {
     try {
       console.log("📊 SHERLOCK v32.0: Dashboard request received");
