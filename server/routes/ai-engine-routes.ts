@@ -168,4 +168,8 @@ router.get('/status', async (req, res) => {
   }
 });
 
+export function registerAiEngineRoutes(app: any, storage?: any) {
+  app.use('/api/ai-engine', router);
+}
+
 export default router;
