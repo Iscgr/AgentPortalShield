@@ -170,7 +170,24 @@ app.use((req, res, next) => {
     log('Database connection successful', 'database');
   }
 
-  const server = await registerRoutes(app);
+  // Register routes
+  registerRoutes(app);
+  registerCrmRoutes(app, requireAuth, storage);
+  registerUnifiedFinancialRoutes(app);
+  registerUnifiedStatisticsRoutes(app);
+  registerSettingsRoutes(app, storage);
+  registerStandardizedInvoiceRoutes(app, storage);
+  registerMaintenanceRoutes(app);
+  registerBatchRollbackRoutes(app, storage);
+  registerWorkspaceRoutes(app, storage);
+  registerIntegrationHealthRoutes(app);
+  registerFeatureFlagRoutes(app);
+  registerAiEngineRoutes(app, storage);
+  registerDebtVerificationRoutes(app);
+
+  // ✅ ATOMOS PHASE 5A: Register evidence validation routes
+  import { registerEvidenceValidationRoutes } from './routes/evidence-validation-routes';
+  registerEvidenceValidationRoutes(app);
 
   // SHERLOCK v16.2 DEPLOYMENT STABILITY: Enhanced health endpoints with comprehensive checks
   app.get('/health', async (req, res) => {
