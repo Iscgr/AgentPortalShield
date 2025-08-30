@@ -135,4 +135,37 @@ export function registerEvidenceValidationRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to perform order sensitivity analysis' });
     }
   });
+
+  // ✅ ATOMOS PHASE 5D: Multi-Root Resolution Analysis
+  app.get("/api/evidence/multi-root-resolution", async (req, res) => {
+    try {
+      console.log(`🧮 ATOMOS PHASE 5D: Executing Multi-Root Resolution Analysis`);
+      
+      const { MultiRootResolutionEngine } = await import('../services/multi-root-resolution-engine');
+      const multiRootReport = MultiRootResolutionEngine.executePhase5DProtocol();
+      
+      res.json({
+        success: true,
+        phase: "5D_MULTI_ROOT_RESOLUTION",
+        multiRootReport,
+        timestamp: new Date().toISOString(),
+        protocolStatus: {
+          mrrThreshold: 0.80,
+          metThreshold: multiRootReport.multiRootResolution >= 0.80,
+          consistencyThreshold: 0.85,
+          consistencyMet: multiRootReport.consistencyMetrics.overallConsistency >= 0.85,
+          readyForPhase5E: multiRootReport.phase5EReadiness,
+          qualityGate: {
+            name: 'MULTI_ROOT_CONVERGENCE_VERIFICATION',
+            status: multiRootReport.phase5EReadiness ? 'PASSED' : 'FAILED',
+            mrrScore: multiRootReport.multiRootResolution,
+            consistencyScore: multiRootReport.consistencyMetrics.overallConsistency
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Multi-root resolution analysis error:', error);
+      res.status(500).json({ error: 'Failed to perform multi-root resolution analysis' });
+    }
+  });
 }
