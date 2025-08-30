@@ -14,7 +14,6 @@ import { invoices } from '../../shared/schema.js'; // Assuming invoices schema i
 import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
 import { storage } from '../storage.js';
 import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
-import { EvidenceCollectionEngine } from '../services/evidence-collection-engine.js';
 import { performance } from 'perf_hooks'; // Import performance for timing
 import { isFeatureEnabled } from '../utils/featureFlags.js'; // Assuming feature flag utility exists
 
@@ -1544,83 +1543,6 @@ router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) =>
     });
   }
 });
-
-// Dashboard route
-router.get('/dashboard', async (req, res) => {
-  const startTime = performance.now();
-
-  // Start evidence collection for this dashboard request
-  const evidenceId = EvidenceCollectionEngine.startCollection('dashboard_load');
-
-  try {
-    // Fetch overall financial summary
-    const summary = await unifiedFinancialEngine.calculateGlobalSummary();
-
-    // Get all representatives with their calculated data
-    const calcStartTime = performance.now();
-    const representatives = await calculateAllRepresentatives();
-    const calcDuration = performance.now() - calcStartTime;
-
-    // Record evidence of calculation performance
-    EvidenceCollectionEngine.monitorPerformance('/dashboard', calcDuration, representatives.length);
-
-    const endTime = performance.now();
-    const responseTime = endTime - startTime;
-
-    // Complete evidence collection and get analysis
-    const evidenceResult = EvidenceCollectionEngine.stopCollection();
-
-    // Log evidence summary for ATOMOS analysis
-    console.log(`🔬 ATOMOS PHASE 4C: Evidence collected for dashboard request:`, {
-      totalEvidence: evidenceResult.summary.totalEvidence,
-      qualityScore: evidenceResult.validation.qualityScore,
-      performanceDegradation: responseTime > 1000 ? 'CRITICAL' : responseTime > 500 ? 'SLOW' : 'ACCEPTABLE'
-    });
-
-    res.json({
-      success: true,
-      data: {
-        summary,
-        representatives: {
-          total: representatives.length.toString(),
-          active: representatives.filter(rep => rep.status === 'ACTIVE').length.toString(),
-          inactive: representatives.filter(rep => rep.status === 'INACTIVE').length
-        },
-        invoices: {
-          total: summary.totalInvoices || '0',
-          paid: summary.paidInvoices || '0',
-          unpaid: summary.unpaidInvoices || '0',
-          overdue: summary.overdueInvoices || '0'
-        },
-        payments: {
-          totalAmount: 0,
-          unallocatedAmount: 0
-        },
-        salesPartners: {
-          total: 0,
-          active: 0
-        },
-        systemStatus: {
-          integrityScore: 0,
-          lastUpdate: new Date().toISOString()
-        }
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-        cacheStatus: 'FRESH',
-        queryTimeMs: Math.round(responseTime),
-        evidenceQuality: evidenceResult.validation.qualityScore
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    res.status(500).json({
-      success: false,
-      error: 'خطا در دریافت اطلاعات داشبورد'
-    });
-  }
-});
-
 
 // Health endpoint for dashboard - SHERLOCK v28.0 COMPLIANT
 router.get('/health', requireAuth, async (req, res) => {

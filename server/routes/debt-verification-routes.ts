@@ -275,8 +275,4 @@ function generateRecommendations(summary: any, inconsistentResults: any[]): stri
   return recommendations;
 }
 
-export function registerDebtVerificationRoutes(app: any) {
-  app.use('/api/debt-verification', router);
-}
-
 export default router;

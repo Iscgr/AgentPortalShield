@@ -161,8 +161,4 @@ router.post('/test/:feature', requireAuth, async (req, res) => {
   }
 });
 
-export function registerFeatureFlagRoutes(app: any) {
-  app.use('/api/feature-flags', router);
-}
-
 export default router;

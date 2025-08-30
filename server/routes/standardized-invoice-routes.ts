@@ -22,14 +22,13 @@ interface MulterRequest extends Request {
  * UNIFIED Invoice Generation Endpoint
  * یک endpoint واحد برای تمام نیازهای ایجاد فاکتور
  */
-export async function registerStandardizedInvoiceRoutes(app: any, storage: any) {
-  const { unifiedAuthMiddleware } = await import('../middleware/unified-auth');
+export function registerStandardizedInvoiceRoutes(app: any, requireAuth: any, storage: any) {
 
   /**
    * POST /api/invoices/generate-standard
    * Endpoint استاندارد برای ایجاد فاکتور از JSON
    */
-  app.post("/api/invoices/generate-standard", unifiedAuthMiddleware, upload.single('usageFile'), async (req: MulterRequest, res: Response) => {
+  app.post("/api/invoices/generate-standard", requireAuth, upload.single('usageFile'), async (req: MulterRequest, res: Response) => {
     try {
       console.log('🚀 SHERLOCK v18.4: STANDARDIZED Invoice Generation Started');
 

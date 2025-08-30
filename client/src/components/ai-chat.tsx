@@ -32,37 +32,22 @@ export default function AiChat() {
 
   const questionMutation = useMutation({
     mutationFn: async (question: string) => {
-      console.log('🤖 AI Chat: Sending question to AI engine...');
-      try {
-        const response = await apiRequest('/api/ai-engine/question', { 
-          method: 'POST', 
-          body: JSON.stringify({ question }),
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        console.log('🤖 AI Chat: Response received:', response);
-        return response;
-      } catch (error) {
-        console.error('🤖 AI Chat: Request failed:', error);
-        throw error;
-      }
+      const response = await apiRequest('/api/ai/question', { method: 'POST', data: { question } });
+      return response.json();
     },
     onSuccess: (data) => {
-      console.log('🤖 AI Chat: Processing successful response:', data);
       const aiMessage: Message = {
         id: Date.now().toString() + '-ai',
-        content: data?.answer || data?.response || 'پاسخ دریافت شد اما محتوا خالی است.',
+        content: data.answer,
         sender: 'ai',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, aiMessage]);
     },
     onError: (error) => {
-      console.error('🤖 AI Chat: Error occurred:', error);
       const errorMessage: Message = {
         id: Date.now().toString() + '-error',
-        content: '⚠️ خطا در ارتباط با دستیار هوش مصنوعی. لطفاً دوباره تلاش کنید.',
+        content: 'متاسفانه در حال حاضر قادر به پاسخگویی نیستم. لطفاً بعداً تلاش کنید.',
         sender: 'ai',
         timestamp: new Date()
       };

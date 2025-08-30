@@ -475,8 +475,4 @@ router.get("/test", async (req, res) => {
   }
 });
 
-export function registerWorkspaceRoutes(app: any, storage: any) {
-  app.use('/api/workspace', router);
-}
-
 export default router;

@@ -343,27 +343,21 @@ export class IntegrationVectorManager {
    * Initialize feature flags for gradual rollout control
    */
   private initializeFeatureFlags(): void {
-    // Production-ready features (Phase 8 validated - 100% functional/performance)
+    // Production-ready features (Phase 8 validated)
     this.featureFlags.set('enable_batch_processing', true);
     this.featureFlags.set('enable_smart_cache', true);
     this.featureFlags.set('enable_cache_invalidation', true);
-    this.featureFlags.set('enable_performance_monitoring', true);
     
-    // Testing/gradual rollout features (ready for staged deployment)
+    // Testing/gradual rollout features
     this.featureFlags.set('enable_mobile_optimizations', true);
-    this.featureFlags.set('enable_realtime_sync', true); // Phase 8 validated
+    this.featureFlags.set('enable_realtime_sync', false); // Will be gradual
     this.featureFlags.set('enable_advanced_monitoring', true);
-    
-    // Security hardening (Phase 9 priority)
-    this.featureFlags.set('enable_security_hardening', false); // Gradual rollout needed
-    this.featureFlags.set('enable_rate_limiting', false);
-    this.featureFlags.set('enable_csrf_protection', false);
     
     // Future features (Phase 10+)
     this.featureFlags.set('enable_predictive_caching', false);
     this.featureFlags.set('enable_ai_optimization', false);
     
-    console.log(`✅ PHASE 9: Configured ${this.featureFlags.size} feature flags for staged integration`);
+    console.log(`✅ PHASE 9B: Configured ${this.featureFlags.size} feature flags`);
   }
 
   /**
