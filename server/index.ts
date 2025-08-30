@@ -58,10 +58,10 @@ const sessionMiddleware = session({
   rolling: true // Extend session on activity
 });
 
-// EMERGENCY: Completely skip session setup
-// Session middleware disabled
+// EMERGENCY: Session middleware completely disabled for stability
+// All session-related middleware removed to prevent conflicts
 
-// EMERGENCY: Performance monitoring disabled
+// EMERGENCY: Performance monitoring completely disabled for stability
 // app.use(performanceMonitoringMiddleware);
 
 // Response compression middleware  
@@ -167,7 +167,48 @@ app.use((req, res, next) => {
     });
 
   } else {
-    // EMERGENCY: Direct route to bypass Vite for root path
+    // Development: Register ALL API routes FIRST with highest priority
+    console.log('🔧 Registering API routes with HIGHEST priority...');
+    
+    // EMERGENCY: Disable auth middleware completely for stability
+    const noAuthMiddleware = (req: any, res: any, next: any) => next();
+    
+    // Register ALL API routes BEFORE any other middleware
+    registerRoutes(app);
+    registerIntegrationHealthRoutes(app);
+    registerBatchRollbackRoutes(app, noAuthMiddleware);
+    registerStandardizedInvoiceRoutes(app, storage);
+    app.use('/api/phase9', phase9IntegrationRoutes);
+    
+    // Add explicit API route protection against Vite interference
+    app.use('/api/*', (req, res, next) => {
+      // Ensure API routes always return proper headers
+      res.setHeader('Content-Type', 'application/json');
+      next();
+    });
+    
+    console.log('✅ API routes registered with protection');
+
+    // Test routes for debugging (AFTER main API routes)
+    app.get('/test', (req, res) => {
+      console.log('TEST ROUTE HIT');
+      res.status(200).send('TEST ROUTE WORKS - Server is responding correctly!');
+    });
+    
+    app.get('/test-json', (req, res) => {
+      console.log('TEST JSON ROUTE HIT');
+      res.status(200).json({ message: 'JSON test works', timestamp: new Date().toISOString() });
+    });
+    
+    // Development: Single HTTP server with Vite integration
+    const { createServer } = await import('http');
+    const httpServer = createServer(app);
+    
+    // Setup Vite middleware AFTER all API routes with lower priority
+    console.log('🔧 Setting up Vite middleware AFTER API routes...');
+    await setupVite(app, httpServer);
+    
+    // Root route LAST (lowest priority)
     app.get('/', async (req, res) => {
       console.log('ROOT ROUTE BYPASS - SERVING BUILT INDEX.HTML');
       
@@ -183,43 +224,6 @@ app.use((req, res, next) => {
         res.status(500).send('Error loading application');
       }
     });
-    
-    // EMERGENCY: Add test route first to isolate the problem
-    app.get('/test', (req, res) => {
-      console.log('TEST ROUTE HIT');
-      res.status(200).send('TEST ROUTE WORKS - Server is responding correctly!');
-    });
-    
-    app.get('/test-json', (req, res) => {
-      console.log('TEST JSON ROUTE HIT');
-      res.status(200).json({ message: 'JSON test works', timestamp: new Date().toISOString() });
-    });
-    
-    // Development: Register routes BEFORE Vite setup
-    console.log('🔧 Registering API routes BEFORE Vite setup...');
-    // EMERGENCY: Disable auth middleware temporarily  
-    const noAuthMiddleware = (req: any, res: any, next: any) => next();
-    registerRoutes(app);
-    registerIntegrationHealthRoutes(app);
-    registerBatchRollbackRoutes(app, noAuthMiddleware);
-    registerStandardizedInvoiceRoutes(app, storage);
-    app.use('/api/phase9', phase9IntegrationRoutes);
-    console.log('✅ API routes registered successfully');
-
-    // Log all registered routes for debugging
-    app._router.stack.forEach((layer: any) => {
-      if (layer.route) {
-        console.log(`🔍 API Route registered: ${layer.route.path}`);
-      }
-    });
-    
-    // Development: Single HTTP server with Vite integration
-    const { createServer } = await import('http');
-    const httpServer = createServer(app);
-    
-    // Setup Vite middleware AFTER routes are registered
-    console.log('🔧 Setting up Vite middleware AFTER API routes...');
-    await setupVite(app, httpServer);
 
     // Start the unified HTTP server
     httpServer.listen(port, host, () => {

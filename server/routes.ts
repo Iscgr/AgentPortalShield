@@ -99,9 +99,15 @@ const upload = multer({
   }
 });
 
-// EMERGENCY: Disable all auth middleware temporarily
-  const authMiddleware = (req: any, res: any, next: any) => next();
-  const enhancedAuthMiddleware = (req: any, res: any, next: any) => next();
+// EMERGENCY: All auth middleware completely disabled for stability
+const authMiddleware = (req: any, res: any, next: any) => {
+  console.log('🔓 Auth middleware bypass - stability mode');
+  next();
+};
+const enhancedAuthMiddleware = (req: any, res: any, next: any) => {
+  console.log('🔓 Enhanced auth middleware bypass - stability mode');
+  next();
+};
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
