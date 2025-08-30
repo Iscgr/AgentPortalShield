@@ -6,6 +6,17 @@ import { setupVite, serveStatic, log } from "./vite";
 import { checkDatabaseHealth, closeDatabaseConnection, pool } from "./db";
 import { performanceMonitoringMiddleware } from "./middleware/performance";
 import { registerCrmRoutes } from "./routes/crm-routes";
+import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-routes";
+import { registerUnifiedStatisticsRoutes } from "./routes/unified-statistics-routes";
+import { registerSettingsRoutes } from "./routes/settings-routes";
+import { registerStandardizedInvoiceRoutes } from "./routes/standardized-invoice-routes";
+import { registerMaintenanceRoutes } from "./routes/maintenance-routes";
+import { registerBatchRollbackRoutes } from "./routes/batch-rollback-routes";
+import { registerWorkspaceRoutes } from "./routes/workspace-routes";
+import { registerIntegrationHealthRoutes } from "./routes/integration-health-routes";
+import { registerFeatureFlagRoutes } from "./routes/feature-flag-routes";
+import { registerAiEngineRoutes } from "./routes/ai-engine-routes";
+import { registerDebtVerificationRoutes } from "./routes/debt-verification-routes";
 
 
 const app = express();
