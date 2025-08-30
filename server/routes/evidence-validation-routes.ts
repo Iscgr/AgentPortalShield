@@ -6,6 +6,7 @@
 
 import { Express } from "express";
 import { EvidenceCollectionEngine } from "../services/evidence-collection-engine";
+import { BayesianAnalysisEngine } from "../services/bayesian-analysis-engine";
 
 export function registerEvidenceValidationRoutes(app: Express) {
   // ✅ ATOMOS PHASE 5A: Evidence collection status endpoint
@@ -74,6 +75,34 @@ export function registerEvidenceValidationRoutes(app: Express) {
     } catch (error) {
       console.error('Manual evidence collection error:', error);
       res.status(500).json({ error: 'Failed to collect evidence' });
+    }
+  });
+
+  // ✅ ATOMOS PHASE 5B: Bayesian posterior probability update
+  app.get("/api/evidence/bayesian-update", async (req, res) => {
+    try {
+      console.log(`🧮 ATOMOS PHASE 5B: Executing Bayesian posterior update`);
+      
+      const updates = BayesianAnalysisEngine.processPhase5AEvidence();
+      const convergenceAnalysis = BayesianAnalysisEngine.analyzeConvergence(updates);
+      const currentProbabilities = BayesianAnalysisEngine.getCurrentProbabilities();
+      
+      res.json({
+        success: true,
+        phase: "5B_BAYESIAN_UPDATE",
+        bayesianUpdates: updates,
+        convergenceAnalysis,
+        currentProbabilities: Object.fromEntries(currentProbabilities),
+        timestamp: new Date().toISOString(),
+        protocolStatus: {
+          convergenceThreshold: 0.92,
+          metThreshold: convergenceAnalysis.overallConvergence >= 0.92,
+          readyForPhase5C: convergenceAnalysis.convergenceStatus === 'CONVERGED'
+        }
+      });
+    } catch (error) {
+      console.error('Bayesian update error:', error);
+      res.status(500).json({ error: 'Failed to perform Bayesian update' });
     }
   });
 }
