@@ -355,6 +355,105 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
     }
   });
   
+  // ==================== GROUP CONFIGURATION ====================
+  
+  // Configure telegram group with Chat ID
+  app.post('/api/telegram/configure-group', authMiddleware, async (req, res) => {
+    try {
+      const { groupChatId, groupType, isActive = true } = req.body;
+      
+      if (!groupChatId) {
+        return res.status(400).json({
+          success: false,
+          message: 'شناسه گروه الزامی است'
+        });
+      }
+      
+      console.log(`🔧 PHASE 8C: Configuring group for bot ${AUTHORIZED_BOT_ID}`);
+      
+      // Validate group access
+      if (telegramService) {
+        try {
+          // Test sending a message to verify access
+          await telegramService.sendMessage(parseInt(groupChatId), 
+            `✅ ربات ${AUTHORIZED_BOT_ID} با موفقیت به گروه متصل شد و آماده دریافت پیام‌های هوشمند است.`
+          );
+          
+          // Store group configuration
+          const groupConfig = {
+            groupId: parseInt(groupChatId),
+            groupType: groupType || 'general',
+            name: `Group_${groupChatId}`,
+            isActive
+          };
+          
+          telegramService.addGroupConfig(groupConfig);
+          
+          res.json({
+            success: true,
+            message: 'گروه با موفقیت تنظیم شد',
+            groupConfig,
+            authorizedBot: AUTHORIZED_BOT_ID
+          });
+          
+        } catch (error) {
+          console.error(`❌ PHASE 8C: Group access error:`, error);
+          res.status(400).json({
+            success: false,
+            message: 'خطا در دسترسی به گروه. اطمینان حاصل کنید ربات به گروه اضافه شده',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'ربات تلگرام تنظیم نشده است'
+        });
+      }
+      
+    } catch (error: unknown) {
+      console.error('❌ PHASE 8C: Error configuring group:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در تنظیم گروه',
+        error: errorMessage
+      });
+    }
+  });
+  
+  // Send test message to group
+  app.post('/api/telegram/test-group-message', authMiddleware, async (req, res) => {
+    try {
+      const { groupChatId, message = 'پیام تست از دستیار هوشمند' } = req.body;
+      
+      if (!telegramService) {
+        return res.status(400).json({
+          success: false,
+          message: 'ربات تلگرام تنظیم نشده است'
+        });
+      }
+      
+      await telegramService.sendMessage(parseInt(groupChatId), 
+        `🤖 ${message}\n\n✅ ارسال شده توسط ${AUTHORIZED_BOT_ID}`
+      );
+      
+      res.json({
+        success: true,
+        message: 'پیام تست با موفقیت ارسال شد'
+      });
+      
+    } catch (error: unknown) {
+      console.error('❌ PHASE 8C: Error sending test message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در ارسال پیام تست',
+        error: errorMessage
+      });
+    }
+  });
+  
   // ==================== AI STATUS CHECK ====================
   
   // AI functionality status endpoint
