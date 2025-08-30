@@ -185,25 +185,6 @@ app.use((req, res, next) => {
     log('Database connection successful', 'database');
   }
 
-  // 🎯 CRITICAL FIX: Register API routes BEFORE any middleware that might interfere
-  console.log('🔧 Registering API routes with priority...');
-  registerRoutes(app);
-  // registerCouplingRoutes(app); // This route is not defined in the original code, assuming it's a typo or removed.
-  registerIntegrationHealthRoutes(app);
-  registerBatchRollbackRoutes(app, unifiedAuthMiddleware);
-  registerStandardizedInvoiceRoutes(app, storage);
-  
-  // Phase 9: Integration monitoring system
-  app.use('/api/phase9', phase9IntegrationRoutes);
-  console.log('✅ PHASE 9: Integration monitoring routes registered');
-
-  // Log all registered routes for debugging
-  app._router.stack.forEach((layer: any) => {
-    if (layer.route) {
-      console.log(`🔍 API Route registered: ${layer.route.path}`);
-    }
-  });
-
   // Move port and host declarations to the top
   const port = parseInt(process.env.PORT || '5000', 10);
   const host = '0.0.0.0';
@@ -227,22 +208,49 @@ app.use((req, res, next) => {
   await killExistingPort(Number(port));
 
   // 🎯 CRITICAL FIX: Single unified server startup logic
+  let serverInstance: any;
+  
   if (process.env.NODE_ENV === "production") {
+    // Production: Register routes first, then static serving
+    console.log('🔧 Registering API routes for production...');
+    registerRoutes(app);
+    registerIntegrationHealthRoutes(app);
+    registerBatchRollbackRoutes(app, unifiedAuthMiddleware);
+    registerStandardizedInvoiceRoutes(app, storage);
+    app.use('/api/phase9', phase9IntegrationRoutes);
+    console.log('✅ Production API routes registered');
+    
     // Production: Static file serving
     serveStatic(app);
     
-    const serverInstance = app.listen(port, host, () => {
+    serverInstance = app.listen(port, host, () => {
       console.log(`🚀 SHERLOCK v32.0: Production server started on port ${port}`);
       console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
     });
 
   } else {
+    // Development: Register routes BEFORE Vite setup
+    console.log('🔧 Registering API routes BEFORE Vite setup...');
+    registerRoutes(app);
+    registerIntegrationHealthRoutes(app);
+    registerBatchRollbackRoutes(app, unifiedAuthMiddleware);
+    registerStandardizedInvoiceRoutes(app, storage);
+    app.use('/api/phase9', phase9IntegrationRoutes);
+    console.log('✅ API routes registered successfully');
+
+    // Log all registered routes for debugging
+    app._router.stack.forEach((layer: any) => {
+      if (layer.route) {
+        console.log(`🔍 API Route registered: ${layer.route.path}`);
+      }
+    });
+    
     // Development: Single HTTP server with Vite integration
     const { createServer } = await import('http');
     const httpServer = createServer(app);
     
-    // Setup Vite middleware with the HTTP server
-    console.log('🔧 Setting up Vite with HTTP server integration...');
+    // Setup Vite middleware AFTER routes are registered
+    console.log('🔧 Setting up Vite middleware AFTER API routes...');
     await setupVite(app, httpServer);
 
     // Start the unified HTTP server
@@ -264,6 +272,9 @@ app.use((req, res, next) => {
         process.exit(1);
       }
     });
+    
+    // Set server instance for graceful shutdown
+    serverInstance = httpServer;
   }
 
   // Graceful shutdown handling for production stability

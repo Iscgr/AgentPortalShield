@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import type { Session } from "express-session";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, or, like, gte, lte, asc, count, desc } from "drizzle-orm";
@@ -65,7 +66,7 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
 
 // --- Interfaces for Authentication Middleware ---
-interface AuthSession extends Express.Session {
+interface AuthSession extends Session {
   authenticated?: boolean;
   userId?: number;
   username?: string;
@@ -81,7 +82,7 @@ interface AuthSession extends Express.Session {
 }
 
 interface AuthRequest extends Request {
-  session?: AuthSession;
+  session: AuthSession;
 }
 
 
@@ -156,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSettingsRoutes(app);
 
   // SHERLOCK v18.4: Register STANDARDIZED Invoice Routes - eliminates 11,117,500 تومان discrepancy
-  registerStandardizedInvoiceRoutes(app, authMiddleware, storage);
+  registerStandardizedInvoiceRoutes(app, storage);
 
   // Register maintenance and monitoring routes
   registerMaintenanceRoutes(app);
@@ -882,7 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payments: payments.map(pay => ({
           amount: pay.amount,
           paymentDate: pay.paymentDate,
-          description: pay.description
+          description: pay.description || ''
         })).sort((a, b) => {
           const dateA = new Date(a.paymentDate);
           const dateB = new Date(b.paymentDate);
@@ -1122,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // ✅ SHERLOCK v33.1: Normalize Persian/English dates for consistency
-      const { toEnglishDigits } = await import("../../client/src/lib/persian-date");
+      const toEnglishDigits = (str: string) => str.replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d).toString());
       const normalizedPaymentDate = toEnglishDigits(paymentDate);
 
       console.log(`📅 تطبیق تاریخ: ورودی="${paymentDate}" -> عادی‌سازی شده="${normalizedPaymentDate}"`);
@@ -1145,7 +1146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newPayment = await storage.createPayment({
         representativeId,
         amount,
-        paymentDate: normalizedPaymentDate,
+        paymentDate: new Date(normalizedPaymentDate),
         description,
         isAllocated: isAllocated,
         invoiceId: invoiceId
@@ -1159,7 +1160,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         try {
           // Allocate payment to specific invoice
-          await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
+          if (newPayment.id !== null) {
+            await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
+          }
 
           // ✅ CRITICAL: Update payment record to reflect allocation
           finalPaymentStatus = await storage.updatePayment(newPayment.id, {
@@ -1184,7 +1187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           await storage.autoAllocatePaymentToInvoices(newPayment.id, representativeId);
           // Get updated payment status after auto-allocation
-          finalPaymentStatus = await storage.getPayment(newPayment.id);
+          finalPaymentStatus = await storage.getPayments().then(payments => payments.find(p => p.id === newPayment.id) || newPayment);
         } catch (autoAllocationError) {
           console.error(`❌ SHERLOCK v33.2: Auto-allocation failed for Payment ${newPayment.id}:`, autoAllocationError);
         }
@@ -2764,7 +2767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         records: records,
         usageData: usageData,
         recordsCount: records.length,
-        totalAmount: records.reduce((sum, r) => sum + parseFloat(r.amount || '0'), 0)
+        totalAmount: records.reduce((sum: number, r: any) => sum + parseFloat(r.amount || '0'), 0)
       };
 
       console.log(`✅ SHERLOCK v32.0: Returning usage details for invoice ${invoiceId}:`, {
