@@ -255,4 +255,136 @@ export class EvidenceCollectionEngine {
       discriminators: Array.from(new Set(this.evidence.map(e => e.discriminatorId)))
     };
   }
+
+  /**
+   * ✅ ATOMOS PHASE 4E: Discriminative Value Verification
+   * Validates actual discriminative power against expected values
+   */
+  static validateDiscriminativePower(): {
+    discriminatorValidation: Record<string, any>;
+    overallEffectiveness: number;
+    verificationStatus: 'VERIFIED' | 'NEEDS_CALIBRATION' | 'FAILED';
+  } {
+    const discriminatorValidation: Record<string, any> = {};
+
+    // Validate D1: Query Pattern Signature
+    const queryPatternEvidence = this.evidence.filter(e => e.discriminatorId === 'D1_QUERY_PATTERN_SIGNATURE');
+    const expectedQueryPower = 0.95;
+    const actualQueryPower = queryPatternEvidence.length > 0 ? 
+      queryPatternEvidence.filter(e => e.confidence > 0.9).length / queryPatternEvidence.length : 0;
+
+    discriminatorValidation['D1_QUERY_PATTERN_SIGNATURE'] = {
+      expected: expectedQueryPower,
+      actual: actualQueryPower,
+      effectiveness: actualQueryPower / expectedQueryPower,
+      status: actualQueryPower >= expectedQueryPower * 0.9 ? 'VERIFIED' : 'NEEDS_CALIBRATION',
+      evidenceCount: queryPatternEvidence.length
+    };
+
+    // Validate D2: Performance Regression Vector
+    const performanceEvidence = this.evidence.filter(e => e.discriminatorId === 'D2_PERFORMANCE_REGRESSION_VECTOR');
+    const expectedPerfPower = 0.90;
+    const actualPerfPower = performanceEvidence.length > 0 ?
+      performanceEvidence.filter(e => e.confidence > 0.85).length / performanceEvidence.length : 0;
+
+    discriminatorValidation['D2_PERFORMANCE_REGRESSION_VECTOR'] = {
+      expected: expectedPerfPower,
+      actual: actualPerfPower,
+      effectiveness: actualPerfPower / expectedPerfPower,
+      status: actualPerfPower >= expectedPerfPower * 0.9 ? 'VERIFIED' : 'NEEDS_CALIBRATION',
+      evidenceCount: performanceEvidence.length
+    };
+
+    // Validate D3: Data Flow Inefficiency Pattern
+    const memoryEvidence = this.evidence.filter(e => e.discriminatorId === 'D3_DATA_FLOW_INEFFICIENCY_PATTERN');
+    const expectedMemoryPower = 0.70;
+    const actualMemoryPower = memoryEvidence.length > 0 ?
+      memoryEvidence.filter(e => e.confidence > 0.8).length / memoryEvidence.length : 0;
+
+    discriminatorValidation['D3_DATA_FLOW_INEFFICIENCY_PATTERN'] = {
+      expected: expectedMemoryPower,
+      actual: actualMemoryPower,
+      effectiveness: actualMemoryPower / expectedMemoryPower,
+      status: actualMemoryPower >= expectedMemoryPower * 0.9 ? 'VERIFIED' : 'NEEDS_CALIBRATION',
+      evidenceCount: memoryEvidence.length
+    };
+
+    // Calculate overall effectiveness
+    const discriminators = Object.values(discriminatorValidation);
+    const overallEffectiveness = discriminators.reduce((sum, d) => sum + d.effectiveness, 0) / discriminators.length;
+
+    // Determine verification status
+    const verifiedCount = discriminators.filter(d => d.status === 'VERIFIED').length;
+    let verificationStatus: 'VERIFIED' | 'NEEDS_CALIBRATION' | 'FAILED';
+
+    if (verifiedCount === discriminators.length && overallEffectiveness >= 0.95) {
+      verificationStatus = 'VERIFIED';
+    } else if (verifiedCount >= discriminators.length * 0.8) {
+      verificationStatus = 'NEEDS_CALIBRATION';
+    } else {
+      verificationStatus = 'FAILED';
+    }
+
+    console.log(`🔬 ATOMOS PHASE 4E: Discriminative value verification complete`);
+    console.log(`📊 Overall effectiveness: ${Math.round(overallEffectiveness * 100)}%`);
+    console.log(`✅ Verification status: ${verificationStatus}`);
+
+    return {
+      discriminatorValidation,
+      overallEffectiveness: Math.round(overallEffectiveness * 100) / 100,
+      verificationStatus
+    };
+  }
+
+  /**
+   * ✅ ATOMOS PHASE 4E: Evidence Quality Assurance
+   * Validates collected evidence meets quality thresholds
+   */
+  static validateEvidenceQuality(): {
+    qualityMetrics: Record<string, number>;
+    qualityStatus: 'EXCELLENT' | 'GOOD' | 'ACCEPTABLE' | 'INSUFFICIENT';
+    recommendations: string[];
+  } {
+    const analysis = this.analyzeEvidence();
+    const qualityMetrics = {
+      completeness: analysis.validation.completeness,
+      precision: analysis.validation.precision,
+      consistency: analysis.validation.consistency,
+      reliability: analysis.validation.reliability,
+      overallQuality: analysis.summary.qualityScore
+    };
+
+    // Determine quality status
+    let qualityStatus: 'EXCELLENT' | 'GOOD' | 'ACCEPTABLE' | 'INSUFFICIENT';
+    const overallScore = qualityMetrics.overallQuality;
+
+    if (overallScore >= 0.90) qualityStatus = 'EXCELLENT';
+    else if (overallScore >= 0.80) qualityStatus = 'GOOD';
+    else if (overallScore >= 0.70) qualityStatus = 'ACCEPTABLE';
+    else qualityStatus = 'INSUFFICIENT';
+
+    // Generate recommendations
+    const recommendations = [];
+    if (qualityMetrics.completeness < 0.8) {
+      recommendations.push("Increase evidence collection duration");
+    }
+    if (qualityMetrics.precision < 0.85) {
+      recommendations.push("Adjust confidence thresholds for evidence recording");
+    }
+    if (qualityMetrics.consistency < 0.80) {
+      recommendations.push("Validate test scenario consistency");
+    }
+    if (qualityMetrics.reliability < 0.80) {
+      recommendations.push("Enhance evidence validation mechanisms");
+    }
+
+    console.log(`🔬 ATOMOS PHASE 4E: Evidence quality validation complete`);
+    console.log(`📊 Quality status: ${qualityStatus} (${Math.round(overallScore * 100)}%)`);
+
+    return {
+      qualityMetrics,
+      qualityStatus,
+      recommendations
+    };
+  }
 }
