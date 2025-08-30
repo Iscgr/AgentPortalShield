@@ -324,11 +324,18 @@ const OverdueInvoicesCard = () => {
 
 
 export default function Dashboard() {
-  const { data: dashboardData, isLoading } = useQuery<DashboardData>({
+  const { data: dashboardData, isLoading, error } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
-    queryFn: () => apiRequest("/api/dashboard"),
+    queryFn: async () => {
+      console.log('🔍 Dashboard: Fetching dashboard data...');
+      const response = await apiRequest("/api/dashboard");
+      console.log('🔍 Dashboard: Raw response:', response);
+      return response;
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     select: (data: any) => {
       console.log('🔍 SHERLOCK v32.2: Raw API response structure:', data);
       
@@ -452,13 +459,29 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Invoice Generation Section */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-1">
           <InvoiceUpload />
         </div>
 
-        {/* SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table */}
-        {/* This widget has been replaced by OverdueInvoicesCard */}
-        {/* <DebtorRepresentativesCard /> */}
+        {/* AI Assistant Section */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Bot className="w-5 h-5 ml-2" />
+                دستیار هوش مصنوعی
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AiChat />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Overdue Invoices Widget */}
+        <div className="lg:col-span-1">
+          <OverdueInvoicesCard />
+        </div>
       </div>
 
       {/* SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table */}

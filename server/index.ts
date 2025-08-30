@@ -182,23 +182,30 @@ app.use((req, res, next) => {
     log('Database connection successful', 'database');
   }
 
-  // Register routes
-  const { storage } = await import('./storage');
-  const { unifiedAuthMiddleware } = await import('./middleware/unified-auth');
-
+  // 🎯 CRITICAL FIX: Register API routes BEFORE any middleware that might interfere
+  console.log('🔧 Registering API routes with priority...');
   registerRoutes(app);
-  registerCrmRoutes(app, unifiedAuthMiddleware, storage);
-  registerUnifiedFinancialRoutes(app);
-  registerUnifiedStatisticsRoutes(app);
-  registerSettingsRoutes(app, storage);
-  await registerStandardizedInvoiceRoutes(app, storage);
-  registerMaintenanceRoutes(app);
-  registerBatchRollbackRoutes(app, unifiedAuthMiddleware);
-  registerWorkspaceRoutes(app, storage);
+  // registerCouplingRoutes(app); // This route is not defined in the original code, assuming it's a typo or removed.
   registerIntegrationHealthRoutes(app);
-  registerFeatureFlagRoutes(app);
-  registerAiEngineRoutes(app, storage);
-  registerDebtVerificationRoutes(app);
+  registerBatchRollbackRoutes(app, unifiedAuthMiddleware);
+  registerStandardizedInvoiceRoutes(app, storage);
+
+  // Log all registered routes for debugging
+  app._router.stack.forEach((layer: any) => {
+    if (layer.route) {
+      console.log(`🔍 API Route registered: ${layer.route.path}`);
+    }
+  });
+
+  // Production static file serving
+  if (process.env.NODE_ENV === "production") {
+    serveStatic(app);
+  } else {
+    // Development mode with API protection
+    console.log('🔧 Setting up Vite with API route protection...');
+    await setupVite(app);
+  }
+
 
   // ✅ ATOMOS PHASE 5A: Register evidence validation routes
   const { registerEvidenceValidationRoutes } = await import('./routes/evidence-validation-routes');
