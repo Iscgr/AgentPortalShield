@@ -24,7 +24,7 @@ import {
   BarChart,
   Users
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,7 +53,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { toPersianDigits } from "@/lib/persian-date";
 import { FinancialIntegrityDashboard } from '../components/financial-integrity-dashboard';
 import { BatchRollbackManager } from '../components/batch-rollback-manager';
-import { UnifiedAuthContext } from '../contexts/unified-auth-context';
 
 const telegramSettingsSchema = z.object({
   botToken: z.string().min(1, "توکن ربات الزامی است"),
@@ -1248,7 +1247,7 @@ export default function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Settings className="w-5 h-5 ml-2" />
+                  <SettingsIcon className="w-5 h-5 ml-2" />
                   تنظیمات عمومی
                 </CardTitle>
               </CardHeader>
