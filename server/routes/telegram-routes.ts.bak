@@ -70,14 +70,14 @@ const configSchema = z.object({
 // ==================== TELEGRAM ROUTES ====================
 
 export function registerTelegramRoutes(app: Express, authMiddleware: any) {
-  
+
   // ==================== BOT CONFIGURATION ====================
-  
+
   // Direct Test Messages for Employee Groups
   app.post('/api/telegram/test-employee-groups', authMiddleware, async (req, res) => {
     try {
       const { groupType } = req.body as { groupType: string };
-      
+
       // Test message formats for different employee subgroups
       const testMessages: Record<string, { persian: string; english: string }> = {
         'daily-report': {
@@ -97,14 +97,14 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           english: '#technical_report\n⚠️ Issue: Server failure\n📅 Time: 2025-03-02 - 14:30\n🔧 Status: Resolved\n👤 Reporter: Hossein Karimi\n📊 Impact: 30min downtime\n🛠️ Solution:\n- Main server restart\n- Log analysis\n- Config optimization\n🔮 Prevention:\n- Enhanced monitoring\n- Auto backup'
         }
       };
-      
+
       const expectedActions: Record<string, string> = {
         'daily-report': 'تحلیل عملکرد، ثبت ساعات کار، برنامه‌ریزی روز بعد',
         'task-assignment': 'ایجاد وظیفه جدید، اختصاص به کارمند، تنظیم یادآوری',
         'leave-request': 'بررسی اعتبار درخواست، تأیید مدیر، تنظیم جایگزین',
         'technical-report': 'ثبت مشکل، پیگیری راه‌حل، آمارگیری اختلالات'
       };
-      
+
       const selectedMessage = testMessages[groupType];
       if (!selectedMessage) {
         return res.status(400).json({
@@ -112,7 +112,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           message: 'Invalid group type'
         });
       }
-      
+
       // Test with both Persian and English formats
       res.json({
         success: true,
@@ -124,7 +124,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           expectedActions: expectedActions[groupType]
         }
       });
-      
+
     } catch (error: unknown) {
       console.error('❌ Error generating test messages:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -135,25 +135,25 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // Configure Telegram bot
   app.post('/api/telegram/config', authMiddleware, async (req, res) => {
     try {
       const config = configSchema.parse(req.body);
-      
+
       // Initialize or reinitialize telegram service
       telegramService = new EnhancedTelegramService(config.token, {
         useWebhook: !config.use_polling,
         webhookUrl: config.webhook_url,
         pollingTimeout: config.polling_timeout
       });
-      
+
       if (config.use_polling) {
         // Start polling
         await telegramService.startPolling(async (update) => {
           await handleTelegramUpdate(update);
         });
-        
+
         res.json({
           success: true,
           message: 'Telegram bot configured with polling',
@@ -162,7 +162,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       } else if (config.webhook_url) {
         // Set webhook
         await telegramService.setWebhook(config.webhook_url);
-        
+
         res.json({
           success: true,
           message: 'Telegram bot configured with webhook',
@@ -182,7 +182,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // Webhook endpoint
   app.post('/api/telegram/webhook', async (req, res) => {
     try {
@@ -194,9 +194,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(200).json({ ok: true }); // Telegram requires 200 even on errors
     }
   });
-  
+
   // ==================== EMPLOYEE MANAGEMENT ====================
-  
+
   // Get all employees
   app.get('/api/telegram/employees', authMiddleware, async (req, res) => {
     try {
@@ -207,13 +207,13 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to fetch employees' });
     }
   });
-  
+
   // Add new employee
   app.post('/api/telegram/employees', authMiddleware, async (req, res) => {
     try {
       const employeeData = insertEmployeeSchema.parse(req.body);
       const [newEmployee] = await db.insert(employees).values(employeeData).returning();
-      
+
       res.json({
         success: true,
         message: 'Employee added successfully',
@@ -227,23 +227,23 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // Update employee
   app.put('/api/telegram/employees/:id', authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const employeeData = insertEmployeeSchema.partial().parse(req.body);
-      
+
       const [updatedEmployee] = await db
         .update(employees)
         .set({ ...employeeData, updatedAt: new Date() })
         .where(eq(employees.id, id))
         .returning();
-      
+
       if (!updatedEmployee) {
         return res.status(404).json({ error: 'Employee not found' });
       }
-      
+
       res.json({
         success: true,
         message: 'Employee updated successfully',
@@ -254,9 +254,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to update employee' });
     }
   });
-  
+
   // ==================== TASK MANAGEMENT ====================
-  
+
   // Get tasks
   app.get('/api/telegram/tasks', authMiddleware, async (req, res) => {
     try {
@@ -267,13 +267,13 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to fetch tasks' });
     }
   });
-  
+
   // Create task
   app.post('/api/telegram/tasks', authMiddleware, async (req, res) => {
     try {
       const taskData = insertEmployeeTaskSchema.parse(req.body);
       const [newTask] = await db.insert(employeeTasks).values(taskData).returning();
-      
+
       res.json({
         success: true,
         message: 'Task created successfully',
@@ -284,13 +284,13 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to create task' });
     }
   });
-  
+
   // Update task status
   app.put('/api/telegram/tasks/:id/status', authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
-      
+
       const [updatedTask] = await db
         .update(employeeTasks)
         .set({ 
@@ -300,11 +300,11 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         })
         .where(eq(employeeTasks.id, id))
         .returning();
-      
+
       if (!updatedTask) {
         return res.status(404).json({ error: 'Task not found' });
       }
-      
+
       res.json({
         success: true,
         message: 'Task status updated successfully',
@@ -315,9 +315,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to update task status' });
     }
   });
-  
+
   // ==================== MESSAGE MANAGEMENT ====================
-  
+
   // Get telegram messages
   app.get('/api/telegram/messages', authMiddleware, async (req, res) => {
     try {
@@ -328,9 +328,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to fetch messages' });
     }
   });
-  
+
   // ==================== LEAVE REQUESTS ====================
-  
+
   // Get leave requests
   app.get('/api/telegram/leave-requests', authMiddleware, async (req, res) => {
     try {
@@ -341,13 +341,13 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to fetch leave requests' });
     }
   });
-  
+
   // Approve/Deny leave request
   app.put('/api/telegram/leave-requests/:id/review', authMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status, reviewComment } = req.body;
-      
+
       const [updatedRequest] = await db
         .update(leaveRequests)
         .set({
@@ -358,17 +358,17 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         })
         .where(eq(leaveRequests.id, id))
         .returning();
-      
+
       if (!updatedRequest) {
         return res.status(404).json({ error: 'Leave request not found' });
       }
-      
+
       // Send response to employee via Telegram
       if (telegramService) {
         // Find employee and send notification
         // Implementation will be added later
       }
-      
+
       res.json({
         success: true,
         message: 'Leave request reviewed successfully',
@@ -379,9 +379,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to review leave request' });
     }
   });
-  
+
   // ==================== TECHNICAL REPORTS ====================
-  
+
   // Get technical reports
   app.get('/api/telegram/technical-reports', authMiddleware, async (req, res) => {
     try {
@@ -392,9 +392,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to fetch technical reports' });
     }
   });
-  
+
   // ==================== DAILY REPORTS ====================
-  
+
   // Get daily reports
   app.get('/api/telegram/daily-reports', authMiddleware, async (req, res) => {
     try {
@@ -405,9 +405,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to fetch daily reports' });
     }
   });
-  
+
   // ==================== STATISTICS ====================
-  
+
   // Get telegram statistics
   app.get('/api/telegram/statistics', authMiddleware, async (req, res) => {
     try {
@@ -418,7 +418,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         unprocessedMessages: await db.select().from(telegramMessages).where(eq(telegramMessages.processed, false)).then(rows => rows.length),
         dailyReportsToday: await db.select().from(dailyReports).where(eq(dailyReports.reportDate, new Date().toLocaleDateString('fa-IR'))).then(rows => rows.length)
       };
-      
+
       res.json({ statistics: stats });
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -432,18 +432,18 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
 async function handleTelegramUpdate(update: any) {
   try {
     console.log('🤖 Processing Telegram update:', update.parsedMessage?.type || 'unknown');
-    
+
     const parsedMessage = update.parsedMessage;
     const entities = update.extractedEntities;
     const commandResponse = update.commandResponse;
-    
+
     if (!parsedMessage) return;
-    
+
     // Find or create employee
     let employee = await db.select().from(employees)
       .where(eq(employees.telegramId, parsedMessage.employeeId.toString()))
       .then(rows => rows[0]);
-    
+
     if (!employee) {
       // Create new employee
       const [newEmployee] = await db.insert(employees).values({
@@ -455,7 +455,7 @@ async function handleTelegramUpdate(update: any) {
       }).returning();
       employee = newEmployee;
     }
-    
+
     // Save telegram message
     const [savedMessage] = await db.insert(telegramMessages).values({
       messageId: parsedMessage.messageId.toString(),
@@ -472,7 +472,7 @@ async function handleTelegramUpdate(update: any) {
       receivedAt: new Date(parsedMessage.timestamp * 1000),
       processedAt: new Date()
     }).returning();
-    
+
     // Handle specific message types
     switch (parsedMessage.type) {
       case 'leave_request':
@@ -485,25 +485,25 @@ async function handleTelegramUpdate(update: any) {
         await handleDailyReport(parsedMessage, employee.id, savedMessage.id);
         break;
     }
-    
+
     // Create task if needed
     if (commandResponse?.createTask) {
       await createTaskFromMessage(parsedMessage, employee.id, savedMessage.id);
     }
-    
+
     // Send response if needed
     if (commandResponse?.shouldRespond && telegramService) {
       await telegramService.sendMessage(
         update.originalUpdate.message.chat.id,
         commandResponse.responseText
       );
-      
+
       // Update message as responded
       await db.update(telegramMessages)
         .set({ responseSent: true })
         .where(eq(telegramMessages.id, savedMessage.id));
     }
-    
+
   } catch (error) {
     console.error('Error handling Telegram update:', error);
   }
@@ -552,7 +552,7 @@ async function handleDailyReport(parsedMessage: any, employeeId: number, message
 }
 
   // ==================== STATUS AND SETTINGS ENDPOINTS ====================
-  
+
   // Get Telegram bot status
   app.get('/api/telegram/status', authMiddleware, async (req, res) => {
     try {
@@ -572,7 +572,7 @@ async function handleDailyReport(parsedMessage: any, employeeId: number, message
       });
     }
   });
-  
+
   // Get Telegram settings
   app.get('/api/telegram/settings', authMiddleware, async (req, res) => {
     try {
@@ -612,7 +612,7 @@ async function createTaskFromMessage(parsedMessage: any, employeeId: number, mes
       createdById: employeeId,
       metadata: { sourceMessageId: messageId }
     }).returning();
-    
+
     // Update message to link the created task
     await db.update(telegramMessages)
       .set({ 
@@ -620,7 +620,7 @@ async function createTaskFromMessage(parsedMessage: any, employeeId: number, mes
         createdTaskId: newTask.id 
       })
       .where(eq(telegramMessages.id, messageId));
-      
+
   } catch (error) {
     console.error('Error creating task from message:', error);
   }

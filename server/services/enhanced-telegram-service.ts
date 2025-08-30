@@ -436,8 +436,12 @@ class EnhancedTelegramService {
   private entityExtractor: EntityExtractor;
   private commandHandler: CommandHandler;
   private groupConfigs: GroupConfig[] = [];
+  private authorizedBotId: string = '@Dsyrhshnmdbot'; // ✅ PHASE 8C: SECURITY
 
   constructor(token: string, config: any = {}) {
+    // ✅ PHASE 8C: SECURITY VALIDATION
+    console.log(`🔐 PHASE 8C: Initializing service for authorized bot: ${this.authorizedBotId}`);
+    
     this.token = token;
     this.apiBase = `https://api.telegram.org/bot${token}`;
     this.config = {
