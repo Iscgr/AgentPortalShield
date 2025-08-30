@@ -391,10 +391,22 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
     try {
       const { groupChatId, groupType, groupName, isActive = true } = req.body;
 
+      console.log('📧 PHASE 8C: Group configuration request:', { groupChatId, groupType, groupName });
+
       if (!groupChatId || !groupName) {
+        console.error('❌ PHASE 8C: Missing required fields');
         return res.status(400).json({
           success: false,
           message: 'شناسه گروه و نام گروه الزامی است'
+        });
+      }
+
+      // Validate Chat ID format
+      if (!String(groupChatId).match(/^-?\d+$/)) {
+        console.error('❌ PHASE 8C: Invalid Chat ID format:', groupChatId);
+        return res.status(400).json({
+          success: false,
+          message: 'شناسه گروه باید عددی باشد'
         });
       }
 

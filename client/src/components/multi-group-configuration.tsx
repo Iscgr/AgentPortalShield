@@ -58,11 +58,26 @@ export function MultiGroupConfiguration({ toast }: MultiGroupConfigurationProps)
       return;
     }
 
+    // Validate Chat ID format
+    if (!newGroup.chatId.match(/^-?\d+$/)) {
+      toast({
+        title: "خطا",
+        description: "شناسه گروه باید عددی باشد (مثل: -1001234567890)",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
+      console.log('🔧 Adding new group:', newGroup);
+      
       const response = await fetch('/api/telegram/configure-group', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ 
           groupChatId: newGroup.chatId, 
           groupType: newGroup.groupType,
@@ -70,7 +85,12 @@ export function MultiGroupConfiguration({ toast }: MultiGroupConfigurationProps)
         })
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const result = await response.json();
+      console.log('✅ Group configuration response:', result);
 
       if (result.success) {
         const newGroupData: TelegramGroup = {

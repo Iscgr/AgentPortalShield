@@ -838,5 +838,5 @@ export class EnhancedTelegramService {
 
 // ==================== EXPORTS ====================
 
-export { EnhancedTelegramService, MessageParser, EntityExtractor, CommandHandler };
+export { MessageParser, EntityExtractor, CommandHandler };
 export default EnhancedTelegramService;

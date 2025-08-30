@@ -285,14 +285,14 @@ app.use((req, res, next) => {
   // Kill existing port and start server
   killExistingPort(Number(port));
 
-  // Add graceful shutdown
+  // Add graceful shutdown handlers
   process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
+    console.log('🛑 SIGTERM received, shutting down gracefully');
     process.exit(0);
   });
 
   process.on('SIGINT', () => {
-    console.log('SIGINT received, shutting down gracefully');
+    console.log('🛑 SIGINT received, shutting down gracefully');
     process.exit(0);
   });
 

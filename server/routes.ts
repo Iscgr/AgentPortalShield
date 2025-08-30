@@ -3187,7 +3187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== ENHANCED TELEGRAM MANAGEMENT ROUTES ====================
+  // ====== ENHANCED TELEGRAM MANAGEMENT ROUTES ======
   // SHERLOCK v32.0: Advanced Telegram bot with AI-powered message parsing
   try {
     const { registerTelegramRoutes } = await import('./routes/telegram-routes');
@@ -3195,7 +3195,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('✅ SHERLOCK v32.0: Enhanced Telegram Management Routes Registered');
   } catch (error) {
     console.error('❌ Failed to register Enhanced Telegram routes:', error);
-    console.log('🔄 Continuing without complex telegram routes...');
+    console.log('🔄 Registering basic telegram fallback routes...');
+
+    // Basic fallback route for group configuration
+    app.post("/api/telegram/configure-group", authMiddleware, async (req, res) => {
+      res.status(503).json({
+        success: false,
+        message: "سرویس تلگرام موقتاً در دسترس نیست. لطفاً بعداً تلاش کنید.",
+        fallback: true
+      });
+    });
+
+    app.get("/api/telegram/ai-status", authMiddleware, async (req, res) => {
+      res.status(503).json({
+        success: false,
+        message: "سرویس AI موقتاً در دسترس نیست",
+        fallback: true
+      });
+    });
   }
 
   const httpServer = createServer(app);

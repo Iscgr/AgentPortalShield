@@ -765,7 +765,7 @@ export default function Settings() {
 
             {/* Multi-Group Configuration */}
             <MultiGroupConfiguration toast={toast} />
-            
+
             {/* AI Integration Status */}
             <Card>
               <CardHeader>
@@ -780,21 +780,36 @@ export default function Settings() {
                     variant="outline"
                     onClick={async () => {
                       try {
-                        const response = await fetch('/api/telegram/ai-status');
+                        console.log('🔍 Checking AI status...');
+                        const response = await fetch('/api/telegram/ai-status', {
+                          method: 'GET',
+                          headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                          }
+                        });
+
+                        if (!response.ok) {
+                          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+
                         const result = await response.json();
+                        console.log('📊 AI Status result:', result);
 
                         if (result.success) {
+                          const activeFeatures = Object.values(result.ai?.features || {}).filter(Boolean).length;
                           toast({
                             title: "✅ وضعیت AI بررسی شد",
-                            description: `اتصال: ${result.ai.connection} | ویژگی‌ها: ${Object.values(result.ai.features).filter(Boolean).length}/3 فعال`,
+                            description: `اتصال: ${result.ai?.connection || 'نامشخص'} | ویژگی‌ها: ${activeFeatures}/3 فعال`,
                           });
                         } else {
-                          throw new Error(result.message);
+                          throw new Error(result.message || 'خطای نامشخص');
                         }
                       } catch (error: any) {
+                        console.error('❌ AI Status Error:', error);
                         toast({
                           title: "❌ خطا در بررسی وضعیت AI",
-                          description: error.message || "خطا در اتصال",
+                          description: error.message || "خطا در اتصال به سرور",
                           variant: "destructive"
                         });
                       }
