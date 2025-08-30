@@ -40,33 +40,48 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
-  // 🚨 CRITICAL FIX: Ensure Vite middleware only handles non-API routes
+  // 🚨 CRITICAL FIX: Enhanced API route protection with strict checking
   app.use((req, res, next) => {
+    // ABSOLUTE API PROTECTION: Never let Vite handle any /api/ routes
     if (req.path.startsWith('/api/')) {
-      console.log(`🔍 Vite middleware: SKIPPING API route ${req.path}`);
+      console.log(`🔒 Vite middleware: PROTECTED API route ${req.path} - bypassing Vite`);
       return next();
     }
-    console.log(`🔍 Vite middleware: HANDLING static route ${req.path}`);
+    
+    // For non-API routes, apply Vite middleware carefully
+    console.log(`🔍 Vite middleware: Processing static route ${req.path}`);
+    
+    // Additional safety check for API-like patterns
+    if (req.path.includes('/api/') || req.url.includes('/api/')) {
+      console.log(`🚨 Vite middleware: Detected API pattern in ${req.path} - bypassing`);
+      return next();
+    }
+    
     vite.middlewares(req, res, next);
   });
 
   app.use(vite.ssrFixStacktrace);
 
-  // Catch-all for client-side routing with strict API protection
+  // 🎯 ENHANCED: Catch-all with multiple safety layers
   app.get('*', (req, res, next) => {
-    // CRITICAL: Never interfere with API routes
-    if (req.path.startsWith('/api/')) {
+    // LAYER 1: Absolute API route protection
+    if (req.path.startsWith('/api/') || req.url.startsWith('/api/')) {
+      console.log(`🔒 Catch-all: API route ${req.path} protected from Vite`);
       return next();
     }
 
+    // LAYER 2: Check Accept headers for HTML requests only
     const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
-
-    if (acceptsHtml) {
-      req.url = '/';
-      vite.middlewares(req, res, next);
-    } else {
-      next();
+    
+    if (!acceptsHtml) {
+      console.log(`🔒 Catch-all: Non-HTML request ${req.path} bypassing Vite`);
+      return next();
     }
+
+    // LAYER 3: Safe Vite handling for HTML requests
+    console.log(`🏠 Catch-all: Serving SPA for ${req.path}`);
+    req.url = '/';
+    vite.middlewares(req, res, next);
   });
 }
 

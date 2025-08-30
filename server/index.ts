@@ -199,82 +199,9 @@ app.use((req, res, next) => {
     }
   });
 
-  // Production static file serving
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    // Development mode with API protection
-    console.log('🔧 Setting up Vite with API route protection...');
-    await setupVite(app);
-  }
-
-
-  // Start server with retry mechanism
-  let serverInstance: any;
-  const startServer = async () => {
-    try {
-      // Wait a moment for port to be freed
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      serverInstance = app.listen(port, host, () => {
-        console.log(`🚀 SHERLOCK v32.0: Server successfully started on port ${port}`);
-        console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
-        console.log(`✅ Dashboard API should now be accessible at /api/dashboard`);
-      });
-
-      serverInstance.on('error', (error: any) => {
-        if (error.code === 'EADDRINUSE') {
-          console.error(`❌ Port ${port} is still in use. Retrying in 2 seconds...`);
-          setTimeout(() => {
-            serverInstance.close();
-            startServer();
-          }, 2000);
-        } else {
-          console.error('❌ Server error:', error);
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ Failed to start server:', error);
-      setTimeout(startServer, 2000);
-    }
-  };
-
   // Move port and host declarations to the top
   const port = parseInt(process.env.PORT || '5000', 10);
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    // Create HTTP server first for Vite setup
-    const { createServer } = await import('http');
-    const server = createServer(app);
-    await setupVite(app, server);
-
-    // Start the server manually after Vite setup
-    server.listen(port, host, () => {
-      console.log(`🚀 SHERLOCK v32.0: Server successfully started on port ${port}`);
-      console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
-      console.log(`✅ Dashboard API should now be accessible at /api/dashboard`);
-    });
-
-    server.on('error', (error: any) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${port} is still in use. Retrying in 2 seconds...`);
-        setTimeout(() => {
-          server.close();
-          startServer();
-        }, 2000);
-      } else {
-        console.error('❌ Server error:', error);
-      }
-    });
-  } else {
-    serveStatic(app);
-    startServer();
-  }
+  const host = '0.0.0.0';
 
   // Kill any existing process on the port before starting
   async function killExistingPort(port: number) {
@@ -292,7 +219,47 @@ app.use((req, res, next) => {
     }
   }
 
-  killExistingPort(Number(port));
+  await killExistingPort(Number(port));
+
+  // 🎯 CRITICAL FIX: Single unified server startup logic
+  if (process.env.NODE_ENV === "production") {
+    // Production: Static file serving
+    serveStatic(app);
+    
+    const serverInstance = app.listen(port, host, () => {
+      console.log(`🚀 SHERLOCK v32.0: Production server started on port ${port}`);
+      console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
+    });
+
+  } else {
+    // Development: Single HTTP server with Vite integration
+    const { createServer } = await import('http');
+    const httpServer = createServer(app);
+    
+    // Setup Vite middleware with the HTTP server
+    console.log('🔧 Setting up Vite with HTTP server integration...');
+    await setupVite(app, httpServer);
+
+    // Start the unified HTTP server
+    httpServer.listen(port, host, () => {
+      console.log(`🚀 SHERLOCK v32.0: Development server started on port ${port}`);
+      console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
+      console.log(`✅ Dashboard API accessible at /api/dashboard`);
+    });
+
+    httpServer.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is still in use. Retrying in 2 seconds...`);
+        setTimeout(() => {
+          httpServer.close();
+          process.exit(1);
+        }, 2000);
+      } else {
+        console.error('❌ Server error:', error);
+        process.exit(1);
+      }
+    });
+  }
 
   // Graceful shutdown handling for production stability
   const gracefulShutdown = async (signal: string) => {
