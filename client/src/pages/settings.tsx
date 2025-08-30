@@ -89,7 +89,7 @@ const aiSettingsSchema = z.object({
   // General AI Settings
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().min(100).max(8000).default(1000),
-  defaultModel: z.string().default("grok-2-1212"),
+  defaultModel: z.string().default("grok-code-fast-1"),
   // Cultural Intelligence
   culturalSensitivity: z.number().min(0).max(1).default(0.95),
   religiousSensitivity: z.number().min(0).max(1).default(0.9),
@@ -247,7 +247,7 @@ export default function Settings() {
       // General AI Settings
       temperature: 0.7,
       maxTokens: 1000,
-      defaultModel: "grok-2-1212",
+      defaultModel: "grok-code-fast-1",
       // Cultural Intelligence
       culturalSensitivity: 0.95,
       religiousSensitivity: 0.9,
@@ -662,7 +662,8 @@ export default function Settings() {
                             />
                           </FormControl>
                           <FormDescription>
-                            توکن ربات تلگرام خود را از @BotFather دریافت کنید
+                            توکن ربات تلگرام خود را از @BotFather دریافت کنید<br/>
+                            <strong>ربات صحیح: @Dsyrhshnmdbot</strong> - اطمینان حاصل کنید توکن مربوط به این ربات باشد
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -1309,8 +1310,8 @@ export default function Settings() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="grok-2-1212">Grok-2 (پیشرفته)</SelectItem>
-                              <SelectItem value="grok-beta">Grok-Beta (سریع)</SelectItem>
+                              <SelectItem value="grok-code-fast-1">Grok Code Fast (سریع و بهینه)</SelectItem>
+                              <SelectItem value="grok-4-0709">Grok-4 (پیشرفته)</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormItem>
