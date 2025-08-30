@@ -357,20 +357,19 @@ export default function Settings() {
 
   const testTelegramMutation = useMutation({
     mutationFn: async () => {
-      // This would test the Telegram connection
-      const response = await apiRequest('/api/test-telegram', { method: 'POST' });
+      const response = await apiRequest('/api/telegram/test-connection', { method: 'POST' });
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
-        title: "اتصال تلگرام موفق",
-        description: "پیام تست با موفقیت ارسال شد",
+        title: "✅ اتصال تلگرام موفق",
+        description: `ربات ${data.botInfo?.username} متصل شد`,
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
-        title: "خطا در اتصال تلگرام",
-        description: "لطفاً تنظیمات را بررسی کنید",
+        title: "❌ خطا در اتصال تلگرام",
+        description: error.message || "لطفاً تنظیمات را بررسی کنید",
         variant: "destructive",
       });
     }
@@ -431,6 +430,30 @@ export default function Settings() {
 
   const onAiSubmit = async (data: AiSettingsData) => {
     try {
+      // Validate API key format before saving
+      if (data.xaiApiKey && !data.xaiApiKey.startsWith('xai-')) {
+        toast({
+          title: "❌ خطا در کلید API",
+          description: "کلید API باید با 'xai-' شروع شود",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Test API key connection first
+      if (data.xaiApiKey) {
+        console.log('🔍 Testing XAI API key before saving...');
+        const testResult = await testGrokConnectionMutation.mutateAsync();
+        if (!testResult.success) {
+          toast({
+            title: "❌ خطا در تست اتصال",
+            description: "کلید API معتبر نیست. لطفاً بررسی کنید",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       // Save API key first
       const response = await apiRequest('/api/settings/xai-grok/configure', { 
         method: 'POST',
@@ -702,7 +725,7 @@ export default function Settings() {
                         type="button" 
                         variant="outline"
                         onClick={() => testTelegramMutation.mutate()}
-                        disabled={testTelegramMutation.isPending}
+                        disabled={testTelegramMutation.isPending || !telegramForm.watch('botToken')}
                       >
                         <TestTube className="w-4 h-4 mr-2" />
                         {testTelegramMutation.isPending ? "در حال تست..." : "تست اتصال"}

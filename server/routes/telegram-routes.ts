@@ -46,6 +46,13 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
       
       if (botTokenSetting?.value && !telegramService) {
+        // Validate token format before initialization
+        const tokenPattern = /^\d+:[A-Za-z0-9_-]+$/;
+        if (!tokenPattern.test(botTokenSetting.value)) {
+          console.error('❌ Invalid bot token format');
+          return false;
+        }
+        
         console.log('🤖 Initializing Telegram service with saved token...');
         telegramService = new EnhancedTelegramService(botTokenSetting.value);
         console.log('✅ Telegram service initialized successfully');
@@ -121,12 +128,13 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         });
       }
 
-      // Validate Chat ID format
-      if (!String(groupChatId).match(/^-?\d+$/)) {
+      // Validate Chat ID format (should be negative for groups/supergroups)
+      const chatIdStr = String(groupChatId);
+      if (!chatIdStr.match(/^-?\d+$/) || (!chatIdStr.startsWith('-100') && !chatIdStr.startsWith('-'))) {
         console.error('❌ PHASE 8C: Invalid Chat ID format:', groupChatId);
         return res.status(400).json({
           success: false,
-          message: 'شناسه گروه باید عددی باشد'
+          message: 'شناسه گروه نامعتبر است. شناسه گروه‌ها باید با -100 شروع شود'
         });
       }
 
@@ -346,3 +354,42 @@ async function createTaskFromMessage(parsedMessage: any, employeeId: number, mes
     console.error('Error creating task from message:', error);
   }
 }
+
+
+  // Test Telegram bot connection
+  app.post('/api/telegram/test-connection', authMiddleware, async (req, res) => {
+    try {
+      if (!telegramService) {
+        const initialized = await initializeTelegramService();
+        if (!initialized) {
+          return res.status(400).json({
+            success: false,
+            message: 'ربات تلگرام تنظیم نشده است'
+          });
+        }
+      }
+
+      // Test with getMe API call
+      const botInfo = await telegramService.apiRequest('getMe');
+      
+      res.json({
+        success: true,
+        message: 'اتصال موفق',
+        botInfo: {
+          id: botInfo.id,
+          username: botInfo.username,
+          first_name: botInfo.first_name,
+          is_bot: botInfo.is_bot
+        }
+      });
+    } catch (error: unknown) {
+      console.error('❌ Telegram connection test failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در اتصال تلگرام',
+        error: errorMessage
+      });
+    }
+  });
+

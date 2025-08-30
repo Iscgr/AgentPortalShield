@@ -439,11 +439,23 @@ export class EnhancedTelegramService {
   private authorizedBotId: string = '@Dsyrhshnmdbot';
 
   constructor(botToken: string, config: any = {}) {
+    // Validate bot token format
+    if (!botToken || typeof botToken !== 'string') {
+      throw new Error('Invalid bot token: Token must be a non-empty string');
+    }
+    
+    const tokenPattern = /^\d+:[A-Za-z0-9_-]+$/;
+    if (!tokenPattern.test(botToken)) {
+      throw new Error('Invalid bot token format: Expected format is "botId:token"');
+    }
+    
     this.botToken = botToken;
     this.apiBase = `https://api.telegram.org/bot${botToken}`;
     this.config = {
       useWebhook: false,
       pollingTimeout: 60,
+      maxRetries: 3,
+      retryDelay: 1000,
       ...config
     };
     
@@ -457,25 +469,55 @@ export class EnhancedTelegramService {
   }
 
   // درخواست API اصلی
-  async apiRequest(method: string, params: any = {}) {
+  async apiRequest(method: string, params: any = {}, retryCount = 0) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(`${this.apiBase}/${method}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(params)
+        body: JSON.stringify(params),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
       const data = await response.json();
 
       if (!data.ok) {
         console.error(`Telegram API error (${method}):`, data);
-        throw new Error(`Telegram API error: ${data.description}`);
+        
+        // Handle specific Telegram API errors
+        if (data.error_code === 401) {
+          throw new Error('Invalid bot token - please check your token configuration');
+        } else if (data.error_code === 403) {
+          throw new Error('Bot was blocked or doesn\'t have permission to perform this action');
+        } else if (data.error_code === 429) {
+          // Rate limiting - implement retry with backoff
+          if (retryCount < this.config.maxRetries) {
+            const delay = this.config.retryDelay * Math.pow(2, retryCount);
+            console.warn(`Rate limited, retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return this.apiRequest(method, params, retryCount + 1);
+          }
+        }
+        
+        throw new Error(`Telegram API error: ${data.description || 'Unknown error'}`);
       }
 
       return data.result;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - Telegram API took too long to respond');
+      }
+      
       console.error(`Error in Telegram API request (${method}):`, error);
       throw error;
     }
