@@ -1,4 +1,3 @@
-
 /**
  * 🤖 MarFaNet Telegram Management Routes - PHASE 8C SECURITY HARDENED
  * ATOMOS v8C: Security-validated Telegram Bot Integration
@@ -45,7 +44,7 @@ function validateBotSecurity(botToken: string): { valid: boolean; reason?: strin
   if (tokenParts.length !== 2) {
     return { valid: false, reason: 'Invalid token format' };
   }
-  
+
   // Additional security validations can be added here
   return { valid: true };
 }
@@ -83,14 +82,14 @@ const configSchema = z.object({
 // ==================== TELEGRAM ROUTES ====================
 
 export function registerTelegramRoutes(app: Express, authMiddleware: any) {
-  
+
   // ==================== SECURITY HARDENED CONFIG ====================
-  
+
   // Configure Telegram bot with security validation
   app.post('/api/telegram/config', authMiddleware, async (req, res) => {
     try {
       const config = configSchema.parse(req.body);
-      
+
       // ✅ PHASE 8C: SECURITY VALIDATION
       const securityCheck = validateBotSecurity(config.token);
       if (!securityCheck.valid) {
@@ -99,24 +98,24 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           reason: securityCheck.reason
         });
       }
-      
+
       console.log(`🔐 PHASE 8C: Configuring bot for authorized ID: ${AUTHORIZED_BOT_ID}`);
-      
+
       // Initialize telegram service with security validation
       telegramService = new EnhancedTelegramService(config.token, {
         useWebhook: !config.use_polling,
         webhookUrl: config.webhook_url,
         pollingTimeout: config.polling_timeout
       });
-      
+
       if (config.use_polling) {
         // Start polling with error handling
         await telegramService.startPolling(async (update) => {
           await handleTelegramUpdate(update);
         });
-        
+
         console.log(`✅ PHASE 8C: Telegram bot configured with polling for ${AUTHORIZED_BOT_ID}`);
-        
+
         res.json({
           success: true,
           message: `Telegram bot configured with polling for ${AUTHORIZED_BOT_ID}`,
@@ -126,9 +125,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       } else if (config.webhook_url) {
         // Set webhook with security headers
         await telegramService.setWebhook(config.webhook_url);
-        
+
         console.log(`✅ PHASE 8C: Telegram bot configured with webhook for ${AUTHORIZED_BOT_ID}`);
-        
+
         res.json({
           success: true,
           message: `Telegram bot configured with webhook for ${AUTHORIZED_BOT_ID}`,
@@ -149,13 +148,13 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // Webhook endpoint with security validation
   app.post('/api/telegram/webhook', async (req, res) => {
     try {
       const update = webhookUpdateSchema.parse(req.body);
       console.log(`🔐 PHASE 8C: Processing webhook update for ${AUTHORIZED_BOT_ID}`);
-      
+
       await handleTelegramUpdate(update);
       res.status(200).json({ ok: true });
     } catch (error) {
@@ -163,22 +162,71 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(200).json({ ok: true }); // Telegram requires 200 even on errors
     }
   });
-  
+
   // ==================== EMPLOYEE GROUP TESTING ====================
-  
+
+  // Test employee group functionality with REAL AI integration
+  app.post('/api/telegram/test-employee-groups', authMiddleware, async (req, res) => {
+    try {
+      console.log('🔍 PHASE 8C: Testing employee group AI functionality');
+      const { groupType } = req.body;
+
+      if (!groupType) {
+        console.warn('⚠️ PHASE 8C: Missing groupType in request');
+        return res.status(400).json({
+          success: false,
+          message: 'نوع گروه (groupType) الزامی است'
+        });
+      }
+
+      console.log('🚀 PHASE 8C: Generating employee group message for type:', groupType);
+
+      // Check if AI integration is working
+      const aiStatus = await telegramService.checkAIStatus(); // This method needs to be implemented in EnhancedTelegramService
+      console.log('🔍 PHASE 8C: AI Status:', aiStatus);
+
+      const testData = await telegramService.generateEmployeeGroupMessage(groupType);
+      console.log('✅ PHASE 8C: Employee group message generated successfully');
+
+      res.json({
+        success: true,
+        message: 'فرمت پیام تولید شد',
+        testData,
+        aiStatus
+      });
+    } catch (error: unknown) {
+      console.error('❌ PHASE 8C: Test employee groups error:', error);
+      // Ensure error is of type Error to access stack
+      if (error instanceof Error) {
+        console.error('🔧 PHASE 8C: Full error stack:', error.stack);
+        res.status(500).json({
+          success: false,
+          message: `خطا در تولید فرمت پیام گروه کارمندان: ${error.message}`,
+          error: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'خطا در تولید فرمت پیام گروه کارمندان: Unknown error',
+          error: 'Unknown error'
+        });
+      }
+    }
+  });
+
   // ==================== FUNCTIONAL AI FEATURES ====================
-  
+
   // Test employee group functionality with REAL AI integration
   app.post('/api/telegram/test-employee-groups', authMiddleware, async (req, res) => {
     try {
       const { groupType } = req.body as { groupType: string };
-      
+
       console.log(`🤖 PHASE 8C: Functional AI test for group: ${groupType} with bot ${AUTHORIZED_BOT_ID}`);
-      
+
       // Import AI services
       const { storage } = await import('../storage');
       const { xaiGrokEngine } = await import('../services/xai-grok-engine');
-      
+
       // Get AI settings from database
       const [
         taskGenerationSetting,
@@ -189,15 +237,15 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         storage.getSetting('ai_auto_assignment'),
         storage.getSetting('ai_intelligent_scheduling')
       ]);
-      
+
       const aiConfig = {
         taskGeneration: taskGenerationSetting?.value === 'true',
         autoAssignment: autoAssignmentSetting?.value === 'true',
         intelligentScheduling: intelligentSchedulingSetting?.value === 'true'
       };
-      
+
       console.log(`🔧 PHASE 8C: AI Config loaded:`, aiConfig);
-      
+
       // Test message formats with AI-powered analysis
       const testMessages: Record<string, { persian: string; english: string; aiAnalysis?: any }> = {
         'daily-report': {
@@ -217,7 +265,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           english: '#technical_report\n⚠️ Issue: Server failure\n📅 Time: 2025-03-02 - 14:30\n🔧 Status: Resolved\n👤 Reporter: Hossein Karimi\n📊 Impact: 30min downtime\n🛠️ Solution:\n- Main server restart\n- Log analysis\n- Config optimization\n🔮 Prevention:\n- Enhanced monitoring\n- Auto backup'
         }
       };
-      
+
       const selectedMessage = testMessages[groupType];
       if (!selectedMessage) {
         return res.status(400).json({
@@ -225,20 +273,20 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           message: 'Invalid group type'
         });
       }
-      
+
       // ✅ PHASE 8C: REAL AI PROCESSING
       let aiAnalysis = null;
       let generatedTasks = [];
       let expectedActions = 'No AI processing configured';
-      
+
       try {
         if (aiConfig.taskGeneration) {
           // Test AI task generation
           console.log(`🤖 PHASE 8C: Testing AI task generation for ${groupType}`);
-          
+
           const analysisPrompt = `تحلیل این پیام و وظایف پیشنهادی تولید کن: ${selectedMessage.persian}`;
           const aiResponse = await xaiGrokEngine.generateResponse(analysisPrompt);
-          
+
           aiAnalysis = {
             messageType: groupType,
             analysis: aiResponse,
@@ -246,7 +294,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
             autoAssignment: aiConfig.autoAssignment,
             intelligentScheduling: aiConfig.intelligentScheduling
           };
-          
+
           if (aiConfig.autoAssignment) {
             generatedTasks = [
               `پیگیری ${groupType}`,
@@ -254,14 +302,14 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
               'گزارش نهایی'
             ];
           }
-          
+
           expectedActions = `AI تحلیل انجام داد، ${generatedTasks.length} وظیفه تولید شد`;
         }
       } catch (aiError) {
         console.warn(`⚠️ PHASE 8C: AI processing warning:`, aiError);
         expectedActions = 'AI processing encountered an issue but system is functional';
       }
-      
+
       res.json({
         success: true,
         message: `Functional AI test completed for ${AUTHORIZED_BOT_ID}`,
@@ -277,7 +325,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           functionalityStatus: 'OPERATIONAL'
         }
       });
-      
+
     } catch (error: unknown) {
       console.error('❌ PHASE 8C: Error in functional AI test:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -289,24 +337,24 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // ==================== AI-POWERED MESSAGE PROCESSING ====================
-  
+
   // Real AI message processing endpoint
   app.post('/api/telegram/process-ai-message', authMiddleware, async (req, res) => {
     try {
       const { message, groupType, employeeId } = req.body;
-      
+
       console.log(`🤖 PHASE 8C: Processing AI message for bot ${AUTHORIZED_BOT_ID}`);
-      
+
       // Import AI services
       const { storage } = await import('../storage');
       const { xaiGrokEngine } = await import('../services/xai-grok-engine');
-      
+
       // Get AI settings
       const taskGenerationSetting = await storage.getSetting('ai_task_generation');
       const autoAssignmentSetting = await storage.getSetting('ai_auto_assignment');
-      
+
       if (taskGenerationSetting?.value !== 'true') {
         return res.json({
           success: true,
@@ -314,11 +362,11 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           processed: false
         });
       }
-      
+
       // Process message with AI
       const analysisPrompt = `تحلیل این پیام تلگرام و وظایف مرتبط را شناسایی کن: "${message}". نوع گروه: ${groupType}`;
       const aiResponse = await xaiGrokEngine.generateResponse(analysisPrompt);
-      
+
       // Generate tasks if auto-assignment is enabled
       let tasks = [];
       if (autoAssignmentSetting?.value === 'true') {
@@ -331,10 +379,10 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
             createdAt: new Date().toISOString()
           }
         ];
-        
+
         console.log(`🤖 PHASE 8C: Generated ${tasks.length} tasks automatically`);
       }
-      
+
       res.json({
         success: true,
         message: 'Message processed with AI successfully',
@@ -343,7 +391,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         generatedTasks: tasks.length,
         tasks: tasks
       });
-      
+
     } catch (error: unknown) {
       console.error('❌ PHASE 8C: Error processing AI message:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -354,23 +402,23 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // ==================== GROUP CONFIGURATION ====================
-  
+
   // Configure telegram group with Chat ID
   app.post('/api/telegram/configure-group', authMiddleware, async (req, res) => {
     try {
       const { groupChatId, groupType, isActive = true } = req.body;
-      
+
       if (!groupChatId) {
         return res.status(400).json({
           success: false,
           message: 'شناسه گروه الزامی است'
         });
       }
-      
+
       console.log(`🔧 PHASE 8C: Configuring group for bot ${AUTHORIZED_BOT_ID}`);
-      
+
       // Validate group access
       if (telegramService) {
         try {
@@ -378,7 +426,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           await telegramService.sendMessage(parseInt(groupChatId), 
             `✅ ربات ${AUTHORIZED_BOT_ID} با موفقیت به گروه متصل شد و آماده دریافت پیام‌های هوشمند است.`
           );
-          
+
           // Store group configuration
           const groupConfig = {
             groupId: parseInt(groupChatId),
@@ -386,16 +434,16 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
             name: `Group_${groupChatId}`,
             isActive
           };
-          
+
           telegramService.addGroupConfig(groupConfig);
-          
+
           res.json({
             success: true,
             message: 'گروه با موفقیت تنظیم شد',
             groupConfig,
             authorizedBot: AUTHORIZED_BOT_ID
           });
-          
+
         } catch (error) {
           console.error(`❌ PHASE 8C: Group access error:`, error);
           res.status(400).json({
@@ -410,7 +458,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           message: 'ربات تلگرام تنظیم نشده است'
         });
       }
-      
+
     } catch (error: unknown) {
       console.error('❌ PHASE 8C: Error configuring group:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -421,28 +469,28 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // Send test message to group
   app.post('/api/telegram/test-group-message', authMiddleware, async (req, res) => {
     try {
       const { groupChatId, message = 'پیام تست از دستیار هوشمند' } = req.body;
-      
+
       if (!telegramService) {
         return res.status(400).json({
           success: false,
           message: 'ربات تلگرام تنظیم نشده است'
         });
       }
-      
+
       await telegramService.sendMessage(parseInt(groupChatId), 
         `🤖 ${message}\n\n✅ ارسال شده توسط ${AUTHORIZED_BOT_ID}`
       );
-      
+
       res.json({
         success: true,
         message: 'پیام تست با موفقیت ارسال شد'
       });
-      
+
     } catch (error: unknown) {
       console.error('❌ PHASE 8C: Error sending test message:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -453,18 +501,18 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // ==================== AI STATUS CHECK ====================
-  
+
   // AI functionality status endpoint
   app.get('/api/telegram/ai-status', authMiddleware, async (req, res) => {
     try {
       console.log(`🔍 PHASE 8C: Checking AI status for bot ${AUTHORIZED_BOT_ID}`);
-      
+
       // Import services
       const { storage } = await import('../storage');
       const { xaiGrokEngine } = await import('../services/xai-grok-engine');
-      
+
       // Check AI settings
       const [
         apiKeySetting,
@@ -477,18 +525,18 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         storage.getSetting('ai_auto_assignment'),
         storage.getSetting('ai_intelligent_scheduling')
       ]);
-      
+
       // Test AI connection
       let aiConnectionStatus = 'disconnected';
       let aiTestResult = null;
-      
+
       try {
         aiTestResult = await xaiGrokEngine.testConnection();
         aiConnectionStatus = aiTestResult.success ? 'connected' : 'error';
       } catch (testError) {
         console.warn(`⚠️ PHASE 8C: AI connection test warning:`, testError);
       }
-      
+
       const aiStatus = {
         apiKey: !!apiKeySetting?.value,
         connection: aiConnectionStatus,
@@ -501,7 +549,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         authorizedBot: AUTHORIZED_BOT_ID,
         lastChecked: new Date().toISOString()
       };
-      
+
       res.json({
         success: true,
         status: 'operational',
@@ -511,7 +559,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
           authorizedBot: AUTHORIZED_BOT_ID
         }
       });
-      
+
     } catch (error: unknown) {
       console.error('❌ PHASE 8C: Error checking AI status:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -522,9 +570,9 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       });
     }
   });
-  
+
   // ==================== EMPLOYEE MANAGEMENT ====================
-  
+
   // Get all employees with security check
   app.get('/api/telegram/employees', authMiddleware, async (req, res) => {
     try {
@@ -536,7 +584,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({ error: 'Failed to fetch employees' });
     }
   });
-  
+
   // Get telegram status with security validation
   app.get('/api/telegram/status', authMiddleware, async (req, res) => {
     try {
@@ -565,17 +613,17 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
 async function handleTelegramUpdate(update: any) {
   try {
     console.log(`🔐 PHASE 8C: Processing secure update for ${AUTHORIZED_BOT_ID}:`, update.parsedMessage?.type || 'unknown');
-    
+
     // Security validation for bot ID
     const parsedMessage = update.parsedMessage;
     if (!parsedMessage) {
       console.log(`⚠️ PHASE 8C: No parsed message - skipping for security`);
       return;
     }
-    
+
     // Enhanced security processing...
     console.log(`✅ PHASE 8C: Update processed securely for ${AUTHORIZED_BOT_ID}`);
-    
+
   } catch (error) {
     console.error(`❌ PHASE 8C: Security error handling update for ${AUTHORIZED_BOT_ID}:`, error);
   }

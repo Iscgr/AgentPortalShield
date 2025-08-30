@@ -23,7 +23,6 @@ import {
   Target,
   BarChart,
   Users,
-  Settings,
   Loader2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -837,7 +836,7 @@ export default function Settings() {
                     }}
                     className="w-full"
                   >
-                    <Settings className="h-4 w-4 ml-2" />
+                    <SettingsIcon className="h-4 w-4 ml-2" />
                     تنظیم گروه
                   </Button>
 

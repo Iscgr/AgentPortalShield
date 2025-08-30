@@ -56,7 +56,7 @@ class MessageParser {
   parseLeaveRequest(message: TelegramMessage): ParsedMessage | null {
     const regex = /#درخواست_مرخصی\s+(\d{4}\/\d{2}\/\d{2})\s+به\s+مدت\s+(.+?)\s+به\s+علت\s+(.+)/i;
     const match = message.text?.match(regex);
-    
+
     if (match) {
       return {
         type: 'leave_request',
@@ -78,7 +78,7 @@ class MessageParser {
   parseTechnicalReport(message: TelegramMessage): ParsedMessage | null {
     const regex = /#گزارش_فنی\s+(.+?)\s+-\s+وضعیت:\s+(.+)/i;
     const match = message.text?.match(regex);
-    
+
     if (match) {
       return {
         type: 'technical_report',
@@ -99,7 +99,7 @@ class MessageParser {
   parseResponsibility(message: TelegramMessage): ParsedMessage | null {
     const regex = /#مسئولیت\s+(.+?)\s+-\s+مسئول:\s+(.+?)\s+-\s+مهلت:\s+(.+)/i;
     const match = message.text?.match(regex);
-    
+
     if (match) {
       return {
         type: 'responsibility',
@@ -121,14 +121,14 @@ class MessageParser {
   parseDailyReport(message: TelegramMessage): ParsedMessage | null {
     const regex = /#گزارش_روزانه\n([\s\S]+)/i;
     const match = message.text?.match(regex);
-    
+
     if (match) {
       const reportBody = match[1];
       const tasks = reportBody.split('\n').map(line => {
         const [task, status] = line.split(':').map(item => item.trim());
         return { task, status };
       }).filter(item => item.task && item.status);
-      
+
       return {
         type: 'daily_report',
         employeeId: message.from.id,
@@ -203,7 +203,7 @@ class EntityExtractor {
       { regex: /لطفا\s+(.+?)(?:\.|$)/gi, priority: 'medium' as const },
       { regex: /می\s?توانید\s+(.+?)(?:\.|$)/gi, priority: 'low' as const }
     ];
-    
+
     let actions: Array<{action: string, priority: 'high' | 'medium' | 'low'}> = [];
     for (const { regex, priority } of actionPhrases) {
       const matches = Array.from(text.matchAll(regex));
@@ -229,7 +229,7 @@ export const BOT_COMMANDS = {
     STATUS: '/status',
     REGISTER: '/register',
   },
-  
+
   // دستورات گزارش
   REPORTS: {
     DAILY: '#گزارش_روزانه',
@@ -237,14 +237,14 @@ export const BOT_COMMANDS = {
     ISSUE: '#مشکل',
     SUCCESS: '#موفقیت',
   },
-  
+
   // دستورات درخواست
   REQUESTS: {
     LEAVE: '#درخواست_مرخصی',
     SUPPORT: '#درخواست_پشتیبانی',
     MATERIAL: '#درخواست_ابزار',
   },
-  
+
   // دستورات وظایف
   TASKS: {
     ASSIGN: '#وظیفه',
@@ -252,7 +252,7 @@ export const BOT_COMMANDS = {
     FOLLOW_UP: '#پیگیری',
     DEADLINE: '#مهلت',
   },
-  
+
   // دستورات نمایندگان
   REPRESENTATIVES: {
     NEW: '#نماینده_جدید',
@@ -268,7 +268,7 @@ export const COMMAND_PARAMETERS = {
     { name: 'duration', regex: /به\s+مدت\s+(.+?)(?:\s|$)/, required: true },
     { name: 'reason', regex: /به\s+علت\s+(.+)$/, required: true }
   ],
-  
+
   [BOT_COMMANDS.TASKS.ASSIGN]: [
     { name: 'task', regex: /وظیفه:\s+(.+?)(?:\s|$)/, required: true },
     { name: 'assignee', regex: /مسئول:\s+(.+?)(?:\s|$)/, required: true },
@@ -280,11 +280,11 @@ export const RESPONSE_TEMPLATES = {
   LEAVE_REQUEST_RECEIVED: 'درخواست مرخصی شما برای تاریخ {date} به مدت {duration} دریافت شد و در حال بررسی است.',
   LEAVE_REQUEST_APPROVED: 'درخواست مرخصی شما برای تاریخ {date} تایید شد.',
   LEAVE_REQUEST_DENIED: 'متاسفانه درخواست مرخصی شما برای تاریخ {date} تایید نشد. دلیل: {reason}',
-  
-  TASK_ASSIGNED: 'وظیفه جدید برای شما تعریف شد:\\n{task}\\nمهلت: {deadline}',
+
+  TASK_ASSIGNED: 'وظیفه جدید برای شما تعریف شد:\n{task}\nمهلت: {deadline}',
   TASK_REMINDER: 'یادآوری: {deadline} مهلت انجام وظیفه "{task}" است.',
   TASK_COMPLETED: 'وظیفه "{task}" با موفقیت تکمیل شد.',
-  
+
   REPORT_ACKNOWLEDGED: 'گزارش شما دریافت شد. با تشکر از همکاری شما.',
 };
 
@@ -305,22 +305,22 @@ class CommandHandler {
   // تشخیص نوع دستور
   identifyCommand(message: TelegramMessage) {
     const text = message.text || '';
-    
+
     // بررسی هر دسته دستور
     for (const category in this.commands) {
       for (const cmd in this.commands[category as keyof typeof this.commands]) {
         const commandText = (this.commands[category as keyof typeof this.commands] as any)[cmd];
         if (text.startsWith(commandText)) {
-          return { 
-            category, 
-            command: cmd, 
+          return {
+            category,
+            command: cmd,
             fullCommand: commandText,
-            text: text.substring(commandText.length).trim() 
+            text: text.substring(commandText.length).trim()
           };
         }
       }
     }
-    
+
     return { category: 'UNKNOWN', command: null, fullCommand: null, text };
   }
 
@@ -329,11 +329,11 @@ class CommandHandler {
     if (!commandInfo.fullCommand || !this.parameters[commandInfo.fullCommand as keyof typeof this.parameters]) {
       return {};
     }
-    
+
     const parameterDefinitions = this.parameters[commandInfo.fullCommand as keyof typeof this.parameters];
     const text = message.text || '';
     const params: any = {};
-    
+
     for (const param of parameterDefinitions) {
       const match = text.match(param.regex);
       if (match) {
@@ -342,14 +342,14 @@ class CommandHandler {
         return null; // پارامتر الزامی موجود نیست
       }
     }
-    
+
     return params;
   }
 
   // تولید پاسخ
   generateResponse(commandInfo: any, parameters: any): string {
     let template = '';
-    
+
     // انتخاب قالب مناسب
     switch (`${commandInfo.category}.${commandInfo.command}`) {
       case 'REQUESTS.LEAVE':
@@ -361,28 +361,28 @@ class CommandHandler {
       default:
         template = this.templates.REPORT_ACKNOWLEDGED;
     }
-    
+
     // جایگزینی متغیرها
     let response = template;
     for (const [key, value] of Object.entries(parameters)) {
       response = response.replace(`{${key}}`, value as string);
     }
-    
+
     return response;
   }
 
   // مدیریت دستور
   async handleCommand(message: TelegramMessage, chatInfo: any) {
     const commandInfo = this.identifyCommand(message);
-    
+
     // دستور ناشناخته
     if (commandInfo.category === 'UNKNOWN') {
       return null;
     }
-    
+
     // استخراج پارامترها
     const parameters = this.extractParameters(commandInfo, message);
-    
+
     // پارامترهای الزامی موجود نیست
     if (parameters === null) {
       return {
@@ -391,7 +391,7 @@ class CommandHandler {
         createTask: false
       };
     }
-    
+
     // پردازش انواع مختلف دستورات
     switch (`${commandInfo.category}.${commandInfo.command}`) {
       case 'REQUESTS.LEAVE':
@@ -401,7 +401,7 @@ class CommandHandler {
         await this.processTaskAssignment(message, parameters);
         break;
     }
-    
+
     // تولید و برگرداندن پاسخ
     return {
       responseText: this.generateResponse(commandInfo, parameters),
@@ -428,31 +428,24 @@ class CommandHandler {
 
 // ==================== ENHANCED TELEGRAM SERVICE ====================
 
-class EnhancedTelegramService {
-  private token: string;
-  private apiBase: string;
-  private config: any;
-  private messageParser: MessageParser;
-  private entityExtractor: EntityExtractor;
-  private commandHandler: CommandHandler;
-  private groupConfigs: GroupConfig[] = [];
-  private authorizedBotId: string = '@Dsyrhshnmdbot'; // ✅ PHASE 8C: SECURITY
+export class EnhancedTelegramService {
+  private bot: TelegramBot | null = null;
+  private xaiEngine: XAIGrokEngine | null = null;
 
-  constructor(token: string, config: any = {}) {
-    // ✅ PHASE 8C: SECURITY VALIDATION
-    console.log(`🔐 PHASE 8C: Initializing service for authorized bot: ${this.authorizedBotId}`);
-    
-    this.token = token;
-    this.apiBase = `https://api.telegram.org/bot${token}`;
-    this.config = {
-      useWebhook: false,
-      webhookUrl: '',
-      pollingTimeout: 60,
-      ...config
-    };
-    this.messageParser = new MessageParser();
-    this.entityExtractor = new EntityExtractor();
-    this.commandHandler = new CommandHandler(this, this.entityExtractor);
+  constructor() {
+    this.initializeServices();
+  }
+
+  private async initializeServices() {
+    try {
+      // Initialize XAI Grok Engine
+      this.xaiEngine = new XAIGrokEngine();
+      console.log('🤖 PHASE 8B: Enhanced Telegram Service initialized with XAI Grok Engine');
+      console.log('🔍 PHASE 8B: AI Integration Status - XAI Engine:', this.xaiEngine ? 'ACTIVE' : 'INACTIVE');
+    } catch (error) {
+      console.error('❌ PHASE 8B: Failed to initialize XAI for Telegram:', error);
+      console.error('🔧 PHASE 8B: Telegram AI features will be DISABLED until this is resolved');
+    }
   }
 
   // درخواست API اصلی
@@ -465,14 +458,14 @@ class EnhancedTelegramService {
         },
         body: JSON.stringify(params)
       });
-      
+
       const data = await response.json();
-      
+
       if (!data.ok) {
         console.error(`Telegram API error (${method}):`, data);
         throw new Error(`Telegram API error: ${data.description}`);
       }
-      
+
       return data.result;
     } catch (error) {
       console.error(`Error in Telegram API request (${method}):`, error);
@@ -494,7 +487,7 @@ class EnhancedTelegramService {
   async joinGroup(inviteLink: string) {
     const match = inviteLink.match(/t\.me\/\+([a-zA-Z0-9_-]+)/);
     if (!match) throw new Error('Invalid invite link format');
-    
+
     const inviteCode = match[1];
     return this.apiRequest('joinChat', {
       invite_link: `https://t.me/+${inviteCode}`
@@ -518,7 +511,7 @@ class EnhancedTelegramService {
   // شروع polling
   async startPolling(callback: (update: any) => Promise<void>) {
     let offset = 0;
-    
+
     const poll = async () => {
       try {
         const updates = await this.apiRequest('getUpdates', {
@@ -526,15 +519,15 @@ class EnhancedTelegramService {
           timeout: this.config.pollingTimeout,
           allowed_updates: ['message', 'edited_message', 'callback_query']
         });
-        
+
         if (updates.length > 0) {
           offset = updates[updates.length - 1].update_id + 1;
-          
+
           for (const update of updates) {
             await this.processUpdate(update, callback);
           }
         }
-        
+
         // ادامه polling
         setTimeout(poll, 1000);
       } catch (error) {
@@ -543,7 +536,7 @@ class EnhancedTelegramService {
         setTimeout(poll, 5000);
       }
     };
-    
+
     // شروع حلقه polling
     poll();
   }
@@ -552,17 +545,17 @@ class EnhancedTelegramService {
   async processUpdate(update: any, callback: (update: any) => Promise<void>) {
     // استخراج پیام
     const message = update.message || update.edited_message || (update.callback_query && update.callback_query.message);
-    
+
     if (!message) return;
-    
+
     console.log(`🤖 PHASE 8C: Processing update with AI integration for ${this.authorizedBotId}`);
-    
+
     // تشخیص نوع گروه
     const groupType = this.identifyGroupType(message.chat);
-    
+
     // پارس کردن پیام
     const parsedData = this.messageParser.parseMessage(message, groupType);
-    
+
     if (parsedData) {
       // استخراج موجودیت‌ها
       const entities = {
@@ -571,10 +564,10 @@ class EnhancedTelegramService {
         dates: this.entityExtractor.extractDateReferences(message.text || ''),
         actionItems: this.entityExtractor.extractActionItems(message.text || '')
       };
-      
+
       // مدیریت دستورات
       const commandResponse = await this.commandHandler.handleCommand(message, { groupType });
-      
+
       // ✅ PHASE 8C: AI PROCESSING INTEGRATION
       let aiProcessing = null;
       try {
@@ -588,7 +581,7 @@ class EnhancedTelegramService {
             employeeId: message.from.id
           })
         });
-        
+
         if (aiResponse.ok) {
           aiProcessing = await aiResponse.json();
           console.log(`🤖 PHASE 8C: AI processing completed:`, aiProcessing.processed);
@@ -596,7 +589,7 @@ class EnhancedTelegramService {
       } catch (aiError) {
         console.warn(`⚠️ PHASE 8C: AI processing warning:`, aiError);
       }
-      
+
       // فراخوانی callback با داده‌های پردازش شده + AI
       await callback({
         originalUpdate: update,
@@ -608,14 +601,14 @@ class EnhancedTelegramService {
       });
     }
   }
-  
+
   // ✅ PHASE 8C: AI INTEGRATION METHODS
-  
+
   // Send AI-powered response
   async sendAiResponse(chatId: number, originalMessage: string, aiAnalysis: any) {
     try {
       const responseText = `🤖 تحلیل هوشمند:\n\n${aiAnalysis.analysis}\n\n✅ پردازش توسط ${this.authorizedBotId}`;
-      
+
       return await this.sendMessage(chatId, responseText, {
         reply_to_message_id: aiAnalysis.messageId
       });
@@ -624,39 +617,39 @@ class EnhancedTelegramService {
       throw error;
     }
   }
-  
+
   // Process group message with AI
   async processGroupMessageWithAI(message: any, groupConfig: any) {
     try {
       console.log(`🤖 PHASE 8C: Processing group message with AI for ${this.authorizedBotId}`);
-      
+
       // Parse message
       const parsedData = this.messageParser.parseMessage(message, groupConfig.groupType);
-      
+
       if (parsedData && parsedData.type !== 'general_message') {
         // Generate AI response for specific message types
         const aiPrompt = `تحلیل این ${parsedData.type}: ${message.text}`;
-        
+
         // This would call the AI service
         const aiResponse = {
           analysis: `تحلیل هوشمند برای ${parsedData.type} انجام شد`,
           suggestions: ['پیگیری', 'بررسی', 'تایید'],
           priority: 'MEDIUM'
         };
-        
+
         // Send AI response back to group
         await this.sendAiResponse(message.chat.id, message.text, {
           ...aiResponse,
           messageId: message.message_id
         });
-        
+
         return {
           processed: true,
           aiResponse,
           parsedData
         };
       }
-      
+
       return { processed: false };
     } catch (error) {
       console.error(`❌ PHASE 8C: Error in AI group processing:`, error);
@@ -668,12 +661,12 @@ class EnhancedTelegramService {
   identifyGroupType(chat: any): string {
     // اینجا می‌توانید بر اساس نام گروه یا شناسه آن نوع گروه را تشخیص دهید
     const title = chat.title?.toLowerCase() || '';
-    
+
     if (title.includes('مرخصی') || title.includes('leave')) return 'leave_requests';
     if (title.includes('فنی') || title.includes('technical')) return 'technical_reports';
     if (title.includes('مسئولیت') || title.includes('responsibility')) return 'responsibilities';
     if (title.includes('روزانه') || title.includes('daily')) return 'daily_reports';
-    
+
     return 'general';
   }
 
@@ -685,6 +678,90 @@ class EnhancedTelegramService {
   // دریافت پیکربندی گروه
   getGroupConfig(groupId: number): GroupConfig | undefined {
     return this.groupConfigs.find(config => config.groupId === groupId);
+  }
+
+  // --- AI Service Integration ---
+
+  // Build contextual prompt for AI
+  buildContextualPrompt(message: string, context: any): string {
+    let prompt = `User message: "${message}"\n\n`;
+    if (context.groupType) {
+      prompt += `Context: This message is from a Telegram group of type "${context.groupType}".\n`;
+    }
+    if (context.employeeId) {
+      prompt += `Sender ID: ${context.employeeId}\n`;
+    }
+    // Add more context as needed, e.g., previous messages, user roles, etc.
+    prompt += '\nAnalyze and respond appropriately.';
+    return prompt;
+  }
+
+  // Process AI message
+  async processAIMessage(message: string, context: any = {}): Promise<string> {
+    console.log('🔍 PHASE 8B: Processing AI message:', message.substring(0, 50) + '...');
+    console.log('🔍 PHASE 8B: XAI Engine status:', this.xaiEngine ? 'AVAILABLE' : 'NOT_AVAILABLE');
+
+    if (!this.xaiEngine) {
+      console.warn('⚠️ PHASE 8B: XAI Engine not available for AI processing');
+      console.warn('🔧 PHASE 8B: Check XAI API key configuration in settings');
+      return 'دستیار هوشمند در حال حاضر در دسترس نیست. لطفاً تنظیمات XAI را بررسی کنید.';
+    }
+
+    try {
+      console.log('🚀 PHASE 8B: Building contextual prompt for AI processing');
+      const prompt = this.buildContextualPrompt(message, context);
+      console.log('🚀 PHASE 8B: Sending request to XAI Grok Engine');
+      const response = await this.xaiEngine.generateResponse(prompt);
+      console.log('✅ PHASE 8B: AI response generated successfully:', response.substring(0, 100) + '...');
+      return response;
+    } catch (error) {
+      console.error('❌ PHASE 8B: AI Message Processing Error:', error);
+      console.error('🔧 PHASE 8B: Error details:', JSON.stringify(error, null, 2));
+      return `خطا در پردازش پیام توسط دستیار هوشمند: ${error.message}`;
+    }
+  }
+
+  // Add AI status check method
+  async checkAIStatus(): Promise<any> {
+    console.log('🔍 PHASE 8B: Checking AI integration status');
+
+    const status = {
+      xaiEngine: this.xaiEngine ? 'INITIALIZED' : 'NOT_INITIALIZED',
+      botConnection: this.bot ? 'CONNECTED' : 'NOT_CONNECTED',
+      timestamp: new Date().toISOString()
+    };
+
+    if (this.xaiEngine) {
+      try {
+        // Test XAI connection
+        const testResponse = await this.xaiEngine.generateResponse('تست اتصال');
+        status.xaiTest = 'SUCCESS';
+        status.xaiResponse = testResponse.substring(0, 50) + '...';
+      } catch (error) {
+        status.xaiTest = 'FAILED';
+        status.xaiError = error.message;
+      }
+    }
+
+    console.log('📊 PHASE 8B: AI Status Report:', status);
+    return status;
+  }
+
+  async sendToGroup(groupChatId: string, message: string): Promise<void> {
+    if (!this.bot) {
+      throw new Error('ربات تلگرام تنظیم نشده است');
+    }
+
+    try {
+      await this.bot.sendMessage(groupChatId, message, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true
+      });
+      console.log('✅ Message sent to group:', groupChatId);
+    } catch (error) {
+      console.error('❌ Failed to send message to group:', error);
+      throw error;
+    }
   }
 }
 
