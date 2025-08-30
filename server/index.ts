@@ -281,53 +281,6 @@ app.use((req, res, next) => {
     next();
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-
-  // Kill any existing process on the port before starting
-  async function killExistingPort(port: number) {
-    try {
-      const { exec } = await import('child_process');
-      exec(`lsof -ti:${port} | xargs kill -9`, (error) => {
-        if (error) {
-          console.log(`No existing process on port ${port} to kill`);
-        } else {
-          console.log(`✅ Killed existing process on port ${port}`);
-        }
-      });
-    } catch (error) {
-      console.log('Could not check for existing processes');
-    }
-  }
-
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
-
-  // Kill existing port and start server
-  killExistingPort(Number(port));
-
-  // Add graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    process.exit(0);
-  });
-
-  process.on('SIGINT', () => {
-    console.log('SIGINT received, shutting down gracefully');
-    process.exit(0);
-  });
-
   // Start server with retry mechanism
   let serverInstance: any;
   const startServer = async () => {
@@ -359,7 +312,61 @@ app.use((req, res, next) => {
     }
   };
 
-  startServer();
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
+  if (app.get("env") === "development") {
+    // Create HTTP server first for Vite setup
+    const server = require('http').createServer(app);
+    await setupVite(app, server);
+    
+    // Start the server manually after Vite setup
+    server.listen(port, host, () => {
+      console.log(`🚀 SHERLOCK v32.0: Server successfully started on port ${port}`);
+      console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
+      console.log(`✅ Dashboard API should now be accessible at /api/dashboard`);
+    });
+
+    server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is still in use. Retrying in 2 seconds...`);
+        setTimeout(() => {
+          server.close();
+          startServer();
+        }, 2000);
+      } else {
+        console.error('❌ Server error:', error);
+      }
+    });
+  } else {
+    serveStatic(app);
+    startServer();
+  }
+
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5000 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
+  const port = parseInt(process.env.PORT || '5000', 10);
+  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
+
+  // Kill any existing process on the port before starting
+  async function killExistingPort(port: number) {
+    try {
+      const { exec } = await import('child_process');
+      exec(`lsof -ti:${port} | xargs kill -9`, (error) => {
+        if (error) {
+          console.log(`No existing process on port ${port} to kill`);
+        } else {
+          console.log(`✅ Killed existing process on port ${port}`);
+        }
+      });
+    } catch (error) {
+      console.log('Could not check for existing processes');
+    }
+  }
+
+  killExistingPort(Number(port));
 
   // Graceful shutdown handling for production stability
   const gracefulShutdown = async (signal: string) => {
