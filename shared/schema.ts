@@ -1518,3 +1518,276 @@ export type InsertWorkspaceAiReminder = z.infer<typeof insertWorkspaceAiReminder
 
 export type RepresentativeSupportHistory = typeof representativeSupportHistory.$inferSelect;
 export type InsertRepresentativeSupportHistory = z.infer<typeof insertRepresentativeSupportHistorySchema>;
+
+// ==================== NEW EMPLOYEE & TELEGRAM MANAGEMENT TABLES ====================
+
+// Employees (کارمندان)
+export const employees = pgTable("employees", {
+  id: serial("id").primaryKey(),
+  telegramId: text("telegram_id").notNull().unique(), // شناسه تلگرام کارمند
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name"),
+  username: text("username"), // نام کاربری تلگرام
+  phone: text("phone"),
+  email: text("email"),
+  position: text("position"), // سمت شغلی
+  department: text("department"), // بخش
+  managerId: integer("manager_id"), // مدیر مستقیم
+  isActive: boolean("is_active").default(true),
+  joinedAt: timestamp("joined_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Tasks (وظایف)
+export const employeeTasks = pgTable("employee_tasks", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // 'generated', 'manual', 'telegram_command'
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  status: text("status").notNull().default("pending"), // pending, in_progress, completed, cancelled
+  assignedToId: integer("assigned_to_id"), // employee ID
+  createdById: integer("created_by_id"), // employee ID
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  metadata: json("metadata"), // اطلاعات اضافی مخصوص نوع وظیفه
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Telegram Groups (گروه‌های تلگرام)
+export const telegramGroups = pgTable("telegram_groups", {
+  id: serial("id").primaryKey(),
+  chatId: text("chat_id").notNull().unique(),
+  title: text("title").notNull(),
+  type: text("type").notNull(), // leave_requests, technical_reports, responsibilities, daily_reports, general
+  isActive: boolean("is_active").default(true),
+  joinedAt: timestamp("joined_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Telegram Messages (پیام‌های تلگرام)
+export const telegramMessages = pgTable("telegram_messages", {
+  id: serial("id").primaryKey(),
+  messageId: text("message_id").notNull(), // شناسه پیام تلگرام
+  chatId: text("chat_id").notNull(),
+  fromUserId: text("from_user_id").notNull(),
+  employeeId: integer("employee_id"), // ارتباط با جدول employees
+  text: text("text"),
+  messageType: text("message_type").notNull(), // leave_request, technical_report, responsibility, daily_report, general_message
+  parsedData: json("parsed_data"), // داده‌های استخراج شده
+  entities: json("entities"), // موجودیت‌های شناسایی شده
+  processed: boolean("processed").default(false),
+  responseRequired: boolean("response_required").default(false),
+  responseText: text("response_text"),
+  responseSent: boolean("response_sent").default(false),
+  taskCreated: boolean("task_created").default(false),
+  createdTaskId: integer("created_task_id"),
+  receivedAt: timestamp("received_at").notNull(),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Leave Requests (درخواست‌های مرخصی)
+export const leaveRequests = pgTable("leave_requests", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  telegramMessageId: integer("telegram_message_id"), // ارتباط با پیام تلگرام
+  requestDate: text("request_date").notNull(), // تاریخ فارسی
+  duration: text("duration").notNull(), // مدت مرخصی
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"), // pending, approved, denied
+  reviewedById: integer("reviewed_by_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewComment: text("review_comment"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Technical Reports (گزارش‌های فنی)
+export const technicalReports = pgTable("technical_reports", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  telegramMessageId: integer("telegram_message_id"),
+  issue: text("issue").notNull(),
+  status: text("status").notNull(), // reported, investigating, resolved
+  priority: text("priority").default("medium"), // low, medium, high, critical
+  assignedToId: integer("assigned_to_id"),
+  resolution: text("resolution"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// Daily Reports (گزارش‌های روزانه)
+export const dailyReports = pgTable("daily_reports", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  telegramMessageId: integer("telegram_message_id"),
+  reportDate: text("report_date").notNull(), // تاریخ فارسی
+  tasks: json("tasks"), // لیست کارهای انجام شده
+  challenges: text("challenges"), // چالش‌ها
+  achievements: text("achievements"), // دستاوردها
+  nextDayPlans: text("next_day_plans"), // برنامه‌های روز بعد
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+// ==================== RELATIONS ====================
+
+export const employeesRelations = relations(employees, ({ one, many }) => ({
+  manager: one(employees, {
+    fields: [employees.managerId],
+    references: [employees.id]
+  }),
+  subordinates: many(employees), // زیردستان
+  assignedTasks: many(employeeTasks), // وظایف تخصیص داده شده
+  createdTasks: many(employeeTasks), // وظایف ایجاد شده
+  telegramMessages: many(telegramMessages),
+  leaveRequests: many(leaveRequests),
+  technicalReports: many(technicalReports),
+  dailyReports: many(dailyReports)
+}));
+
+export const employeeTasksRelations = relations(employeeTasks, ({ one }) => ({
+  assignedTo: one(employees, {
+    fields: [employeeTasks.assignedToId],
+    references: [employees.id]
+  }),
+  createdBy: one(employees, {
+    fields: [employeeTasks.createdById],
+    references: [employees.id]
+  }),
+  relatedTelegramMessage: one(telegramMessages, {
+    fields: [employeeTasks.id],
+    references: [telegramMessages.createdTaskId]
+  })
+}));
+
+export const telegramGroupsRelations = relations(telegramGroups, ({ many }) => ({
+  messages: many(telegramMessages)
+}));
+
+export const telegramMessagesRelations = relations(telegramMessages, ({ one }) => ({
+  employee: one(employees, {
+    fields: [telegramMessages.employeeId],
+    references: [employees.id]
+  }),
+  createdTask: one(employeeTasks, {
+    fields: [telegramMessages.createdTaskId],
+    references: [employeeTasks.id]
+  }),
+  leaveRequest: one(leaveRequests, {
+    fields: [telegramMessages.id],
+    references: [leaveRequests.telegramMessageId]
+  }),
+  technicalReport: one(technicalReports, {
+    fields: [telegramMessages.id],
+    references: [technicalReports.telegramMessageId]
+  }),
+  dailyReport: one(dailyReports, {
+    fields: [telegramMessages.id],
+    references: [dailyReports.telegramMessageId]
+  })
+}));
+
+export const leaveRequestsRelations = relations(leaveRequests, ({ one }) => ({
+  employee: one(employees, {
+    fields: [leaveRequests.employeeId],
+    references: [employees.id]
+  }),
+  reviewedBy: one(employees, {
+    fields: [leaveRequests.reviewedById],
+    references: [employees.id]
+  }),
+  telegramMessage: one(telegramMessages, {
+    fields: [leaveRequests.telegramMessageId],
+    references: [telegramMessages.id]
+  })
+}));
+
+export const technicalReportsRelations = relations(technicalReports, ({ one }) => ({
+  employee: one(employees, {
+    fields: [technicalReports.employeeId],
+    references: [employees.id]
+  }),
+  assignedTo: one(employees, {
+    fields: [technicalReports.assignedToId],
+    references: [employees.id]
+  }),
+  telegramMessage: one(telegramMessages, {
+    fields: [technicalReports.telegramMessageId],
+    references: [telegramMessages.id]
+  })
+}));
+
+export const dailyReportsRelations = relations(dailyReports, ({ one }) => ({
+  employee: one(employees, {
+    fields: [dailyReports.employeeId],
+    references: [employees.id]
+  }),
+  telegramMessage: one(telegramMessages, {
+    fields: [dailyReports.telegramMessageId],
+    references: [telegramMessages.id]
+  })
+}));
+
+// ==================== ZOD SCHEMAS ====================
+
+export const insertEmployeeSchema = createInsertSchema(employees).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertEmployeeTaskSchema = createInsertSchema(employeeTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertTelegramGroupSchema = createInsertSchema(telegramGroups).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertTelegramMessageSchema = createInsertSchema(telegramMessages).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertTechnicalReportSchema = createInsertSchema(technicalReports).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertDailyReportSchema = createInsertSchema(dailyReports).omit({
+  id: true,
+  createdAt: true
+});
+
+// ==================== TYPES ====================
+
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+
+export type EmployeeTask = typeof employeeTasks.$inferSelect;
+export type InsertEmployeeTask = z.infer<typeof insertEmployeeTaskSchema>;
+
+export type TelegramGroup = typeof telegramGroups.$inferSelect;
+export type InsertTelegramGroup = z.infer<typeof insertTelegramGroupSchema>;
+
+export type TelegramMessage = typeof telegramMessages.$inferSelect;
+export type InsertTelegramMessage = z.infer<typeof insertTelegramMessageSchema>;
+
+export type LeaveRequest = typeof leaveRequests.$inferSelect;
+export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
+
+export type TechnicalReport = typeof technicalReports.$inferSelect;
+export type InsertTechnicalReport = z.infer<typeof insertTechnicalReportSchema>;
+
+export type DailyReport = typeof dailyReports.$inferSelect;
+export type InsertDailyReport = z.infer<typeof insertDailyReportSchema>;

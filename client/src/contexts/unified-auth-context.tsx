@@ -8,7 +8,7 @@ interface UnifiedUser {
   id: number;
   username: string;
   role: string;
-  panelType: 'ADMIN_PANEL' | 'CRM_PANEL';
+  panelType: 'ADMIN_PANEL';
   permissions?: string[];
   hasFullAccess?: boolean;
   authenticated?: boolean;
@@ -18,13 +18,12 @@ interface UnifiedAuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   user: UnifiedUser | null;
-  userType: 'ADMIN' | 'CRM' | null;
+  userType: 'ADMIN' | null;
   login: () => void;
   logout: () => void;
   checkAuth: () => Promise<void>;
   loginMutation: any;
   adminLoginMutation: any;
-  crmLoginMutation: any;
 }
 
 const UnifiedAuthContext = createContext<UnifiedAuthContextType | undefined>(undefined);
@@ -33,7 +32,7 @@ export function UnifiedAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UnifiedUser | null>(null);
-  const [userType, setUserType] = useState<'ADMIN' | 'CRM' | null>(null);
+  const [userType, setUserType] = useState<'ADMIN' | null>(null);
   const [, setLocation] = useLocation();
 
   // Admin login mutation
@@ -70,39 +69,6 @@ export function UnifiedAuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  // CRM login mutation
-  const crmLoginMutation = useMutation({
-    mutationFn: async (credentials: { username: string; password: string }) => {
-      console.log('🔐 SHERLOCK v1.0: CRM Login Request:', credentials);
-      const response = await apiRequest('/api/crm/auth/login', {
-        method: 'POST',
-        data: credentials
-      });
-      console.log('✅ SHERLOCK v1.0: CRM Login Success:', response);
-      return response;
-    },
-    onSuccess: (data) => {
-      console.log('🔐 SHERLOCK v1.0: CRM Auth Success - Setting state');
-      setIsAuthenticated(true);
-      setUser({
-        ...data.user,
-        panelType: 'CRM_PANEL',
-        authenticated: true
-      });
-      setUserType('CRM');
-      queryClient.invalidateQueries();
-      setTimeout(() => {
-        console.log('🔐 SHERLOCK v1.0: Redirecting to CRM dashboard');
-        setLocation('/crm');
-      }, 100);
-    },
-    onError: (error: any) => {
-      console.error('❌ SHERLOCK v1.0: CRM login error:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserType(null);
-    }
-  });
 
   // Unified login mutation (for backward compatibility)
   const loginMutation = adminLoginMutation;
@@ -150,17 +116,10 @@ export function UnifiedAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      if (userType === 'ADMIN') {
-        await fetch("/api/auth/logout", { 
-          method: "POST", 
-          credentials: "include" 
-        });
-      } else if (userType === 'CRM') {
-        await fetch("/api/crm/auth/logout", { 
-          method: "POST", 
-          credentials: "include" 
-        });
-      }
+      await fetch("/api/auth/logout", { 
+        method: "POST", 
+        credentials: "include" 
+      });
     } catch (error) {
       console.error('❌ SHERLOCK v1.0: Logout error:', error);
     } finally {
@@ -189,7 +148,6 @@ export function UnifiedAuthProvider({ children }: { children: ReactNode }) {
         checkAuth,
         loginMutation,
         adminLoginMutation,
-        crmLoginMutation,
       }}
     >
       {children}

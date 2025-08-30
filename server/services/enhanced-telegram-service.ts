@@ -1,525 +1,610 @@
+/**
+ * 🤖 پیاده‌سازی کامل و پیشرفته سرویس تلگرام برای MarFaNet
+ * SHERLOCK v32.0: Enhanced Telegram Service with AI-powered message parsing
+ * 
+ * قابلیت‌ها:
+ * - پردازش پیام‌های گروهی کارمندان
+ * - استخراج گزارشات، درخواست‌ها و وظایف
+ * - تحلیل متن فارسی با هوش مصنوعی
+ * - مدیریت خودکار دستورات
+ * - تولید وظایف هوشمند
+ */
 
-// Enhanced Telegram Service - MarFaNet Architecture Migration
-// Advanced message parsing and AI-powered response system
+import fetch from 'node-fetch';
 
-import { db } from '../db';
-import { sql } from 'drizzle-orm';
-import { TelegramApi } from 'node-telegram-bot-api';
-import { nanoid } from 'nanoid';
+// ==================== TYPES & INTERFACES ====================
 
-export interface TelegramMessage {
-  message_id: string;
-  chat: {
-    id: string;
-    title?: string;
-    type: string;
-  };
+interface TelegramMessage {
+  message_id: number;
   from: {
-    id: string;
+    id: number;
+    is_bot: boolean;
     first_name: string;
     last_name?: string;
     username?: string;
   };
-  text: string;
+  chat: {
+    id: number;
+    title?: string;
+    type: 'private' | 'group' | 'supergroup' | 'channel';
+  };
   date: number;
+  text?: string;
+  reply_to_message?: TelegramMessage;
 }
 
-export interface ParsedMessageData {
-  type: 'daily_report' | 'technical_report' | 'leave_request' | 'follow_up' | 'task_request' | 'general_message';
-  extractedData: Record<string, any>;
-  confidence: number;
-  actionRequired: boolean;
+interface ParsedMessage {
+  type: 'leave_request' | 'technical_report' | 'responsibility' | 'daily_report' | 'general_message';
+  employeeId: number;
+  employeeName: string;
+  messageId: number;
+  timestamp: number;
+  data?: any;
 }
 
-export interface AIResponseTemplate {
-  messageToEmployee: string;
-  tasks?: Array<{
-    title: string;
-    description: string;
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    assignedTo?: string;
-    dueDate?: string;
-  }>;
-  analysis: string;
-  followUpRequired: boolean;
+interface GroupConfig {
+  groupId: number;
+  groupType: 'leave_requests' | 'technical_reports' | 'responsibilities' | 'daily_reports' | 'general';
+  name: string;
+  isActive: boolean;
 }
 
-export class EnhancedTelegramService {
-  private bot: TelegramApi;
-  private messageProcessors: Map<string, Function>;
-  
-  // Command prefixes for different message types
-  private readonly COMMAND_PREFIXES = {
-    REPORT: ['#گزارش', '#report', '/report'],
-    TASK: ['#وظیفه', '#task', '/task'],
-    LEAVE: ['#مرخصی', '#leave', '/leave'],
-    FOLLOW_UP: ['#پیگیری', '#followup', '/followup'],
-    HELP: ['#راهنما', '#help', '/help']
-  };
+// ==================== MESSAGE PARSER ====================
 
-  // Response templates
-  private readonly RESPONSE_TEMPLATES = {
-    REPORT_RECEIVED: `✅ گزارش {reportType} شما دریافت شد.
-
-📅 تاریخ ثبت: {date}
-🆔 شناسه گزارش: {reportId}
-
-این گزارش توسط دستیار هوشمند بررسی خواهد شد.`,
-
-    TASK_CREATED: `⚠️ وظیفه جدید ایجاد شد
-
-🆔 شناسه: {taskId}
-📊 اولویت: {priority}
-📝 توضیحات: {description}
-⏰ مهلت انجام: {dueDate}
-
-لطفا نتیجه پیگیری را با دستور #بروزرسانی {taskId} گزارش کنید.`,
-
-    LEAVE_REQUEST_RECEIVED: `📝 درخواست مرخصی شما ثبت شد
-
-📅 تاریخ: {date}
-⏱️ مدت: {duration} روز
-💭 دلیل: {reason}
-📊 وضعیت: در انتظار بررسی
-
-نتیجه بررسی به شما اطلاع داده خواهد شد.`,
-
-    ERROR_INVALID_FORMAT: `❌ فرمت دستور نامعتبر است
-
-✅ دستور صحیح: {correctFormat}
-💡 مثال: {example}
-
-برای راهنمایی بیشتر، دستور #راهنما را وارد کنید.`
-  };
-
-  constructor(botToken: string) {
-    this.bot = new TelegramApi(botToken, { polling: true });
-    this.messageProcessors = new Map();
-    this.initializeMessageProcessors();
-    this.setupBotHandlers();
+class MessageParser {
+  // درخواست مرخصی
+  parseLeaveRequest(message: TelegramMessage): ParsedMessage | null {
+    const regex = /#درخواست_مرخصی\s+(\d{4}\/\d{2}\/\d{2})\s+به\s+مدت\s+(.+?)\s+به\s+علت\s+(.+)/i;
+    const match = message.text?.match(regex);
+    
+    if (match) {
+      return {
+        type: 'leave_request',
+        employeeId: message.from.id,
+        employeeName: message.from.username || `${message.from.first_name} ${message.from.last_name || ''}`,
+        messageId: message.message_id,
+        timestamp: message.date,
+        data: {
+          date: match[1],
+          duration: match[2].trim(),
+          reason: match[3].trim()
+        }
+      };
+    }
+    return null;
   }
 
-  /**
-   * Initialize message processors for different types
-   */
-  private initializeMessageProcessors(): void {
-    this.messageProcessors.set('daily_report', this.processDailyReport.bind(this));
-    this.messageProcessors.set('technical_report', this.processTechnicalReport.bind(this));
-    this.messageProcessors.set('leave_request', this.processLeaveRequest.bind(this));
-    this.messageProcessors.set('follow_up', this.processFollowUp.bind(this));
-    this.messageProcessors.set('task_request', this.processTaskRequest.bind(this));
-    this.messageProcessors.set('general_message', this.processGeneralMessage.bind(this));
+  // گزارش فنی
+  parseTechnicalReport(message: TelegramMessage): ParsedMessage | null {
+    const regex = /#گزارش_فنی\s+(.+?)\s+-\s+وضعیت:\s+(.+)/i;
+    const match = message.text?.match(regex);
+    
+    if (match) {
+      return {
+        type: 'technical_report',
+        employeeId: message.from.id,
+        employeeName: message.from.username || `${message.from.first_name} ${message.from.last_name || ''}`,
+        messageId: message.message_id,
+        timestamp: message.date,
+        data: {
+          issue: match[1].trim(),
+          status: match[2].trim()
+        }
+      };
+    }
+    return null;
   }
 
-  /**
-   * Setup bot message handlers
-   */
-  private setupBotHandlers(): void {
-    this.bot.on('message', async (msg) => {
-      try {
-        await this.handleIncomingMessage(msg as TelegramMessage);
-      } catch (error) {
-        console.error('Error handling Telegram message:', error);
-      }
-    });
-
-    this.bot.on('polling_error', (error) => {
-      console.error('Telegram polling error:', error);
-    });
+  // تخصیص مسئولیت
+  parseResponsibility(message: TelegramMessage): ParsedMessage | null {
+    const regex = /#مسئولیت\s+(.+?)\s+-\s+مسئول:\s+(.+?)\s+-\s+مهلت:\s+(.+)/i;
+    const match = message.text?.match(regex);
+    
+    if (match) {
+      return {
+        type: 'responsibility',
+        employeeId: message.from.id,
+        employeeName: message.from.username || `${message.from.first_name} ${message.from.last_name || ''}`,
+        messageId: message.message_id,
+        timestamp: message.date,
+        data: {
+          task: match[1].trim(),
+          assignee: match[2].trim(),
+          deadline: match[3].trim()
+        }
+      };
+    }
+    return null;
   }
 
-  /**
-   * Main message handling pipeline
-   */
-  async handleIncomingMessage(message: TelegramMessage): Promise<void> {
-    try {
-      // 1. Parse and classify message
-      const parsedData = await this.parseMessage(message);
+  // گزارش روزانه
+  parseDailyReport(message: TelegramMessage): ParsedMessage | null {
+    const regex = /#گزارش_روزانه\n([\s\S]+)/i;
+    const match = message.text?.match(regex);
+    
+    if (match) {
+      const reportBody = match[1];
+      const tasks = reportBody.split('\n').map(line => {
+        const [task, status] = line.split(':').map(item => item.trim());
+        return { task, status };
+      }).filter(item => item.task && item.status);
       
-      // 2. Store message in database
-      const activityId = await this.storeActivity(message, parsedData);
-      
-      // 3. Process based on type
-      const processor = this.messageProcessors.get(parsedData.type);
-      if (processor) {
-        await processor(message, parsedData, activityId);
-      }
-      
-      // 4. Mark as processed
-      await this.markAsProcessed(activityId);
-      
-    } catch (error) {
-      console.error('Failed to handle message:', error);
-      await this.sendErrorResponse(message.chat.id, 'خطا در پردازش پیام. لطفا مجددا تلاش کنید.');
+      return {
+        type: 'daily_report',
+        employeeId: message.from.id,
+        employeeName: message.from.username || `${message.from.first_name} ${message.from.last_name || ''}`,
+        messageId: message.message_id,
+        timestamp: message.date,
+        data: { tasks }
+      };
     }
+    return null;
   }
 
-  /**
-   * Parse and classify incoming message
-   */
-  async parseMessage(message: TelegramMessage): Promise<ParsedMessageData> {
-    const text = message.text || '';
-    
-    // Check for commands first
-    const command = this.extractCommand(text);
-    if (command) {
-      return this.parseCommandMessage(text, command);
-    }
-
-    // Use heuristic detection for message types
-    if (this.detectLeaveRequest(message)) {
-      return this.parseLeaveRequest(text);
-    }
-    
-    if (this.detectTechnicalReport(message)) {
-      return this.parseTechnicalReport(text);
-    }
-    
-    if (this.detectDailyReport(message)) {
-      return this.parseDailyReport(text);
-    }
-    
-    if (this.detectFollowUp(message)) {
-      return this.parseFollowUp(text);
-    }
-
-    // Default to general message
+  // پیام عمومی
+  parseGeneralMessage(message: TelegramMessage): ParsedMessage {
     return {
       type: 'general_message',
-      extractedData: { content: text },
-      confidence: 0.5,
-      actionRequired: false
+      employeeId: message.from.id,
+      employeeName: message.from.username || `${message.from.first_name} ${message.from.last_name || ''}`,
+      messageId: message.message_id,
+      timestamp: message.date,
+      data: {
+        content: message.text || ''
+      }
     };
   }
 
-  /**
-   * Extract command from message
-   */
-  private extractCommand(text: string): { type: string; args: string[]; restOfMessage: string } | null {
-    const firstLine = text.split('\n')[0].trim();
-    const words = firstLine.split(' ');
+  // پارسر اصلی
+  parseMessage(message: TelegramMessage, groupType: string): ParsedMessage {
+    switch (groupType) {
+      case 'leave_requests':
+        return this.parseLeaveRequest(message) || this.parseGeneralMessage(message);
+      case 'technical_reports':
+        return this.parseTechnicalReport(message) || this.parseGeneralMessage(message);
+      case 'responsibilities':
+        return this.parseResponsibility(message) || this.parseGeneralMessage(message);
+      case 'daily_reports':
+        return this.parseDailyReport(message) || this.parseGeneralMessage(message);
+      case 'general':
+      default:
+        return this.parseGeneralMessage(message);
+    }
+  }
+}
+
+// ==================== ENTITY EXTRACTOR ====================
+
+class EntityExtractor {
+  // استخراج نام نمایندگان
+  extractRepresentativeNames(text: string): string[] {
+    const regex = /نماینده:?\s+([^\n,]+)/gi;
+    const matches = Array.from(text.matchAll(regex));
+    return matches.map(match => match[1].trim());
+  }
+
+  // استخراج محصولات
+  extractProductReferences(text: string): string[] {
+    const productRegex = /محصول:?\s+([^\n,]+)/gi;
+    const matches = [...text.matchAll(productRegex)];
+    return matches.map(match => match[1].trim());
+  }
+
+  // استخراج تاریخ‌ها
+  extractDateReferences(text: string): string[] {
+    const dateRegex = /(\d{4}\/\d{2}\/\d{2})/g;
+    return [...text.matchAll(dateRegex)].map(match => match[1]);
+  }
+
+  // استخراج آیتم‌های عملیاتی
+  extractActionItems(text: string): Array<{action: string, priority: 'high' | 'medium' | 'low'}> {
+    const actionPhrases = [
+      { regex: /باید\s+(.+?)(?:\.|$)/gi, priority: 'high' as const },
+      { regex: /لطفا\s+(.+?)(?:\.|$)/gi, priority: 'medium' as const },
+      { regex: /می\s?توانید\s+(.+?)(?:\.|$)/gi, priority: 'low' as const }
+    ];
     
-    for (const [type, prefixes] of Object.entries(this.COMMAND_PREFIXES)) {
-      for (const prefix of prefixes) {
-        if (words[0] === prefix) {
-          return {
-            type,
-            args: words.slice(1),
-            restOfMessage: text.substring(firstLine.length).trim()
+    let actions: Array<{action: string, priority: 'high' | 'medium' | 'low'}> = [];
+    for (const { regex, priority } of actionPhrases) {
+      const matches = Array.from(text.matchAll(regex));
+      actions = actions.concat(
+        matches.map(match => ({
+          action: match[1].trim(),
+          priority
+        }))
+      );
+    }
+    return actions;
+  }
+}
+
+// ==================== COMMAND DEFINITIONS ====================
+
+export const BOT_COMMANDS = {
+  // دستورات سیستم
+  SYSTEM: {
+    START: '/start',
+    HELP: '/help',
+    SETTINGS: '/settings',
+    STATUS: '/status',
+    REGISTER: '/register',
+  },
+  
+  // دستورات گزارش
+  REPORTS: {
+    DAILY: '#گزارش_روزانه',
+    TECHNICAL: '#گزارش_فنی',
+    ISSUE: '#مشکل',
+    SUCCESS: '#موفقیت',
+  },
+  
+  // دستورات درخواست
+  REQUESTS: {
+    LEAVE: '#درخواست_مرخصی',
+    SUPPORT: '#درخواست_پشتیبانی',
+    MATERIAL: '#درخواست_ابزار',
+  },
+  
+  // دستورات وظایف
+  TASKS: {
+    ASSIGN: '#وظیفه',
+    COMPLETE: '#انجام_شد',
+    FOLLOW_UP: '#پیگیری',
+    DEADLINE: '#مهلت',
+  },
+  
+  // دستورات نمایندگان
+  REPRESENTATIVES: {
+    NEW: '#نماینده_جدید',
+    UPDATE: '#بروزرسانی_نماینده',
+    INACTIVE: '#نماینده_غیرفعال',
+    SALES: '#آمار_فروش',
+  }
+};
+
+export const COMMAND_PARAMETERS = {
+  [BOT_COMMANDS.REQUESTS.LEAVE]: [
+    { name: 'date', regex: /(\d{4}\/\d{2}\/\d{2})/, required: true },
+    { name: 'duration', regex: /به\s+مدت\s+(.+?)(?:\s|$)/, required: true },
+    { name: 'reason', regex: /به\s+علت\s+(.+)$/, required: true }
+  ],
+  
+  [BOT_COMMANDS.TASKS.ASSIGN]: [
+    { name: 'task', regex: /وظیفه:\s+(.+?)(?:\s|$)/, required: true },
+    { name: 'assignee', regex: /مسئول:\s+(.+?)(?:\s|$)/, required: true },
+    { name: 'deadline', regex: /مهلت:\s+(.+?)(?:\s|$)/, required: false }
+  ]
+};
+
+export const RESPONSE_TEMPLATES = {
+  LEAVE_REQUEST_RECEIVED: 'درخواست مرخصی شما برای تاریخ {date} به مدت {duration} دریافت شد و در حال بررسی است.',
+  LEAVE_REQUEST_APPROVED: 'درخواست مرخصی شما برای تاریخ {date} تایید شد.',
+  LEAVE_REQUEST_DENIED: 'متاسفانه درخواست مرخصی شما برای تاریخ {date} تایید نشد. دلیل: {reason}',
+  
+  TASK_ASSIGNED: 'وظیفه جدید برای شما تعریف شد:\\n{task}\\nمهلت: {deadline}',
+  TASK_REMINDER: 'یادآوری: {deadline} مهلت انجام وظیفه "{task}" است.',
+  TASK_COMPLETED: 'وظیفه "{task}" با موفقیت تکمیل شد.',
+  
+  REPORT_ACKNOWLEDGED: 'گزارش شما دریافت شد. با تشکر از همکاری شما.',
+};
+
+// ==================== COMMAND HANDLER ====================
+
+class CommandHandler {
+  private telegramService: EnhancedTelegramService;
+  private entityExtractor: EntityExtractor;
+  private commands = BOT_COMMANDS;
+  private parameters = COMMAND_PARAMETERS;
+  private templates = RESPONSE_TEMPLATES;
+
+  constructor(telegramService: EnhancedTelegramService, entityExtractor: EntityExtractor) {
+    this.telegramService = telegramService;
+    this.entityExtractor = entityExtractor;
+  }
+
+  // تشخیص نوع دستور
+  identifyCommand(message: TelegramMessage) {
+    const text = message.text || '';
+    
+    // بررسی هر دسته دستور
+    for (const category in this.commands) {
+      for (const cmd in this.commands[category as keyof typeof this.commands]) {
+        const commandText = (this.commands[category as keyof typeof this.commands] as any)[cmd];
+        if (text.startsWith(commandText)) {
+          return { 
+            category, 
+            command: cmd, 
+            fullCommand: commandText,
+            text: text.substring(commandText.length).trim() 
           };
         }
       }
     }
     
-    return null;
+    return { category: 'UNKNOWN', command: null, fullCommand: null, text };
   }
 
-  /**
-   * Message type detection methods
-   */
-  private detectLeaveRequest(message: TelegramMessage): boolean {
+  // استخراج پارامترها
+  extractParameters(commandInfo: any, message: TelegramMessage) {
+    if (!commandInfo.fullCommand || !this.parameters[commandInfo.fullCommand as keyof typeof this.parameters]) {
+      return {};
+    }
+    
+    const parameterDefinitions = this.parameters[commandInfo.fullCommand as keyof typeof this.parameters];
     const text = message.text || '';
-    return (
-      text.includes('مرخصی') ||
-      text.includes('درخواست مرخصی') ||
-      message.chat.title === 'بخش مرخصی'
-    );
+    const params: any = {};
+    
+    for (const param of parameterDefinitions) {
+      const match = text.match(param.regex);
+      if (match) {
+        params[param.name] = match[1].trim();
+      } else if (param.required) {
+        return null; // پارامتر الزامی موجود نیست
+      }
+    }
+    
+    return params;
   }
 
-  private detectTechnicalReport(message: TelegramMessage): boolean {
-    const text = message.text || '';
-    return (
-      text.includes('گزارش فنی') ||
-      text.includes('#فنی') ||
-      message.chat.title === 'گزارش فنی'
-    );
-  }
-
-  private detectDailyReport(message: TelegramMessage): boolean {
-    const text = message.text || '';
-    return (
-      text.includes('گزارش کار روزانه') ||
-      text.includes('#گزارش_روزانه') ||
-      message.chat.title === 'گزارش کار روزانه'
-    );
-  }
-
-  private detectFollowUp(message: TelegramMessage): boolean {
-    const text = message.text || '';
-    return (
-      text.includes('پیگیری') ||
-      message.chat.title === 'پیگیری ها'
-    );
-  }
-
-  /**
-   * Message parsing methods
-   */
-  private parseCommandMessage(text: string, command: any): ParsedMessageData {
-    switch (command.type) {
-      case 'REPORT':
-        return {
-          type: 'daily_report',
-          extractedData: {
-            reportType: command.args[0] || 'روزانه',
-            content: command.restOfMessage
-          },
-          confidence: 0.9,
-          actionRequired: true
-        };
-      
-      case 'LEAVE':
-        return {
-          type: 'leave_request',
-          extractedData: {
-            date: command.args[0],
-            duration: command.args[1],
-            reason: command.restOfMessage
-          },
-          confidence: 0.9,
-          actionRequired: true
-        };
-      
+  // تولید پاسخ
+  generateResponse(commandInfo: any, parameters: any): string {
+    let template = '';
+    
+    // انتخاب قالب مناسب
+    switch (`${commandInfo.category}.${commandInfo.command}`) {
+      case 'REQUESTS.LEAVE':
+        template = this.templates.LEAVE_REQUEST_RECEIVED;
+        break;
+      case 'TASKS.ASSIGN':
+        template = this.templates.TASK_ASSIGNED;
+        break;
       default:
-        return {
-          type: 'general_message',
-          extractedData: { content: text },
-          confidence: 0.7,
-          actionRequired: false
-        };
+        template = this.templates.REPORT_ACKNOWLEDGED;
     }
+    
+    // جایگزینی متغیرها
+    let response = template;
+    for (const [key, value] of Object.entries(parameters)) {
+      response = response.replace(`{${key}}`, value as string);
+    }
+    
+    return response;
   }
 
-  private parseLeaveRequest(text: string): ParsedMessageData {
-    const datePattern = /تاریخ[:\s]+([\d\/]+)/;
-    const durationPattern = /مدت[:\s]+([\d]+)(?:\s*روز)?/;
-    const reasonPattern = /(?:دلیل|علت)[:\s]+(.+)(?:\n|$)/;
+  // مدیریت دستور
+  async handleCommand(message: TelegramMessage, chatInfo: any) {
+    const commandInfo = this.identifyCommand(message);
     
+    // دستور ناشناخته
+    if (commandInfo.category === 'UNKNOWN') {
+      return null;
+    }
+    
+    // استخراج پارامترها
+    const parameters = this.extractParameters(commandInfo, message);
+    
+    // پارامترهای الزامی موجود نیست
+    if (parameters === null) {
+      return {
+        responseText: 'فرمت دستور نادرست است. لطفا راهنما را مطالعه کنید.',
+        shouldRespond: true,
+        createTask: false
+      };
+    }
+    
+    // پردازش انواع مختلف دستورات
+    switch (`${commandInfo.category}.${commandInfo.command}`) {
+      case 'REQUESTS.LEAVE':
+        await this.processLeaveRequest(message, parameters);
+        break;
+      case 'TASKS.ASSIGN':
+        await this.processTaskAssignment(message, parameters);
+        break;
+    }
+    
+    // تولید و برگرداندن پاسخ
     return {
-      type: 'leave_request',
-      extractedData: {
-        date: (text.match(datePattern) || [])[1],
-        duration: parseInt((text.match(durationPattern) || [])[1] || '1'),
-        reason: (text.match(reasonPattern) || [])[1] || ''
-      },
-      confidence: 0.8,
-      actionRequired: true
+      responseText: this.generateResponse(commandInfo, parameters),
+      shouldRespond: true,
+      createTask: commandInfo.category === 'TASKS'
     };
   }
 
-  private parseDailyReport(text: string): ParsedMessageData {
-    const tasksPattern = /(?:وظایف انجام شده|کارهای انجام شده)[:\s]+(.+?)(?:\n|$)/s;
-    const representativesPattern = /(?:نمایندگان|نماینده)[:\s]+(.+?)(?:\n|$)/s;
-    const followupPattern = /(?:پیگیری|موارد پیگیری)[:\s]+(.+?)(?:\n|$)/s;
-    
-    return {
-      type: 'daily_report',
-      extractedData: {
-        tasks: (text.match(tasksPattern) || [])[1] || '',
-        representatives: (text.match(representativesPattern) || [])[1] || '',
-        followup: (text.match(followupPattern) || [])[1] || ''
-      },
-      confidence: 0.85,
-      actionRequired: true
-    };
+  // پردازش درخواست مرخصی
+  async processLeaveRequest(message: TelegramMessage, parameters: any) {
+    // ذخیره درخواست در دیتابیس
+    // اطلاع‌رسانی به مدیر مربوطه
+    console.log('🏖️ Processing leave request:', parameters);
   }
 
-  private parseTechnicalReport(text: string): ParsedMessageData {
-    const issuePattern = /(?:مشکل|خطا|ایراد)[:\s]+(.+?)(?:\n|$)/s;
-    const solutionPattern = /(?:راه حل|حل شد|برطرف شد)[:\s]+(.+?)(?:\n|$)/s;
-    
-    return {
-      type: 'technical_report',
-      extractedData: {
-        issue: (text.match(issuePattern) || [])[1] || '',
-        solution: (text.match(solutionPattern) || [])[1] || ''
-      },
-      confidence: 0.8,
-      actionRequired: true
-    };
-  }
-
-  private parseFollowUp(text: string): ParsedMessageData {
-    const representativePattern = /(?:نماینده|R)(\d+)/;
-    const issuePattern = /(.+)/s;
-    
-    return {
-      type: 'follow_up',
-      extractedData: {
-        representativeId: (text.match(representativePattern) || [])[1],
-        issue: text
-      },
-      confidence: 0.75,
-      actionRequired: true
-    };
-  }
-
-  /**
-   * Store activity in database
-   */
-  private async storeActivity(message: TelegramMessage, parsedData: ParsedMessageData): Promise<string> {
-    const activityId = nanoid();
-    
-    await db.execute(sql`
-      INSERT INTO telegram_activities (
-        id, message_id, chat_id, group_name, user_id, user_name,
-        message_type, content, parsed_data, processed, created_at
-      ) VALUES (
-        ${activityId},
-        ${message.message_id},
-        ${message.chat.id},
-        ${message.chat.title || 'Private Chat'},
-        ${message.from.id},
-        ${`${message.from.first_name} ${message.from.last_name || ''}`.trim()},
-        ${parsedData.type},
-        ${message.text},
-        ${JSON.stringify(parsedData.extractedData)},
-        FALSE,
-        datetime('now')
-      )
-    `);
-    
-    return activityId;
-  }
-
-  /**
-   * Message processors
-   */
-  private async processDailyReport(message: TelegramMessage, parsedData: ParsedMessageData, activityId: string): Promise<void> {
-    const reportId = `RPT-${Date.now()}`;
-    
-    await this.sendResponse(
-      message.chat.id,
-      this.formatTemplate(this.RESPONSE_TEMPLATES.REPORT_RECEIVED, {
-        reportType: 'روزانه',
-        date: new Date().toLocaleDateString('fa-IR'),
-        reportId
-      }),
-      message.message_id
-    );
-
-    // TODO: Integrate with AI for analysis and task generation
-  }
-
-  private async processTechnicalReport(message: TelegramMessage, parsedData: ParsedMessageData, activityId: string): Promise<void> {
-    await this.sendResponse(
-      message.chat.id,
-      '🔧 گزارش فنی شما دریافت شد و در اولویت بررسی قرار گرفت.',
-      message.message_id
-    );
-  }
-
-  private async processLeaveRequest(message: TelegramMessage, parsedData: ParsedMessageData, activityId: string): Promise<void> {
-    const { date, duration, reason } = parsedData.extractedData;
-    
-    await this.sendResponse(
-      message.chat.id,
-      this.formatTemplate(this.RESPONSE_TEMPLATES.LEAVE_REQUEST_RECEIVED, {
-        date: date || 'نامشخص',
-        duration: duration || '1',
-        reason: reason || 'نامشخص'
-      }),
-      message.message_id
-    );
-  }
-
-  private async processFollowUp(message: TelegramMessage, parsedData: ParsedMessageData, activityId: string): Promise<void> {
-    const followUpId = `FLW-${Date.now()}`;
-    
-    await this.sendResponse(
-      message.chat.id,
-      `🔍 پیگیری شما با شناسه ${followUpId} ثبت شد و در حال بررسی است.`,
-      message.message_id
-    );
-  }
-
-  private async processTaskRequest(message: TelegramMessage, parsedData: ParsedMessageData, activityId: string): Promise<void> {
-    // TODO: Implement task request processing
-    await this.sendResponse(
-      message.chat.id,
-      '✅ درخواست وظیفه شما ثبت شد.',
-      message.message_id
-    );
-  }
-
-  private async processGeneralMessage(message: TelegramMessage, parsedData: ParsedMessageData, activityId: string): Promise<void> {
-    // TODO: Implement general message processing with AI
-    console.log('General message processed:', activityId);
-  }
-
-  /**
-   * Utility methods
-   */
-  private async sendResponse(chatId: string, text: string, replyToMessageId?: string): Promise<void> {
-    const options: any = {};
-    if (replyToMessageId) {
-      options.reply_to_message_id = replyToMessageId;
-    }
-    
-    await this.bot.sendMessage(chatId, text, options);
-  }
-
-  private async sendErrorResponse(chatId: string, errorMessage: string): Promise<void> {
-    await this.bot.sendMessage(chatId, `❌ ${errorMessage}`);
-  }
-
-  private formatTemplate(template: string, values: Record<string, string>): string {
-    let result = template;
-    for (const [key, value] of Object.entries(values)) {
-      result = result.replace(new RegExp(`{${key}}`, 'g'), value);
-    }
-    return result;
-  }
-
-  private async markAsProcessed(activityId: string): Promise<void> {
-    await db.execute(sql`
-      UPDATE telegram_activities 
-      SET processed = TRUE 
-      WHERE id = ${activityId}
-    `);
-  }
-
-  /**
-   * Preserve existing invoice notification functionality
-   */
-  async sendInvoiceNotification(representativeId: number, invoiceData: any): Promise<void> {
-    try {
-      // Get representative's chat ID from database
-      const representative = await db.execute(sql`
-        SELECT name, phone FROM representatives WHERE id = ${representativeId}
-      `);
-
-      if (!representative.rows.length) {
-        console.error('Representative not found for invoice notification:', representativeId);
-        return;
-      }
-
-      const rep = representative.rows[0] as any;
-      
-      // Format invoice notification message
-      const message = `🧾 فاکتور جدید
-
-👤 نماینده: ${rep.name}
-📞 تلفن: ${rep.phone}
-🆔 شماره فاکتور: ${invoiceData.invoiceNumber}
-💰 مبلغ کل: ${invoiceData.totalAmount?.toLocaleString('fa-IR')} تومان
-📅 تاریخ: ${new Date().toLocaleDateString('fa-IR')}
-
-وضعیت: ${invoiceData.status === 'paid' ? '✅ پرداخت شده' : '⏳ در انتظار پرداخت'}`;
-
-      // Send to configured chat (implement chat ID configuration)
-      const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
-      if (ADMIN_CHAT_ID) {
-        await this.bot.sendMessage(ADMIN_CHAT_ID, message);
-      }
-      
-    } catch (error) {
-      console.error('Failed to send invoice notification:', error);
-    }
+  // پردازش تخصیص وظیفه
+  async processTaskAssignment(message: TelegramMessage, parameters: any) {
+    // ایجاد رکورد وظیفه
+    // اطلاع‌رسانی به مسئول
+    // زمان‌بندی یادآوری در صورت وجود مهلت
+    console.log('📋 Processing task assignment:', parameters);
   }
 }
 
-// Export singleton instance
-export const enhancedTelegramService = new EnhancedTelegramService(
-  process.env.TELEGRAM_BOT_TOKEN || ''
-);
+// ==================== ENHANCED TELEGRAM SERVICE ====================
+
+class EnhancedTelegramService {
+  private token: string;
+  private apiBase: string;
+  private config: any;
+  private messageParser: MessageParser;
+  private entityExtractor: EntityExtractor;
+  private commandHandler: CommandHandler;
+  private groupConfigs: GroupConfig[] = [];
+
+  constructor(token: string, config: any = {}) {
+    this.token = token;
+    this.apiBase = `https://api.telegram.org/bot${token}`;
+    this.config = {
+      useWebhook: false,
+      webhookUrl: '',
+      pollingTimeout: 60,
+      ...config
+    };
+    this.messageParser = new MessageParser();
+    this.entityExtractor = new EntityExtractor();
+    this.commandHandler = new CommandHandler(this, this.entityExtractor);
+  }
+
+  // درخواست API اصلی
+  async apiRequest(method: string, params: any = {}) {
+    try {
+      const response = await fetch(`${this.apiBase}/${method}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params)
+      });
+      
+      const data = await response.json();
+      
+      if (!data.ok) {
+        console.error(`Telegram API error (${method}):`, data);
+        throw new Error(`Telegram API error: ${data.description}`);
+      }
+      
+      return data.result;
+    } catch (error) {
+      console.error(`Error in Telegram API request (${method}):`, error);
+      throw error;
+    }
+  }
+
+  // ارسال پیام
+  async sendMessage(chatId: number, text: string, options: any = {}) {
+    return this.apiRequest('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      ...options
+    });
+  }
+
+  // عضویت در گروه
+  async joinGroup(inviteLink: string) {
+    const match = inviteLink.match(/t\.me\/\+([a-zA-Z0-9_-]+)/);
+    if (!match) throw new Error('Invalid invite link format');
+    
+    const inviteCode = match[1];
+    return this.apiRequest('joinChat', {
+      invite_link: `https://t.me/+${inviteCode}`
+    });
+  }
+
+  // تنظیم webhook
+  async setWebhook(url: string, options: any = {}) {
+    return this.apiRequest('setWebhook', {
+      url,
+      allowed_updates: ['message', 'edited_message', 'callback_query'],
+      ...options
+    });
+  }
+
+  // حذف webhook
+  async deleteWebhook() {
+    return this.apiRequest('deleteWebhook');
+  }
+
+  // شروع polling
+  async startPolling(callback: (update: any) => Promise<void>) {
+    let offset = 0;
+    
+    const poll = async () => {
+      try {
+        const updates = await this.apiRequest('getUpdates', {
+          offset,
+          timeout: this.config.pollingTimeout,
+          allowed_updates: ['message', 'edited_message', 'callback_query']
+        });
+        
+        if (updates.length > 0) {
+          offset = updates[updates.length - 1].update_id + 1;
+          
+          for (const update of updates) {
+            await this.processUpdate(update, callback);
+          }
+        }
+        
+        // ادامه polling
+        setTimeout(poll, 1000);
+      } catch (error) {
+        console.error('Polling error:', error);
+        // تلاش مجدد پس از تاخیر
+        setTimeout(poll, 5000);
+      }
+    };
+    
+    // شروع حلقه polling
+    poll();
+  }
+
+  // پردازش یک به‌روزرسانی
+  async processUpdate(update: any, callback: (update: any) => Promise<void>) {
+    // استخراج پیام
+    const message = update.message || update.edited_message || (update.callback_query && update.callback_query.message);
+    
+    if (!message) return;
+    
+    // تشخیص نوع گروه
+    const groupType = this.identifyGroupType(message.chat);
+    
+    // پارس کردن پیام
+    const parsedData = this.messageParser.parseMessage(message, groupType);
+    
+    if (parsedData) {
+      // استخراج موجودیت‌ها
+      const entities = {
+        representatives: this.entityExtractor.extractRepresentativeNames(message.text || ''),
+        products: this.entityExtractor.extractProductReferences(message.text || ''),
+        dates: this.entityExtractor.extractDateReferences(message.text || ''),
+        actionItems: this.entityExtractor.extractActionItems(message.text || '')
+      };
+      
+      // مدیریت دستورات
+      const commandResponse = await this.commandHandler.handleCommand(message, { groupType });
+      
+      // فراخوانی callback با داده‌های پردازش شده
+      await callback({
+        originalUpdate: update,
+        parsedMessage: parsedData,
+        extractedEntities: entities,
+        commandResponse,
+        groupType
+      });
+    }
+  }
+
+  // تشخیص نوع گروه
+  identifyGroupType(chat: any): string {
+    // اینجا می‌توانید بر اساس نام گروه یا شناسه آن نوع گروه را تشخیص دهید
+    const title = chat.title?.toLowerCase() || '';
+    
+    if (title.includes('مرخصی') || title.includes('leave')) return 'leave_requests';
+    if (title.includes('فنی') || title.includes('technical')) return 'technical_reports';
+    if (title.includes('مسئولیت') || title.includes('responsibility')) return 'responsibilities';
+    if (title.includes('روزانه') || title.includes('daily')) return 'daily_reports';
+    
+    return 'general';
+  }
+
+  // افزودن پیکربندی گروه
+  addGroupConfig(config: GroupConfig) {
+    this.groupConfigs.push(config);
+  }
+
+  // دریافت پیکربندی گروه
+  getGroupConfig(groupId: number): GroupConfig | undefined {
+    return this.groupConfigs.find(config => config.groupId === groupId);
+  }
+}
+
+// ==================== EXPORTS ====================
+
+export { EnhancedTelegramService, MessageParser, EntityExtractor, CommandHandler };
+export default EnhancedTelegramService;

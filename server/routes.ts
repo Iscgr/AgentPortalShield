@@ -32,7 +32,6 @@ import {
 } from "./services/telegram";
 
 import { xaiGrokEngine } from "./services/xai-grok-engine";
-import { registerCrmRoutes, invalidateCrmCache } from "./routes/crm-routes";
 import { registerSettingsRoutes } from "./routes/settings-routes";
 import bcrypt from "bcryptjs";
 // Commented out temporarily - import { generateFinancialReport } from "./services/report-generator";
@@ -71,13 +70,7 @@ interface AuthSession extends Express.Session {
   username?: string;
   role?: string;
   permissions?: string[];
-  crmAuthenticated?: boolean;
-  crmUserId?: number;
-  crmUsername?: string;
-  crmRole?: string;
-  crmPermissions?: string[];
   user?: any;
-  crmUser?: any;
 }
 
 interface AuthRequest extends Request {
@@ -112,12 +105,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error("Failed to initialize default admin user:", error);
   }
 
-  // Initialize default CRM user
-  try {
-    await storage.initializeDefaultCrmUser("crm", "8679");
-  } catch (error) {
-    console.error("Failed to initialize default CRM user:", error);
-  }
 
   // SHERLOCK v1.0: Authentication Test Endpoint (before other routes)
   app.get("/api/auth/test", (req, res) => {
@@ -125,18 +112,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sessionId: req.sessionID,
       hasSession: !!req.session,
       adminAuthenticated: req.session?.authenticated === true,
-      crmAuthenticated: req.session?.crmAuthenticated === true,
       adminUser: req.session?.user ? {
         id: req.session.user.id,
         username: req.session.user.username,
         role: req.session.user.role
       } : null,
-      crmUser: req.session?.crmUser ? {
-        id: req.session.crmUser.id,
-        username: req.session.crmUser.username,
-        role: req.session.crmUser.role
-      } : null,
-      isAuthenticated: !!(req.session?.authenticated || req.session?.crmAuthenticated),
+      isAuthenticated: !!req.session?.authenticated,
       timestamp: new Date().toISOString()
     };
 
@@ -149,8 +130,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Register essential CRM routes (core functionality only)
-  registerCrmRoutes(app, unifiedAuthMiddleware, storage); // Pass unified authMiddleware
 
   // Register Settings routes (core system settings)
   registerSettingsRoutes(app);
@@ -193,16 +172,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sessionId: req.sessionID,
       hasSession: !!req.session,
       adminAuth: req.session?.authenticated,
-      crmAuth: req.session?.crmAuthenticated,
       adminUser: req.session?.user ? {
         id: req.session.user.id,
         username: req.session.user.username,
         role: req.session.user.role
-      } : null,
-      crmUser: req.session?.crmUser ? {
-        id: req.session.crmUser.id,
-        username: req.session.crmUser.username,
-        role: req.session.crmUser.role
       } : null,
       cookieSettings: req.session?.cookie ? {
         secure: req.session.cookie.secure,
@@ -3009,8 +2982,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Force recreate admin user
       await storage.initializeDefaultAdminUser("mgr", "8679");
 
-      // Force recreate CRM user
-      await storage.initializeDefaultCrmUser("crm", "8679");
 
       res.json({
         success: true,
@@ -3119,6 +3090,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // ==================== ENHANCED TELEGRAM MANAGEMENT ROUTES ====================
+  // SHERLOCK v32.0: Advanced Telegram bot with AI-powered message parsing
+  try {
+    const { registerTelegramRoutes } = await import('./routes/telegram-routes');
+    registerTelegramRoutes(app, authMiddleware);
+    console.log('✅ SHERLOCK v32.0: Enhanced Telegram Management Routes Registered');
+  } catch (error) {
+    console.error('❌ Failed to register Enhanced Telegram routes:', error);
+  }
 
   const httpServer = createServer(app);
   return httpServer;

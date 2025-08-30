@@ -28,67 +28,9 @@ import NotFound from "@/pages/not-found";
 import UnifiedAuth from "@/pages/unified-auth";
 import FinancialIntegrityPage from "@/pages/financial-integrity";
 
-// Lazy load Modern CRM Dashboard with preloading optimization
-const ModernCrmDashboard = lazy(() => 
-  import('./components/crm/modern-crm-dashboard').then(module => {
-    // Preload critical components
-    import('./components/crm/workspace/WorkspaceHub');
-    return module;
-  })
-);
 
 
 
-// CRM Protected Routes Component
-function CrmProtectedRoutes() {
-  const { user, isLoading } = useUnifiedAuth(); // Use unified auth hook
-  const [, setLocation] = useLocation();
-
-  // Check authentication but don't create infinite loops
-  useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation('/'); // Redirect to unified auth
-    }
-  }, [user, isLoading, setLocation]);
-
-  // Show loading while checking authentication
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">در حال بررسی احراز هویت CRM...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Return null while redirecting
-  if (!user) {
-    return null;
-  }
-
-  // 🔥 NEW: Render Modern CRM Dashboard (Unified Interface)
-  return (
-    <Switch>
-      <Route path="/crm">
-        {() => (
-          <Suspense fallback={
-            <div className="min-h-screen clay-background relative flex items-center justify-center">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
-                <p className="text-white text-lg">بارگذاری پنل CRM مدرن...</p>
-                <p className="text-blue-200 text-sm mt-2">معماری یکپارچه جدید</p>
-              </div>
-            </div>
-          }>
-            <ModernCrmDashboard />
-          </Suspense>
-        )}
-      </Route>
-    </Switch>
-  );
-}
 
 
 function AuthenticatedRouter() {
@@ -97,8 +39,6 @@ function AuthenticatedRouter() {
 
   // ✅ SHERLOCK v32.1: بهبود تشخیص پرتال عمومی با regex دقیق
   const isPublicPortal = /^\/portal\/[^\/]+\/?$|^\/representative\/[^\/]+\/?$/.test(location);
-
-  const isCrmRoute = location.startsWith('/crm');
 
   if (isPublicPortal) {
     // 🔒 SECURITY: Completely isolated public portal - no admin access
@@ -136,12 +76,6 @@ function AuthenticatedRouter() {
         </Switch>
       </div>
     );
-  }
-
-  // SHERLOCK v3.0 FIX: Always require login for CRM routes
-  if (isCrmRoute) {
-    // 🔒 SECURITY: CRM routes are protected by unified auth
-    return <CrmProtectedRoutes />;
   }
 
   // Show loading state while checking authentication
