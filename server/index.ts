@@ -49,17 +49,17 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 // CRITICAL FIX: Register API routes BEFORE any other middleware in development
 if (process.env.NODE_ENV !== "production") {
   console.log('🔧 CRITICAL: Registering API routes with ABSOLUTE priority...');
-  
+
   // EMERGENCY: Disable auth middleware completely for stability
   const noAuthMiddleware = (req: any, res: any, next: any) => next();
-  
+
   // Register ALL API routes BEFORE Vite middleware
   registerRoutes(app);
   registerIntegrationHealthRoutes(app);
   registerBatchRollbackRoutes(app, noAuthMiddleware);
   registerStandardizedInvoiceRoutes(app, storage);
   app.use('/api/phase9', phase9IntegrationRoutes);
-  
+
   console.log('✅ CRITICAL: API routes registered with absolute priority');
 }
 
@@ -100,7 +100,7 @@ if (process.env.NODE_ENV !== "production") {
 
   // 🎯 CRITICAL FIX: Single unified server startup logic
   let serverInstance: any;
-  
+
   if (process.env.NODE_ENV === "production") {
     // Production: Register routes first, then static serving
     console.log('🔧 Registering API routes for production...');
@@ -110,41 +110,50 @@ if (process.env.NODE_ENV !== "production") {
     registerStandardizedInvoiceRoutes(app, storage);
     app.use('/api/phase9', phase9IntegrationRoutes);
     console.log('✅ Production API routes registered');
-    
+
     // Production: Static file serving
     serveStatic(app);
-    
+
     serverInstance = app.listen(port, host, () => {
       console.log(`🚀 SHERLOCK v32.0: Production server started on port ${port}`);
       console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
     });
 
   } else {
-    // ULTRA-MINIMAL API PROTECTION - No complex headers
-    console.log('✅ API routes protected - minimal interference');
-    
-    // Development: Single HTTP server with Vite integration
-    const { createServer } = await import('http');
-    const httpServer = createServer(app);
-    
-    // Setup Vite middleware AFTER all API routes with lower priority
-    console.log('🔧 Setting up Vite middleware AFTER API routes...');
-    await setupVite(app, httpServer);
-    
-    // Root route handled by Vite middleware - removed manual handling
+    // DEVELOPMENT: NO VITE MIDDLEWARE - Direct API only
+    console.log('🚨 DEVELOPMENT MODE: NO VITE MIDDLEWARE - API ONLY');
+
+    // Basic fallback for non-API routes
+    app.use((req, res, next) => {
+      if (!req.path.startsWith('/api/')) {
+        res.send(`
+        <html>
+          <head><title>API Server</title></head>
+          <body>
+            <h1>API Server Running</h1>
+            <p>Server is running in API-only mode</p>
+            <p>Dashboard API: <a href="/api/dashboard">/api/dashboard</a></p>
+            <p>Time: ${new Date().toISOString()}</p>
+          </body>
+        </html>
+      `);
+      } else {
+        next();
+      }
+    });
 
     // Start the unified HTTP server
-    httpServer.listen(port, host, () => {
+    serverInstance = app.listen(port, host, () => {
       console.log(`🚀 SHERLOCK v32.0: Development server started on port ${port}`);
       console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
       console.log(`✅ Dashboard API accessible at /api/dashboard`);
     });
 
-    httpServer.on('error', (error: any) => {
+    serverInstance.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${port} is still in use. Retrying in 2 seconds...`);
         setTimeout(() => {
-          httpServer.close();
+          serverInstance.close();
           process.exit(1);
         }, 2000);
       } else {
@@ -152,9 +161,7 @@ if (process.env.NODE_ENV !== "production") {
         process.exit(1);
       }
     });
-    
-    // Set server instance for graceful shutdown
-    serverInstance = httpServer;
+
   }
 
   // Graceful shutdown handling for production stability
