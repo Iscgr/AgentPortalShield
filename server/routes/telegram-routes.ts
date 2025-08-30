@@ -165,55 +165,6 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
 
   // ==================== EMPLOYEE GROUP TESTING ====================
 
-  // Test employee group functionality with REAL AI integration
-  app.post('/api/telegram/test-employee-groups', authMiddleware, async (req, res) => {
-    try {
-      console.log('🔍 PHASE 8C: Testing employee group AI functionality');
-      const { groupType } = req.body;
-
-      if (!groupType) {
-        console.warn('⚠️ PHASE 8C: Missing groupType in request');
-        return res.status(400).json({
-          success: false,
-          message: 'نوع گروه (groupType) الزامی است'
-        });
-      }
-
-      console.log('🚀 PHASE 8C: Generating employee group message for type:', groupType);
-
-      // Check if AI integration is working
-      const aiStatus = await telegramService.checkAIStatus(); // This method needs to be implemented in EnhancedTelegramService
-      console.log('🔍 PHASE 8C: AI Status:', aiStatus);
-
-      const testData = await telegramService.generateEmployeeGroupMessage(groupType);
-      console.log('✅ PHASE 8C: Employee group message generated successfully');
-
-      res.json({
-        success: true,
-        message: 'فرمت پیام تولید شد',
-        testData,
-        aiStatus
-      });
-    } catch (error: unknown) {
-      console.error('❌ PHASE 8C: Test employee groups error:', error);
-      // Ensure error is of type Error to access stack
-      if (error instanceof Error) {
-        console.error('🔧 PHASE 8C: Full error stack:', error.stack);
-        res.status(500).json({
-          success: false,
-          message: `خطا در تولید فرمت پیام گروه کارمندان: ${error.message}`,
-          error: error.message
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          message: 'خطا در تولید فرمت پیام گروه کارمندان: Unknown error',
-          error: 'Unknown error'
-        });
-      }
-    }
-  });
-
   // ==================== FUNCTIONAL AI FEATURES ====================
 
   // Test employee group functionality with REAL AI integration
@@ -405,47 +356,112 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
 
   // ==================== GROUP CONFIGURATION ====================
 
-  // Configure telegram group with Chat ID
+  // ==================== MULTI-GROUP MANAGEMENT ====================
+
+  // Get all configured groups
+  app.get('/api/telegram/groups', authMiddleware, async (req, res) => {
+    try {
+      const { storage } = await import('../storage');
+      
+      // Get stored groups from database
+      const groupsData = await storage.getSetting('telegram_groups');
+      const groups = groupsData?.value ? JSON.parse(groupsData.value) : [];
+
+      console.log(`🔍 PHASE 8C: Retrieved ${groups.length} configured groups`);
+
+      res.json({
+        success: true,
+        groups,
+        totalConfigured: groups.length,
+        maxGroups: 5
+      });
+    } catch (error: unknown) {
+      console.error('❌ PHASE 8C: Error fetching groups:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در دریافت گروه‌ها',
+        error: errorMessage
+      });
+    }
+  });
+
+  // Configure multiple telegram groups with Chat ID
   app.post('/api/telegram/configure-group', authMiddleware, async (req, res) => {
     try {
-      const { groupChatId, groupType, isActive = true } = req.body;
+      const { groupChatId, groupType, groupName, isActive = true } = req.body;
 
-      if (!groupChatId) {
+      if (!groupChatId || !groupName) {
         return res.status(400).json({
           success: false,
-          message: 'شناسه گروه الزامی است'
+          message: 'شناسه گروه و نام گروه الزامی است'
         });
       }
 
-      console.log(`🔧 PHASE 8C: Configuring group for bot ${AUTHORIZED_BOT_ID}`);
+      console.log(`🔧 PHASE 8C: Configuring group "${groupName}" for bot ${AUTHORIZED_BOT_ID}`);
 
       // Validate group access
       if (telegramService) {
         try {
           // Test sending a message to verify access
           await telegramService.sendMessage(parseInt(groupChatId), 
-            `✅ ربات ${AUTHORIZED_BOT_ID} با موفقیت به گروه متصل شد و آماده دریافت پیام‌های هوشمند است.`
+            `✅ ربات ${AUTHORIZED_BOT_ID} با موفقیت به گروه "${groupName}" متصل شد!\n\n🤖 دستیار هوشمند آماده پردازش پیام‌های نوع: ${groupType}`
           );
 
-          // Store group configuration
+          // Load existing groups
+          const { storage } = await import('../storage');
+          const existingGroupsData = await storage.getSetting('telegram_groups');
+          const existingGroups = existingGroupsData?.value ? JSON.parse(existingGroupsData.value) : [];
+
+          // Create new group configuration
           const groupConfig = {
+            id: Date.now().toString(),
             groupId: parseInt(groupChatId),
             groupType: groupType || 'general',
-            name: `Group_${groupChatId}`,
-            isActive
+            name: groupName,
+            chatId: groupChatId,
+            isActive,
+            createdAt: new Date().toISOString(),
+            status: 'connected'
           };
 
+          // Check for duplicates
+          const isDuplicate = existingGroups.some((g: any) => g.chatId === groupChatId);
+          if (isDuplicate) {
+            return res.status(400).json({
+              success: false,
+              message: 'این گروه قبلاً تنظیم شده است'
+            });
+          }
+
+          // Add to existing groups (max 5)
+          if (existingGroups.length >= 5) {
+            return res.status(400).json({
+              success: false,
+              message: 'حداکثر 5 گروه قابل تنظیم است'
+            });
+          }
+
+          const updatedGroups = [...existingGroups, groupConfig];
+
+          // Save to database
+          await storage.updateSetting('telegram_groups', JSON.stringify(updatedGroups));
+
+          // Add to telegram service
           telegramService.addGroupConfig(groupConfig);
+
+          console.log(`✅ PHASE 8C: Group "${groupName}" configured successfully. Total groups: ${updatedGroups.length}/5`);
 
           res.json({
             success: true,
             message: 'گروه با موفقیت تنظیم شد',
             groupConfig,
+            totalGroups: updatedGroups.length,
             authorizedBot: AUTHORIZED_BOT_ID
           });
 
         } catch (error) {
-          console.error(`❌ PHASE 8C: Group access error:`, error);
+          console.error(`❌ PHASE 8C: Group access error for "${groupName}":`, error);
           res.status(400).json({
             success: false,
             message: 'خطا در دسترسی به گروه. اطمینان حاصل کنید ربات به گروه اضافه شده',
@@ -455,7 +471,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       } else {
         res.status(400).json({
           success: false,
-          message: 'ربات تلگرام تنظیم نشده است'
+          message: 'ربات تلگرام تنظیم نشده است. ابتدا توکن ربات را تنظیم کنید'
         });
       }
 
@@ -465,6 +481,41 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
       res.status(500).json({
         success: false,
         message: 'خطا در تنظیم گروه',
+        error: errorMessage
+      });
+    }
+  });
+
+  // Delete a configured group
+  app.delete('/api/telegram/groups/:groupId', authMiddleware, async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { storage } = await import('../storage');
+
+      // Load existing groups
+      const existingGroupsData = await storage.getSetting('telegram_groups');
+      const existingGroups = existingGroupsData?.value ? JSON.parse(existingGroupsData.value) : [];
+
+      // Remove the group
+      const updatedGroups = existingGroups.filter((g: any) => g.id !== groupId);
+
+      // Save updated list
+      await storage.updateSetting('telegram_groups', JSON.stringify(updatedGroups));
+
+      console.log(`🗑️ PHASE 8C: Group ${groupId} removed. Remaining groups: ${updatedGroups.length}`);
+
+      res.json({
+        success: true,
+        message: 'گروه با موفقیت حذف شد',
+        remainingGroups: updatedGroups.length
+      });
+
+    } catch (error: unknown) {
+      console.error('❌ PHASE 8C: Error deleting group:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در حذف گروه',
         error: errorMessage
       });
     }

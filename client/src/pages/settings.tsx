@@ -54,6 +54,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { toPersianDigits } from "@/lib/persian-date";
 import { FinancialIntegrityDashboard } from '../components/financial-integrity-dashboard';
 import { BatchRollbackManager } from '../components/batch-rollback-manager';
+import { MultiGroupConfiguration } from '../components/multi-group-configuration';
 
 const telegramSettingsSchema = z.object({
   botToken: z.string().min(1, "توکن ربات الزامی است"),
@@ -762,127 +763,46 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            {/* Group Configuration */}
+            {/* Multi-Group Configuration */}
+            <MultiGroupConfiguration toast={toast} />
+            
+            {/* AI Integration Status */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Users className="w-5 h-5 ml-2" />
-                  تنظیم گروه‌های تلگرام
+                  <Brain className="w-5 h-5 ml-2" />
+                  وضعیت ادغام هوش مصنوعی
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="groupChatId">شناسه گروه (Chat ID)</Label>
-                    <Input
-                      id="groupChatId"
-                      placeholder="-1001234567890"
-                      className="mt-1"
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      برای دریافت Chat ID، ربات را به گروه اضافه کرده و پیام /start بفرستید
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="groupType">نوع گروه</Label>
-                    <select id="groupType" className="mt-1 w-full p-2 border rounded">
-                      <option value="general">عمومی</option>
-                      <option value="daily_reports">گزارشات روزانه</option>
-                      <option value="leave_requests">درخواست مرخصی</option>
-                      <option value="technical_reports">گزارشات فنی</option>
-                      <option value="responsibilities">مسئولیت‌ها</option>
-                    </select>
-                  </div>
-
-                  <Button 
-                    onClick={async () => {
-                      const chatId = (document.getElementById('groupChatId') as HTMLInputElement)?.value;
-                      const groupType = (document.getElementById('groupType') as HTMLSelectElement)?.value;
-
-                      if (!chatId) {
-                        toast({
-                          title: "خطا",
-                          description: "شناسه گروه الزامی است",
-                          variant: "destructive"
-                        });
-                        return;
-                      }
-
-                      try {
-                        const response = await fetch('/api/telegram/configure-group', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ groupChatId: chatId, groupType })
-                        });
-
-                        const result = await response.json();
-
-                        if (result.success) {
-                          toast({
-                            title: "موفق",
-                            description: "گروه با موفقیت تنظیم شد"
-                          });
-                        } else {
-                          throw new Error(result.message);
-                        }
-                      } catch (error: any) {
-                        toast({
-                          title: "خطا",
-                          description: error.message || "خطا در تنظیم گروه",
-                          variant: "destructive"
-                        });
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    <SettingsIcon className="h-4 w-4 ml-2" />
-                    تنظیم گروه
-                  </Button>
-
                   <Button 
                     variant="outline"
                     onClick={async () => {
-                      const chatId = (document.getElementById('groupChatId') as HTMLInputElement)?.value;
-
-                      if (!chatId) {
-                        toast({
-                          title: "خطا",
-                          description: "شناسه گروه الزامی است",
-                          variant: "destructive"
-                        });
-                        return;
-                      }
-
                       try {
-                        const response = await fetch('/api/telegram/test-group-message', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ groupChatId: chatId })
-                        });
-
+                        const response = await fetch('/api/telegram/ai-status');
                         const result = await response.json();
 
                         if (result.success) {
                           toast({
-                            title: "موفق",
-                            description: "پیام تست ارسال شد"
+                            title: "✅ وضعیت AI بررسی شد",
+                            description: `اتصال: ${result.ai.connection} | ویژگی‌ها: ${Object.values(result.ai.features).filter(Boolean).length}/3 فعال`,
                           });
                         } else {
                           throw new Error(result.message);
                         }
                       } catch (error: any) {
                         toast({
-                          title: "خطا",
-                          description: error.message || "خطا در ارسال پیام",
+                          title: "❌ خطا در بررسی وضعیت AI",
+                          description: error.message || "خطا در اتصال",
                           variant: "destructive"
                         });
                       }
                     }}
                     className="w-full"
                   >
-                    <MessageSquare className="h-4 w-4 ml-2" />
-                    تست پیام در گروه
+                    <Bot className="h-4 w-4 ml-2" />
+                    بررسی وضعیت هوش مصنوعی
                   </Button>
                 </div>
               </CardContent>
