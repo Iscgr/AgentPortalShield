@@ -325,38 +325,7 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
     }
   });
 
-}
-
-// ==================== HELPER FUNCTIONS ====================
-
-async function createTaskFromMessage(parsedMessage: any, employeeId: number, messageId: number) {
-  try {
-    const [newTask] = await db.insert(employeeTasks).values({
-      title: `Task from ${parsedMessage.type}`,
-      description: JSON.stringify(parsedMessage.data),
-      type: 'telegram_command',
-      priority: 'medium',
-      status: 'pending',
-      assignedToId: employeeId,
-      createdById: employeeId,
-      metadata: { sourceMessageId: messageId }
-    }).returning();
-
-    // Update message to link the created task
-    await db.update(telegramMessages)
-      .set({ 
-        taskCreated: true, 
-        createdTaskId: newTask.id 
-      })
-      .where(eq(telegramMessages.id, messageId));
-
-  } catch (error) {
-    console.error('Error creating task from message:', error);
-  }
-}
-
-
-  // Test Telegram bot connection
+// Test Telegram bot connection
   app.post('/api/telegram/test-connection', authMiddleware, async (req, res) => {
     try {
       if (!telegramService) {
@@ -392,4 +361,34 @@ async function createTaskFromMessage(parsedMessage: any, employeeId: number, mes
       });
     }
   });
+
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
+async function createTaskFromMessage(parsedMessage: any, employeeId: number, messageId: number) {
+  try {
+    const [newTask] = await db.insert(employeeTasks).values({
+      title: `Task from ${parsedMessage.type}`,
+      description: JSON.stringify(parsedMessage.data),
+      type: 'telegram_command',
+      priority: 'medium',
+      status: 'pending',
+      assignedToId: employeeId,
+      createdById: employeeId,
+      metadata: { sourceMessageId: messageId }
+    }).returning();
+
+    // Update message to link the created task
+    await db.update(telegramMessages)
+      .set({ 
+        taskCreated: true, 
+        createdTaskId: newTask.id 
+      })
+      .where(eq(telegramMessages.id, messageId));
+
+  } catch (error) {
+    console.error('Error creating task from message:', error);
+  }
+}
 
