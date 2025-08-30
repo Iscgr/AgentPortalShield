@@ -212,22 +212,7 @@ app.use((req, res, next) => {
     console.log('🔧 Setting up Vite middleware AFTER API routes...');
     await setupVite(app, httpServer);
     
-    // Root route LAST (lowest priority)
-    app.get('/', async (req, res) => {
-      console.log('ROOT ROUTE BYPASS - SERVING BUILT INDEX.HTML');
-      
-      try {
-        const fs = await import('fs');
-        const path = await import('path');
-        const indexPath = path.resolve(import.meta.dirname, '..', 'dist', 'public', 'index.html');
-        const html = fs.readFileSync(indexPath, 'utf-8');
-        res.setHeader('Content-Type', 'text/html');
-        res.status(200).send(html);
-      } catch (error) {
-        console.log('Error serving index.html:', error);
-        res.status(500).send('Error loading application');
-      }
-    });
+    // Root route handled by Vite middleware - removed manual handling
 
     // Start the unified HTTP server
     httpServer.listen(port, host, () => {

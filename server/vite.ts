@@ -40,48 +40,37 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
-  // 🚨 CRITICAL FIX: Enhanced API route protection with strict checking
+  // 🚨 CRITICAL FIX: Complete API route isolation from Vite
   app.use((req, res, next) => {
     // ABSOLUTE API PROTECTION: Never let Vite handle any /api/ routes
     if (req.path.startsWith('/api/') || req.url.startsWith('/api/')) {
-      console.log(`🔒 Vite middleware: PROTECTED API route ${req.path} - bypassing Vite completely`);
+      console.log(`🔒 Vite middleware: BYPASSING API route ${req.path}`);
       return next();
     }
     
     // Additional safety checks for API patterns
     if (req.path.includes('/api/') || req.url.includes('/api/') || req.originalUrl?.includes('/api/')) {
-      console.log(`🚨 Vite middleware: Detected API pattern in ${req.path} - bypassing`);
+      console.log(`🚨 Vite middleware: BYPASSING API pattern in ${req.path}`);
       return next();
     }
-    
-    // For non-API routes, apply Vite middleware carefully
-    console.log(`🔍 Vite middleware: Processing static route ${req.path}`);
-    vite.middlewares(req, res, next);
+
+    // Only process static assets and UI routes
+    if (req.path.startsWith('/src/') || req.path.startsWith('/@') || req.path.endsWith('.tsx') || req.path.endsWith('.ts') || req.path.endsWith('.css')) {
+      console.log(`🔍 Vite middleware: Processing dev asset ${req.path}`);
+      return vite.middlewares(req, res, next);
+    }
+
+    // For root and other UI routes, serve the app
+    if (req.path === '/' || (!req.path.includes('.') && !req.path.startsWith('/api/'))) {
+      console.log(`🏠 Vite middleware: Serving app for ${req.path}`);
+      return vite.middlewares(req, res, next);
+    }
+
+    // Let other middleware handle everything else
+    next();
   });
 
   app.use(vite.ssrFixStacktrace);
-
-  // 🎯 ENHANCED: Catch-all with multiple safety layers
-  app.get('*', (req, res, next) => {
-    // LAYER 1: Absolute API route protection
-    if (req.path.startsWith('/api/') || req.url.startsWith('/api/')) {
-      console.log(`🔒 Catch-all: API route ${req.path} protected from Vite`);
-      return next();
-    }
-
-    // LAYER 2: Check Accept headers for HTML requests only
-    const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
-    
-    if (!acceptsHtml) {
-      console.log(`🔒 Catch-all: Non-HTML request ${req.path} bypassing Vite`);
-      return next();
-    }
-
-    // LAYER 3: Safe Vite handling for HTML requests
-    console.log(`🏠 Catch-all: Serving SPA for ${req.path}`);
-    req.url = '/';
-    vite.middlewares(req, res, next);
-  });
 }
 
 export function serveStatic(app: Express) {
