@@ -595,7 +595,6 @@ async function handleDailyReport(parsedMessage: any, employeeId: number, message
       });
     }
   });
-
 }
 
 // ==================== HELPER FUNCTIONS ====================
