@@ -31,6 +31,36 @@ let telegramService: EnhancedTelegramService | null = null;
 
 export function registerTelegramRoutes(app: Express, authMiddleware: any) {
 
+  // ==================== BOT INITIALIZATION ====================
+  
+  // Initialize telegram service when bot token is available
+  const initializeTelegramService = async () => {
+    try {
+      const { storage } = await import('../storage');
+      const botTokenSetting = await storage.getSetting('telegram_bot_token');
+      
+      console.log('🔍 Checking telegram bot token:', {
+        hasToken: !!botTokenSetting?.value,
+        tokenLength: botTokenSetting?.value?.length || 0,
+        serviceExists: !!telegramService
+      });
+      
+      if (botTokenSetting?.value && !telegramService) {
+        console.log('🤖 Initializing Telegram service with saved token...');
+        telegramService = new EnhancedTelegramService(botTokenSetting.value);
+        console.log('✅ Telegram service initialized successfully');
+        return true;
+      }
+      return !!telegramService;
+    } catch (error) {
+      console.error('❌ Failed to initialize Telegram service:', error);
+      return false;
+    }
+  };
+
+  // Initialize on startup
+  initializeTelegramService();
+
   // ==================== GROUP MANAGEMENT ====================
 
   // Get configured Telegram groups
@@ -79,7 +109,11 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
         });
       }
 
-      // Check telegram service
+      // Check telegram service - try to initialize if not already done
+      if (!telegramService) {
+        await initializeTelegramService();
+      }
+      
       if (!telegramService) {
         return res.status(400).json({
           success: false,
@@ -237,6 +271,11 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
   // Get Telegram bot status
   app.get('/api/telegram/status', authMiddleware, async (req, res) => {
     try {
+      // Try to initialize if not already done
+      if (!telegramService) {
+        await initializeTelegramService();
+      }
+      
       res.json({
         success: true,
         status: telegramService ? 'connected' : 'disconnected',
