@@ -193,7 +193,7 @@ app.use((req, res, next) => {
   registerSettingsRoutes(app, storage);
   await registerStandardizedInvoiceRoutes(app, storage);
   registerMaintenanceRoutes(app);
-  registerBatchRollbackRoutes(app, storage);
+  registerBatchRollbackRoutes(app, unifiedAuthMiddleware);
   registerWorkspaceRoutes(app, storage);
   registerIntegrationHealthRoutes(app);
   registerFeatureFlagRoutes(app);
