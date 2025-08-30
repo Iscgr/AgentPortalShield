@@ -1,0 +1,60 @@
+
+> rest-express@1.0.0 dev
+✅ XAI Grok Engine initialized successfully
+✅ PHASE 9: Integration health routes registered
+🚩 ATOMOS Feature Flag Manager v1.0 initialized with safe defaults
+✅ PHASE 9B: Initialized 4 integration vectors
+✅ PHASE 9: Configured 12 feature flags for staged integration
+✅ PHASE 9: Comprehensive integration monitoring routes registered
+🔧 CRITICAL: Registering API routes with ABSOLUTE priority...
+✅ Integration health routes registered for Phase 9
+✅ Batch Rollback Routes Registered
+✅ CRITICAL: API routes registered with absolute priority
+5:10:40 PM [express] Checking database connection...
+Query: select "id", "username", "password_hash", "role", "permissions", "is_active", "last_login_at", "created_at" from "admin_users" where "admin_users"."username" = $1 limit $2 -- params: ["mgr", 1]
+✅ Standardized Invoice Routes Registered
+5:10:40 PM [database] Database connection successful
+✅ API routes protected from Vite interference
+🔧 Setting up Vite middleware AFTER API routes...
+No existing process on port 5000 to kill
+Query: update "admin_users" set "password_hash" = $1, "role" = $2, "is_active" = $3 where "admin_users"."username" = $4 -- params: ["$2b$12$w5KBWl9WtZTnkyMKYCRQ7.Pmon/6QK1T/50jUa9ZhS1CT.Z9A.Tjy", "SUPER_ADMIN", true, "mgr"]
+🚀 SHERLOCK v32.0: Development server started on port 5000
+📱 WebView: https://workspace.info9071.repl.co
+✅ Dashboard API accessible at /api/dashboard
+🔄 Admin user 'mgr' password reset successfully
+Query: select "id", "username", "password_hash", "full_name", "email", "role", "permissions", "is_active", "last_login_at", "created_at", "updated_at" from "crm_users" where "crm_users"."username" = $1 limit $2 -- params: ["crm", 1]
+REQUEST: GET /
+🏠 Vite middleware: Serving app for /
+Query: update "crm_users" set "password_hash" = $1, "role" = $2, "is_active" = $3 where "crm_users"."username" = $4 -- params: ["$2b$12$PX.2w3FkgAUjRhsifUkHt.nChzOyp6eV2CvGMG3k4rFDb9T4lDHe.", "CRM_MANAGER", true, "crm"]
+🔄 CRM user 'crm' password reset successfully
+✅ XAI Grok Engine initialized successfully
+✅ Settings routes registered successfully
+✅ Maintenance routes registered successfully
+✅ Integration health routes registered for Phase 9
+✅ Batch Rollback Routes Registered
+📊 Registering /api/dashboard route...
+✅ Standardized Invoice Routes Registered
+5:10:42 PM [error] Uncaught Exception: terminating connection due to administrator command
+error: terminating connection due to administrator command
+    at cn.parseErrorMessage (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1182:6)
+    at cn.handlePacket (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1143:13)
+    at cn.parse (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1127:36)
+    at v.<anonymous> (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1190:16)
+    at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+    at WebSocket.<anonymous> (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:987:80)
+    at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+    at WebSocket.onMessage (/home/runner/workspace/node_modules/ws/lib/event-target.js:209:9)
+    at WebSocket.emit (node:events:524:28)
+    at Receiver.receiverOnMessage (/home/runner/workspace/node_modules/ws/lib/websocket.js:1220:20)
+5:10:42 PM [error] Uncaught Exception: terminating connection due to administrator command
+error: terminating connection due to administrator command
+    at cn.parseErrorMessage (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1182:6)
+    at cn.handlePacket (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1143:13)
+    at cn.parse (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1127:36)
+    at v.<anonymous> (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1190:16)
+    at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+    at WebSocket.<anonymous> (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:987:80)
+    at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+    at WebSocket.onMessage (/home/runner/workspace/node_modules/ws/lib/event-target.js:209:9)
+    at WebSocket.emit (node:events:524:28)
+    at Receiver.receiverOnMessage (/home/runner/workspace/node_modules/ws/lib/websocket.js:1220:20
