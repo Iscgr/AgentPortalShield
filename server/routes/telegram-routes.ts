@@ -73,6 +73,69 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
   
   // ==================== BOT CONFIGURATION ====================
   
+  // Direct Test Messages for Employee Groups
+  app.post('/api/telegram/test-employee-groups', authMiddleware, async (req, res) => {
+    try {
+      const { groupType } = req.body as { groupType: string };
+      
+      // Test message formats for different employee subgroups
+      const testMessages: Record<string, { persian: string; english: string }> = {
+        'daily-report': {
+          persian: '#گزارش_روزانه\n📅 تاریخ: ۱۴۰۳/۱۲/۱۱\n👤 نام: احمد محمدی\n🏢 پروژه: طراحی وب‌سایت\n⏰ ساعات کار: ۸ ساعت\n✅ کارهای انجام شده:\n- طراحی صفحه اصلی\n- بهینه‌سازی CSS\n- تست واکنش‌گرایی\n🎯 برنامه فردا:\n- کدنویسی بخش پنل کاربری\n💬 توضیحات: پیشرفت خوبی داشتیم',
+          english: '#daily_report\n📅 Date: 2025-03-02\n👤 Name: Ahmad Mohammadi\n🏢 Project: Website Design\n⏰ Hours: 8h\n✅ Completed:\n- Homepage design\n- CSS optimization\n- Responsiveness testing\n🎯 Tomorrow:\n- User panel coding\n💬 Notes: Good progress made'
+        },
+        'task-assignment': {
+          persian: '#وظیفه_جدید\n📋 عنوان: بررسی امنیت سیستم\n👤 مسئول: مریم احمدی\n📅 ددلاین: ۱۴۰۳/۱۲/۱۵\n🎯 اولویت: بالا\n📝 شرح کار:\n- بررسی آسیب‌پذیری‌های احتمالی\n- تست نفوذ اولیه\n- گزارش مفصل امنیتی\n⚠️ نکات مهم:\n- استفاده از ابزارهای مجاز\n- رعایت حریم خصوصی',
+          english: '#new_task\n📋 Title: Security System Review\n👤 Assigned: Maryam Ahmadi\n📅 Deadline: 2025-03-06\n🎯 Priority: High\n📝 Description:\n- Check vulnerabilities\n- Initial penetration testing\n- Detailed security report\n⚠️ Important:\n- Use authorized tools\n- Respect privacy'
+        },
+        'leave-request': {
+          persian: '#مرخصی\n👤 نام: علی رضایی\n📅 از تاریخ: ۱۴۰۳/۱۲/۲۰\n📅 تا تاریخ: ۱۴۰۳/۱۲/۲۲\n🏥 نوع: استعلاجی\n📝 دلیل: ویزیت پزشک\n📞 تماس اضطراری: ۰۹۱۲۳۴۵۶۷۸۹\n💼 جایگزین: محمد حسینی\n✅ کارهای محول شده تکمیل شد',
+          english: '#leave_request\n👤 Name: Ali Rezaei\n📅 From: 2025-03-11\n📅 To: 2025-03-13\n🏥 Type: Medical\n📝 Reason: Doctor visit\n📞 Emergency: 09123456789\n💼 Replacement: Mohammad Hosseini\n✅ Assigned tasks completed'
+        },
+        'technical-report': {
+          persian: '#گزارش_فنی\n⚠️ مشکل: خرابی سرور\n📅 زمان: ۱۴۰۳/۱۲/۱۱ - ۱۴:۳۰\n🔧 وضعیت: حل شده\n👤 گزارش‌دهنده: حسین کریمی\n📊 تاثیر: ۳۰ دقیقه قطعی سرویس\n🛠️ راه‌حل:\n- ریستارت سرور اصلی\n- بررسی لاگ‌ها\n- بهینه‌سازی تنظیمات\n🔮 پیشگیری:\n- مانیتورینگ بیشتر\n- بک‌آپ خودکار',
+          english: '#technical_report\n⚠️ Issue: Server failure\n📅 Time: 2025-03-02 - 14:30\n🔧 Status: Resolved\n👤 Reporter: Hossein Karimi\n📊 Impact: 30min downtime\n🛠️ Solution:\n- Main server restart\n- Log analysis\n- Config optimization\n🔮 Prevention:\n- Enhanced monitoring\n- Auto backup'
+        }
+      };
+      
+      const expectedActions: Record<string, string> = {
+        'daily-report': 'تحلیل عملکرد، ثبت ساعات کار، برنامه‌ریزی روز بعد',
+        'task-assignment': 'ایجاد وظیفه جدید، اختصاص به کارمند، تنظیم یادآوری',
+        'leave-request': 'بررسی اعتبار درخواست، تأیید مدیر، تنظیم جایگزین',
+        'technical-report': 'ثبت مشکل، پیگیری راه‌حل، آمارگیری اختلالات'
+      };
+      
+      const selectedMessage = testMessages[groupType];
+      if (!selectedMessage) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid group type'
+        });
+      }
+      
+      // Test with both Persian and English formats
+      res.json({
+        success: true,
+        message: 'Test messages generated successfully',
+        testData: {
+          groupType,
+          messages: selectedMessage,
+          aiProcessingNote: 'این پیام‌ها توسط دستیار هوشمند تجزیه و تحلیل می‌شوند',
+          expectedActions: expectedActions[groupType]
+        }
+      });
+      
+    } catch (error: unknown) {
+      console.error('❌ Error generating test messages:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'Error generating test messages',
+        error: errorMessage
+      });
+    }
+  });
+  
   // Configure Telegram bot
   app.post('/api/telegram/config', authMiddleware, async (req, res) => {
     try {

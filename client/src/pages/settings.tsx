@@ -17,7 +17,12 @@ import {
   AlertTriangle,
   RotateCcw,
   Database,
-  SendToBack
+  SendToBack,
+  Brain,
+  CheckSquare,
+  Target,
+  BarChart,
+  Users
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +33,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   Form,
@@ -80,6 +87,34 @@ const aiSettingsSchema = z.object({
   xaiApiKey: z.string().min(1, "کلید xAI Grok الزامی است"),
   enableAutoAnalysis: z.boolean(),
   analysisFrequency: z.string(),
+  // General AI Settings
+  temperature: z.number().min(0).max(2).default(0.7),
+  maxTokens: z.number().min(100).max(8000).default(1000),
+  defaultModel: z.string().default("grok-2-1212"),
+  // Cultural Intelligence
+  culturalSensitivity: z.number().min(0).max(1).default(0.95),
+  religiousSensitivity: z.number().min(0).max(1).default(0.9),
+  languageFormality: z.enum(["FORMAL", "RESPECTFUL", "CASUAL"]).default("RESPECTFUL"),
+  persianPoetryIntegration: z.boolean().default(true),
+  culturalMetaphors: z.boolean().default(true),
+  // Behavior Settings
+  proactivityLevel: z.number().min(0).max(1).default(0.8),
+  confidenceThreshold: z.number().min(0).max(1).default(0.75),
+  learningRate: z.number().min(0).max(1).default(0.1),
+  creativityLevel: z.number().min(0).max(1).default(0.6),
+  riskTolerance: z.number().min(0).max(1).default(0.3),
+  // Task Management
+  taskGenerationEnabled: z.boolean().default(true),
+  autoAssignmentEnabled: z.boolean().default(false),
+  intelligentScheduling: z.boolean().default(true),
+  maxSuggestions: z.number().min(1).max(20).default(5),
+  responseTimeout: z.number().min(5).max(60).default(30),
+  // Security
+  dataEncryption: z.boolean().default(true),
+  accessLogging: z.boolean().default(true),
+  // Integrations
+  telegramIntegration: z.boolean().default(false),
+  xaiIntegration: z.boolean().default(true)
 });
 
 const dataResetSchema = z.object({
@@ -209,7 +244,35 @@ export default function Settings() {
     defaultValues: {
       xaiApiKey: "",
       enableAutoAnalysis: false,
-      analysisFrequency: "daily"
+      analysisFrequency: "daily",
+      // General AI Settings
+      temperature: 0.7,
+      maxTokens: 1000,
+      defaultModel: "grok-2-1212",
+      // Cultural Intelligence
+      culturalSensitivity: 0.95,
+      religiousSensitivity: 0.9,
+      languageFormality: "RESPECTFUL",
+      persianPoetryIntegration: true,
+      culturalMetaphors: true,
+      // Behavior Settings
+      proactivityLevel: 0.8,
+      confidenceThreshold: 0.75,
+      learningRate: 0.1,
+      creativityLevel: 0.6,
+      riskTolerance: 0.3,
+      // Task Management
+      taskGenerationEnabled: true,
+      autoAssignmentEnabled: false,
+      intelligentScheduling: true,
+      maxSuggestions: 5,
+      responseTimeout: 30,
+      // Security
+      dataEncryption: true,
+      accessLogging: true,
+      // Integrations
+      telegramIntegration: false,
+      xaiIntegration: true
     }
   });
 
@@ -342,25 +405,83 @@ export default function Settings() {
     }
   });
 
+  const testEmployeeGroupMutation = useMutation({
+    mutationFn: async (groupType: string) => {
+      const response = await apiRequest('/api/telegram/test-employee-groups', { 
+        method: 'POST',
+        data: { groupType }
+      });
+      return response;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "✅ تست گروه کارمندان موفق",
+        description: `فرمت پیام ${data.testData?.groupType} تولید شد. ${data.testData?.expectedActions}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "❌ خطا در تست گروه کارمندان",
+        description: error.message || "لطفاً دوباره تلاش کنید",
+        variant: "destructive",
+      });
+    }
+  });
+
   const onAiSubmit = async (data: AiSettingsData) => {
     try {
+      // Save API key first
       const response = await apiRequest('/api/settings/xai-grok/configure', { 
         method: 'POST',
         data: { apiKey: data.xaiApiKey }
       });
-      const result = response;
 
-      await updateSettingMutation.mutateAsync({ key: 'ai_auto_analysis', value: data.enableAutoAnalysis.toString() });
-      await updateSettingMutation.mutateAsync({ key: 'ai_analysis_frequency', value: data.analysisFrequency });
+      // Save all AI configuration settings
+      const settingsToUpdate = [
+        { key: 'ai_auto_analysis', value: data.enableAutoAnalysis.toString() },
+        { key: 'ai_analysis_frequency', value: data.analysisFrequency },
+        { key: 'ai_temperature', value: data.temperature.toString() },
+        { key: 'ai_max_tokens', value: data.maxTokens.toString() },
+        { key: 'ai_default_model', value: data.defaultModel },
+        { key: 'ai_cultural_sensitivity', value: data.culturalSensitivity.toString() },
+        { key: 'ai_religious_sensitivity', value: data.religiousSensitivity.toString() },
+        { key: 'ai_language_formality', value: data.languageFormality },
+        { key: 'ai_persian_poetry', value: data.persianPoetryIntegration.toString() },
+        { key: 'ai_cultural_metaphors', value: data.culturalMetaphors.toString() },
+        { key: 'ai_proactivity_level', value: data.proactivityLevel.toString() },
+        { key: 'ai_confidence_threshold', value: data.confidenceThreshold.toString() },
+        { key: 'ai_learning_rate', value: data.learningRate.toString() },
+        { key: 'ai_creativity_level', value: data.creativityLevel.toString() },
+        { key: 'ai_risk_tolerance', value: data.riskTolerance.toString() },
+        { key: 'ai_task_generation', value: data.taskGenerationEnabled.toString() },
+        { key: 'ai_auto_assignment', value: data.autoAssignmentEnabled.toString() },
+        { key: 'ai_intelligent_scheduling', value: data.intelligentScheduling.toString() },
+        { key: 'ai_max_suggestions', value: data.maxSuggestions.toString() },
+        { key: 'ai_response_timeout', value: data.responseTimeout.toString() },
+        { key: 'ai_data_encryption', value: data.dataEncryption.toString() },
+        { key: 'ai_access_logging', value: data.accessLogging.toString() },
+        { key: 'ai_telegram_integration', value: data.telegramIntegration.toString() },
+        { key: 'ai_xai_integration', value: data.xaiIntegration.toString() }
+      ];
+
+      // Update all settings in parallel
+      await Promise.all(
+        settingsToUpdate.map(setting => 
+          updateSettingMutation.mutateAsync({ 
+            key: setting.key, 
+            value: setting.value 
+          })
+        )
+      );
 
       toast({
-        title: "تنظیمات xAI Grok ذخیره شد",
-        description: result.message,
+        title: "✅ تنظیمات دستیار هوشمند ذخیره شد",
+        description: "همه ماژول‌های AI بروزرسانی شدند. سیستم آماده بهره‌برداری است.",
       });
     } catch (error: any) {
       toast({
-        title: "خطا در ذخیره تنظیمات",
-        description: error.message,
+        title: "❌ خطا در ذخیره تنظیمات",
+        description: error.message || "لطفاً دوباره تلاش کنید",
         variant: "destructive",
       });
     }
@@ -1063,62 +1184,436 @@ export default function Settings() {
 
         {/* AI Settings */}
         <TabsContent value="ai">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Bot className="w-5 h-5 ml-2" />
-                تنظیمات هوش مصنوعی (xAI Grok)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form {...aiForm}>
-                <form onSubmit={aiForm.handleSubmit(onAiSubmit)} className="space-y-6">
-                  <FormField
-                    control={aiForm.control}
-                    name="xaiApiKey"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>کلید API xAI Grok</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="xai-..."
-                            type="password"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          کلید API خود را از پلتفرم xAI دریافت کنید
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex space-x-2">
-                    <Button 
-                      type="button"
-                      variant="outline"
-                      onClick={() => testGrokConnectionMutation.mutate()}
-                      disabled={testGrokConnectionMutation.isPending || !aiForm.watch('xaiApiKey')}
-                    >
-                      <TestTube className="w-4 h-4 mr-2" />
-                      {testGrokConnectionMutation.isPending ? "در حال تست..." : "تست اتصال"}
-                    </Button>
-                  </div>
-
+          <div className="space-y-6">
+            {/* API Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Bot className="w-5 h-5 ml-2" />
+                  پیکربندی موتور هوش مصنوعی
+                </CardTitle>
+                <CardDescription>
+                  تنظیمات اتصال و پیکربندی اولیه موتور XAI-Grok
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...aiForm}>
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>تحلیل خودکار</Label>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          فعال‌سازی تحلیل خودکار وضعیت مالی
-                        </p>
-                      </div>
+                    <FormField
+                      control={aiForm.control}
+                      name="xaiApiKey"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>کلید API xAI Grok</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="xai-..."
+                              type="password"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            کلید API خود را از پلتفرم xAI دریافت کنید
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex space-x-2">
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => testGrokConnectionMutation.mutate()}
+                        disabled={testGrokConnectionMutation.isPending || !aiForm.watch('xaiApiKey')}
+                      >
+                        <TestTube className="w-4 h-4 mr-2" />
+                        {testGrokConnectionMutation.isPending ? "در حال تست..." : "تست اتصال"}
+                      </Button>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => {/* TODO: Direct test */}}
+                      >
+                        <Bot className="w-4 h-4 mr-2" />
+                        تست مستقیم دستیار
+                      </Button>
+                    </div>
+                  </div>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* General AI Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Settings className="w-5 h-5 ml-2" />
+                  تنظیمات عمومی
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...aiForm}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={aiForm.control}
+                      name="temperature"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>خلاقیت (Temperature): {field.value}</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={0}
+                              max={2}
+                              step={0.1}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            0 = محافظه‌کار، 2 = خلاق
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="maxTokens"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>حداکثر طول پاسخ</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={100}
+                              max={8000}
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            تعداد کلمات پاسخ (100-8000)
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="defaultModel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>مدل پیش‌فرض</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="grok-2-1212">Grok-2 (پیشرفته)</SelectItem>
+                              <SelectItem value="grok-beta">Grok-Beta (سریع)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="responseTimeout"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>تایم‌اوت پاسخ: {field.value}s</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={5}
+                              max={60}
+                              step={5}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* Cultural Intelligence */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Globe className="w-5 h-5 ml-2" />
+                  هوش فرهنگی فارسی
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...aiForm}>
+                  <div className="space-y-4">
+                    <FormField
+                      control={aiForm.control}
+                      name="culturalSensitivity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>حساسیت فرهنگی: {Math.round(field.value * 100)}%</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            میزان توجه به نکات فرهنگی ایرانی
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="religiousSensitivity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>حساسیت مذهبی: {Math.round(field.value * 100)}%</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="languageFormality"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>سطح رسمی بودن زبان</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FORMAL">رسمی</SelectItem>
+                              <SelectItem value="RESPECTFUL">محترمانه</SelectItem>
+                              <SelectItem value="CASUAL">غیررسمی</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={aiForm.control}
+                        name="persianPoetryIntegration"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between">
+                            <FormLabel>استفاده از شعر فارسی</FormLabel>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={aiForm.control}
+                        name="culturalMetaphors"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between">
+                            <FormLabel>استعاره‌های فرهنگی</FormLabel>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* Behavior Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Brain className="w-5 h-5 ml-2" />
+                  تنظیمات رفتاری
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...aiForm}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={aiForm.control}
+                      name="proactivityLevel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>سطح پیش‌فعالی: {Math.round(field.value * 100)}%</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            میزان ابتکار عمل دستیار
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="confidenceThreshold"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>آستانه اطمینان: {Math.round(field.value * 100)}%</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            حداقل اطمینان برای پیشنهاد
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="learningRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>نرخ یادگیری: {Math.round(field.value * 100)}%</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="riskTolerance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>تحمل ریسک: {Math.round(field.value * 100)}%</FormLabel>
+                          <FormControl>
+                            <Slider
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              value={[field.value]}
+                              onValueChange={(value) => field.onChange(value[0])}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* Task Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CheckSquare className="w-5 h-5 ml-2" />
+                  مدیریت وظایف هوشمند
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...aiForm}>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={aiForm.control}
+                        name="taskGenerationEnabled"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between">
+                            <FormLabel>تولید خودکار وظایف</FormLabel>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={aiForm.control}
+                        name="autoAssignmentEnabled"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between">
+                            <FormLabel>تخصیص خودکار</FormLabel>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={aiForm.control}
+                        name="intelligentScheduling"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between">
+                            <FormLabel>زمان‌بندی هوشمند</FormLabel>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
                       <FormField
                         control={aiForm.control}
                         name="enableAutoAnalysis"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="flex items-center justify-between">
+                            <FormLabel>تحلیل خودکار</FormLabel>
                             <FormControl>
                               <Switch
                                 checked={field.value}
@@ -1130,54 +1625,211 @@ export default function Settings() {
                       />
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={aiForm.control}
+                        name="maxSuggestions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>حداکثر پیشنهادات</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={20}
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value))}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={aiForm.control}
+                        name="analysisFrequency"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>دوره تحلیل</FormLabel>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="daily">روزانه</SelectItem>
+                                <SelectItem value="weekly">هفتگی</SelectItem>
+                                <SelectItem value="monthly">ماهانه</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Direct Test Section */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-3">
+                        تست مستقیم ماژول‌ها
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => testEmployeeGroupMutation.mutate('daily-report')}
+                          disabled={testEmployeeGroupMutation.isPending}
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          تست گزارش روزانه
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => testEmployeeGroupMutation.mutate('task-assignment')}
+                          disabled={testEmployeeGroupMutation.isPending}
+                        >
+                          <Target className="w-4 h-4 mr-2" />
+                          تست وظیفایف جدید
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => testEmployeeGroupMutation.mutate('leave-request')}
+                          disabled={testEmployeeGroupMutation.isPending}
+                        >
+                          <BarChart className="w-4 h-4 mr-2" />
+                          تست درخواست مرخصی
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => testEmployeeGroupMutation.mutate('technical-report')}
+                          disabled={testEmployeeGroupMutation.isPending}
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          تست گزارش فنی
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* Security & Integration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Shield className="w-5 h-5 ml-2" />
+                  امنیت و ادغام
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...aiForm}>
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={aiForm.control}
-                      name="analysisFrequency"
+                      name="dataEncryption"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>دوره تحلیل</FormLabel>
-                          <select 
-                            value={field.value}
-                            onChange={field.onChange}
-                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg"
-                          >
-                            <option value="daily">روزانه</option>
-                            <option value="weekly">هفتگی</option>
-                            <option value="monthly">ماهانه</option>
-                          </select>
-                          <FormDescription>
-                            فاصله زمانی برای تحلیل خودکار
-                          </FormDescription>
+                        <FormItem className="flex items-center justify-between">
+                          <FormLabel>رمزنگاری داده‌ها</FormLabel>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="accessLogging"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between">
+                          <FormLabel>لاگ دسترسی‌ها</FormLabel>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="telegramIntegration"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between">
+                          <FormLabel>ادغام تلگرام</FormLabel>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={aiForm.control}
+                      name="xaiIntegration"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between">
+                          <FormLabel>ادغام XAI</FormLabel>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
                         </FormItem>
                       )}
                     />
                   </div>
+                </Form>
+              </CardContent>
+            </Card>
 
-                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                    <h4 className="font-medium text-green-900 dark:text-green-200 mb-2">
-                      قابلیت‌های DA VINCI v6.0 Persian AI Engine
-                    </h4>
-                    <div className="space-y-1 text-sm text-green-800 dark:text-green-300">
-                      <div>✓ تحلیل وضعیت مالی با نگاه فرهنگی ایرانی</div>
-                      <div>✓ پروفایل‌سازی روانشناختی نمایندگان</div>
-                      <div>✓ تولید خودکار وظایف با انطباق فرهنگی</div>
-                      <div>✓ تحلیل هوشمند عملکرد بر اساس الگوهای بومی</div>
-                      <div>✓ گزارشات تحلیلی با زبان و فرهنگ فارسی</div>
-                      <div>✓ سیستم آموزش و تطبیق مستمر</div>
-                    </div>
+            {/* Status & Capabilities */}
+            <Card>
+              <CardHeader>
+                <CardTitle>وضعیت و قابلیت‌ها</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <h4 className="font-medium text-green-900 dark:text-green-200 mb-2">
+                    قابلیت‌های فعال DA VINCI v6.0 Persian AI Engine
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-green-800 dark:text-green-300">
+                    <div>✓ تحلیل وضعیت مالی فرهنگی</div>
+                    <div>✓ پروفایل‌سازی روانشناختی</div>
+                    <div>✓ تولید خودکار وظایف</div>
+                    <div>✓ تحلیل هوشمند عملکرد</div>
+                    <div>✓ گزارشات تحلیلی فارسی</div>
+                    <div>✓ سیستم یادگیری مستمر</div>
+                    <div>✓ ادغام تلگرام</div>
+                    <div>✓ امنیت رمزنگاری شده</div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  <Button 
-                    type="submit" 
-                    disabled={updateSettingMutation.isPending}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {updateSettingMutation.isPending ? "در حال ذخیره..." : "ذخیره تنظیمات"}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button 
+                onClick={aiForm.handleSubmit(onAiSubmit)}
+                disabled={updateSettingMutation.isPending}
+                size="lg"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {updateSettingMutation.isPending ? "در حال ذخیره..." : "ذخیره همه تنظیمات AI"}
+              </Button>
+            </div>
+          </div>
         </TabsContent>
 
 
