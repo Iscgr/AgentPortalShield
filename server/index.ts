@@ -17,6 +17,7 @@ import { registerIntegrationHealthRoutes } from "./routes/integration-health-rou
 import { registerFeatureFlagRoutes } from "./routes/feature-flag-routes";
 import { registerAiEngineRoutes } from "./routes/ai-engine-routes";
 import { registerDebtVerificationRoutes } from "./routes/debt-verification-routes";
+import phase9IntegrationRoutes from "./routes/phase-9-integration-monitoring";
 import { unifiedAuthMiddleware } from "./middleware/unified-auth";
 import { storage } from "./storage";
 
@@ -191,6 +192,10 @@ app.use((req, res, next) => {
   registerIntegrationHealthRoutes(app);
   registerBatchRollbackRoutes(app, unifiedAuthMiddleware);
   registerStandardizedInvoiceRoutes(app, storage);
+  
+  // Phase 9: Integration monitoring system
+  app.use('/api/phase9', phase9IntegrationRoutes);
+  console.log('✅ PHASE 9: Integration monitoring routes registered');
 
   // Log all registered routes for debugging
   app._router.stack.forEach((layer: any) => {
