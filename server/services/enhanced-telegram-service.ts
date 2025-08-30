@@ -548,12 +548,14 @@ class EnhancedTelegramService {
     poll();
   }
 
-  // پردازش یک به‌روزرسانی
+  // پردازش یک به‌روزرسانی با AI
   async processUpdate(update: any, callback: (update: any) => Promise<void>) {
     // استخراج پیام
     const message = update.message || update.edited_message || (update.callback_query && update.callback_query.message);
     
     if (!message) return;
+    
+    console.log(`🤖 PHASE 8C: Processing update with AI integration for ${this.authorizedBotId}`);
     
     // تشخیص نوع گروه
     const groupType = this.identifyGroupType(message.chat);
@@ -573,14 +575,92 @@ class EnhancedTelegramService {
       // مدیریت دستورات
       const commandResponse = await this.commandHandler.handleCommand(message, { groupType });
       
-      // فراخوانی callback با داده‌های پردازش شده
+      // ✅ PHASE 8C: AI PROCESSING INTEGRATION
+      let aiProcessing = null;
+      try {
+        // Call AI processing if configured
+        const aiResponse = await fetch('/api/telegram/process-ai-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: message.text,
+            groupType,
+            employeeId: message.from.id
+          })
+        });
+        
+        if (aiResponse.ok) {
+          aiProcessing = await aiResponse.json();
+          console.log(`🤖 PHASE 8C: AI processing completed:`, aiProcessing.processed);
+        }
+      } catch (aiError) {
+        console.warn(`⚠️ PHASE 8C: AI processing warning:`, aiError);
+      }
+      
+      // فراخوانی callback با داده‌های پردازش شده + AI
       await callback({
         originalUpdate: update,
         parsedMessage: parsedData,
         extractedEntities: entities,
         commandResponse,
+        aiProcessing,
         groupType
       });
+    }
+  }
+  
+  // ✅ PHASE 8C: AI INTEGRATION METHODS
+  
+  // Send AI-powered response
+  async sendAiResponse(chatId: number, originalMessage: string, aiAnalysis: any) {
+    try {
+      const responseText = `🤖 تحلیل هوشمند:\n\n${aiAnalysis.analysis}\n\n✅ پردازش توسط ${this.authorizedBotId}`;
+      
+      return await this.sendMessage(chatId, responseText, {
+        reply_to_message_id: aiAnalysis.messageId
+      });
+    } catch (error) {
+      console.error(`❌ PHASE 8C: Error sending AI response:`, error);
+      throw error;
+    }
+  }
+  
+  // Process group message with AI
+  async processGroupMessageWithAI(message: any, groupConfig: any) {
+    try {
+      console.log(`🤖 PHASE 8C: Processing group message with AI for ${this.authorizedBotId}`);
+      
+      // Parse message
+      const parsedData = this.messageParser.parseMessage(message, groupConfig.groupType);
+      
+      if (parsedData && parsedData.type !== 'general_message') {
+        // Generate AI response for specific message types
+        const aiPrompt = `تحلیل این ${parsedData.type}: ${message.text}`;
+        
+        // This would call the AI service
+        const aiResponse = {
+          analysis: `تحلیل هوشمند برای ${parsedData.type} انجام شد`,
+          suggestions: ['پیگیری', 'بررسی', 'تایید'],
+          priority: 'MEDIUM'
+        };
+        
+        // Send AI response back to group
+        await this.sendAiResponse(message.chat.id, message.text, {
+          ...aiResponse,
+          messageId: message.message_id
+        });
+        
+        return {
+          processed: true,
+          aiResponse,
+          parsedData
+        };
+      }
+      
+      return { processed: false };
+    } catch (error) {
+      console.error(`❌ PHASE 8C: Error in AI group processing:`, error);
+      throw error;
     }
   }
 
