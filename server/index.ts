@@ -186,7 +186,7 @@ app.use((req, res, next) => {
   registerDebtVerificationRoutes(app);
 
   // ✅ ATOMOS PHASE 5A: Register evidence validation routes
-  import { registerEvidenceValidationRoutes } from './routes/evidence-validation-routes';
+  const { registerEvidenceValidationRoutes } = await import('./routes/evidence-validation-routes');
   registerEvidenceValidationRoutes(app);
 
   // SHERLOCK v16.2 DEPLOYMENT STABILITY: Enhanced health endpoints with comprehensive checks

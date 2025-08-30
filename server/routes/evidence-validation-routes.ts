@@ -105,4 +105,34 @@ export function registerEvidenceValidationRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to perform Bayesian update' });
     }
   });
+
+  // ✅ ATOMOS PHASE 5C: Order Sensitivity Analysis
+  app.get("/api/evidence/order-sensitivity", async (req, res) => {
+    try {
+      console.log(`🧮 ATOMOS PHASE 5C: Executing Order Sensitivity Analysis`);
+      
+      const { OrderSensitivityEngine } = await import('../services/order-sensitivity-engine');
+      const orderReport = OrderSensitivityEngine.executePhase5CProtocol();
+      
+      res.json({
+        success: true,
+        phase: "5C_ORDER_SENSITIVITY",
+        orderSensitivityReport: orderReport,
+        timestamp: new Date().toISOString(),
+        protocolStatus: {
+          orcThreshold: 0.85,
+          metThreshold: orderReport.thresholdStatus.passed,
+          readyForPhase5D: orderReport.convergenceStatus !== 'SENSITIVE',
+          qualityGate: {
+            name: 'ORDER_INDEPENDENCE_VERIFICATION',
+            status: orderReport.thresholdStatus.passed ? 'PASSED' : 'FAILED',
+            score: orderReport.orderRobustnessCoefficient
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Order sensitivity analysis error:', error);
+      res.status(500).json({ error: 'Failed to perform order sensitivity analysis' });
+    }
+  });
 }
