@@ -312,6 +312,10 @@ app.use((req, res, next) => {
     }
   };
 
+  // Move port and host declarations to the top
+  const port = parseInt(process.env.PORT || '5000', 10);
+  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
+
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
@@ -343,9 +347,6 @@ app.use((req, res, next) => {
     serveStatic(app);
     startServer();
   }
-
-  const port = parseInt(process.env.PORT || '5000', 10);
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
 
   // Kill any existing process on the port before starting
   async function killExistingPort(port: number) {
