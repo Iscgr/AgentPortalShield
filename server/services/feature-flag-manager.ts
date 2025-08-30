@@ -37,11 +37,11 @@ class FeatureFlagManager {
       },
 
       BATCH_QUERY_OPTIMIZATION: {
-        enabled: false,
-        percentage: 0,
-        conditions: ['unified_engine_active'],
+        enabled: true,  // ✅ PHASE 8B: ACTIVATED FOR PERFORMANCE VALIDATION
+        percentage: 100,  // 100% traffic for immediate testing
+        conditions: [],  // Remove conditional dependency
         lastModified: new Date().toISOString(),
-        modifiedBy: 'system_init'
+        modifiedBy: 'phase_8b_performance_validation'
       },
 
       CACHE_OPTIMIZATION: {
