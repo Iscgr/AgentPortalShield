@@ -551,6 +551,55 @@ async function handleDailyReport(parsedMessage: any, employeeId: number, message
   }
 }
 
+  // ==================== STATUS AND SETTINGS ENDPOINTS ====================
+  
+  // Get Telegram bot status
+  app.get('/api/telegram/status', authMiddleware, async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        status: telegramService ? 'connected' : 'disconnected',
+        botInitialized: !!telegramService,
+        lastUpdate: new Date().toISOString()
+      });
+    } catch (error: unknown) {
+      console.error('❌ Error getting telegram status:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'Error getting telegram status',
+        error: errorMessage
+      });
+    }
+  });
+  
+  // Get Telegram settings
+  app.get('/api/telegram/settings', authMiddleware, async (req, res) => {
+    try {
+      // Return basic settings info without exposing sensitive data
+      res.json({
+        success: true,
+        settings: {
+          configured: !!telegramService,
+          pollingEnabled: true,
+          webhookEnabled: false
+        }
+      });
+    } catch (error: unknown) {
+      console.error('❌ Error getting telegram settings:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'Error getting telegram settings',
+        error: errorMessage
+      });
+    }
+  });
+
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
 async function createTaskFromMessage(parsedMessage: any, employeeId: number, messageId: number) {
   try {
     const [newTask] = await db.insert(employeeTasks).values({

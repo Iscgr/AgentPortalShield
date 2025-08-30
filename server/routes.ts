@@ -3091,6 +3091,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+  // ==================== SIMPLE TELEGRAM TEST ROUTE ====================
+  // Direct test for message sending without complex routing
+  app.post("/api/telegram/direct-send-test", authMiddleware, async (req, res) => {
+    try {
+      const { message, groupId } = req.body;
+      
+      // Simple test message
+      const testMessage = message || `🤖 تست ارسال مستقیم از MarFaNet\n📅 ${new Date().toLocaleDateString('fa-IR')}\n⏰ ${new Date().toLocaleTimeString('fa-IR')}\n\n✅ سیستم تلگرام عملیاتی است`;
+      
+      res.json({
+        success: true,
+        message: "Test message prepared",
+        testData: {
+          message: testMessage,
+          timestamp: new Date().toISOString(),
+          note: "این یک تست مستقیم ارسال پیام است"
+        }
+      });
+      
+    } catch (error: unknown) {
+      console.error('❌ Error in direct telegram test:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در تست مستقیم تلگرام',
+        error: errorMessage
+      });
+    }
+  });
+
+  // ==================== ACTUAL TELEGRAM SEND ROUTE ====================
+  // Real message sending to Telegram groups
+  app.post("/api/telegram/send-to-group", authMiddleware, async (req, res) => {
+    try {
+      const { message, groupId, messageType } = req.body;
+      
+      // Get bot credentials from settings
+      const botTokenSetting = await storage.getSetting("telegram_bot_token");
+      const chatIdSetting = await storage.getSetting("telegram_chat_id");
+      
+      if (!botTokenSetting || !chatIdSetting) {
+        return res.status(400).json({
+          success: false,
+          message: "تنظیمات ربات تلگرام یافت نشد. لطفاً ابتدا توکن و شناسه گروه را تنظیم کنید."
+        });
+      }
+      
+      const botToken = botTokenSetting.value;
+      const chatId = chatIdSetting.value;
+      
+      // Prepare message with Persian format
+      const finalMessage = message || `#تست_سیستم\n🤖 پیام آزمایشی از MarFaNet\n📅 ${new Date().toLocaleDateString('fa-IR')}\n⏰ ${new Date().toLocaleTimeString('fa-IR')}\n\n✅ سیستم مدیریت کارمندان فعال است`;
+      
+      // Send to Telegram
+      const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      const response = await fetch(telegramApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: finalMessage,
+          parse_mode: 'HTML'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.ok) {
+        res.json({
+          success: true,
+          message: "پیام با موفقیت در گروه تلگرام ارسال شد",
+          telegramResponse: result,
+          sentMessage: finalMessage
+        });
+      } else {
+        console.error('❌ Telegram API Error:', result);
+        res.status(400).json({
+          success: false,
+          message: "خطا در ارسال پیام تلگرام",
+          error: result.description || 'Unknown telegram error'
+        });
+      }
+      
+    } catch (error: unknown) {
+      console.error('❌ Error sending telegram message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در ارسال پیام تلگرام',
+        error: errorMessage
+      });
+    }
+  });
+
   // ==================== ENHANCED TELEGRAM MANAGEMENT ROUTES ====================
   // SHERLOCK v32.0: Advanced Telegram bot with AI-powered message parsing
   try {
@@ -3099,6 +3195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('✅ SHERLOCK v32.0: Enhanced Telegram Management Routes Registered');
   } catch (error) {
     console.error('❌ Failed to register Enhanced Telegram routes:', error);
+    console.log('🔄 Continuing without complex telegram routes...');
   }
 
   const httpServer = createServer(app);
