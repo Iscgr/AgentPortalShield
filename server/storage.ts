@@ -1201,7 +1201,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // ✅ SHERLOCK v22.1 CRITICAL FIX: Include 'partial' status in debt calculation
-      // remainingDebt = unpaid/overdue/partial invoices - allocated payments (NEVER negative)
+      // remainingDebt = unpaid/overdue/partial invoices - allocated payments
       const debtorReps = await db
         .select({
           id: representatives.id,
