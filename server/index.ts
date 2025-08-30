@@ -27,46 +27,17 @@ const app = express();
 // Fix for Replit GCE deployment - trust proxy for authentication
 app.set('trust proxy', true);
 
-// Enhanced CORS and security headers with special handling for portal routes
+// EMERGENCY: Simplified CORS - minimal headers only
 app.use((req, res, next) => {
-  // Set comprehensive CORS headers for all origins in production
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
-  res.header('Access-Control-Allow-Credentials', 'true');
-
-  // Check if this is a portal route (public access)
-  const isPortalRoute = req.path.startsWith('/portal') || req.path.startsWith('/api/portal');
-
-  if (isPortalRoute) {
-    // Relaxed security headers for portal routes to improve Android browser compatibility
-    res.header('X-Content-Type-Options', 'nosniff');
-    res.header('X-Frame-Options', 'ALLOWALL'); // Allow iframe embedding for portal
-    res.header('Referrer-Policy', 'no-referrer-when-downgrade');
-    res.header('Cache-Control', 'public, max-age=300'); // Allow caching for portal content
-    res.header('Pragma', 'public');
-
-    // Additional headers for Android browser compatibility
-    res.header('X-UA-Compatible', 'IE=edge,chrome=1');
-    res.header('X-DNS-Prefetch-Control', 'on');
-    res.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  } else {
-    // Strict security headers for admin routes
-    res.header('X-Content-Type-Options', 'nosniff');
-    res.header('X-Frame-Options', 'SAMEORIGIN');
-    res.header('X-XSS-Protection', '1; mode=block');
-    res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.header('Pragma', 'no-cache');
-    res.header('Expires', '0');
-  }
-
-  // Handle preflight requests
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
-
+  
   next();
 });
 
@@ -91,21 +62,14 @@ const sessionMiddleware = session({
   rolling: true // Extend session on activity
 });
 
-// Apply session middleware for all non-portal routes
+// EMERGENCY: Disable session middleware temporarily
 app.use((req, res, next) => {
-  const isPortalRoute = req.path.startsWith('/portal') || req.path.startsWith('/api/portal');
-
-  if (isPortalRoute) {
-    // Skip session middleware for portal routes to avoid authentication issues
-    next();
-  } else {
-    // Apply session middleware for admin and CRM routes
-    sessionMiddleware(req, res, next);
-  }
+  console.log('🚨 EMERGENCY: Session middleware disabled for debugging');
+  next();
 });
 
-// Performance monitoring middleware
-app.use(performanceMonitoringMiddleware);
+// EMERGENCY: Performance monitoring disabled
+// app.use(performanceMonitoringMiddleware);
 
 // Response compression middleware  
 // Compression middleware removed for simplified system
@@ -113,64 +77,17 @@ app.use(performanceMonitoringMiddleware);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Special middleware for Android browser compatibility
+// EMERGENCY: Android middleware disabled
+// app.use(androidMiddleware); // Temporarily disabled
+
+// EMERGENCY: Timeout middleware disabled
+// app.use(timeoutMiddleware); // Temporarily disabled
+
+// EMERGENCY: Simple logging only
 app.use((req, res, next) => {
-  const userAgent = req.headers['user-agent'] || '';
-  const isAndroid = /Android/.test(userAgent);
-  const isPortalRoute = req.path.startsWith('/portal') || req.path.startsWith('/api/portal');
-
-  if (isAndroid && isPortalRoute) {
-    // Additional Android-specific headers for better compatibility
-    res.header('Accept-Ranges', 'bytes');
-    res.header('Content-Security-Policy', 'default-src \'self\' \'unsafe-inline\' \'unsafe-eval\' data: blob:; connect-src \'self\' *');
-    res.header('X-Permitted-Cross-Domain-Policies', 'none');
-    res.header('X-Download-Options', 'noopen');
-
-    // Remove problematic headers that cause issues on some Android browsers
-    res.removeHeader('X-XSS-Protection');
-    res.removeHeader('Strict-Transport-Security');
+  if (req.path.startsWith("/api")) {
+    console.log(`🔍 ${req.method} ${req.path}`);
   }
-
-  next();
-});
-
-// Increase timeout for large file processing
-app.use((req, res, next) => {
-  // Set timeout to 10 minutes for file upload endpoints
-  if (req.path === '/api/invoices/generate') {
-    req.setTimeout(10 * 60 * 1000); // 10 minutes
-    res.setTimeout(10 * 60 * 1000); // 10 minutes
-  }
-  next();
-});
-
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
   next();
 });
 
