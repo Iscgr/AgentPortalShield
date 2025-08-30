@@ -76,6 +76,23 @@ app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 // EMERGENCY: Timeout middleware disabled
 // app.use(timeoutMiddleware); // Temporarily disabled
 
+// CRITICAL FIX: Register API routes BEFORE any other middleware in development
+if (process.env.NODE_ENV !== "production") {
+  console.log('🔧 CRITICAL: Registering API routes with ABSOLUTE priority...');
+  
+  // EMERGENCY: Disable auth middleware completely for stability
+  const noAuthMiddleware = (req: any, res: any, next: any) => next();
+  
+  // Register ALL API routes BEFORE Vite middleware
+  registerRoutes(app);
+  registerIntegrationHealthRoutes(app);
+  registerBatchRollbackRoutes(app, noAuthMiddleware);
+  registerStandardizedInvoiceRoutes(app, storage);
+  app.use('/api/phase9', phase9IntegrationRoutes);
+  
+  console.log('✅ CRITICAL: API routes registered with absolute priority');
+}
+
 // EMERGENCY: Deep debugging middleware
 app.use((req, res, next) => {
   console.log(`REQUEST: ${req.method} ${req.path}`);
@@ -167,19 +184,6 @@ app.use((req, res, next) => {
     });
 
   } else {
-    // Development: Register ALL API routes FIRST with highest priority
-    console.log('🔧 Registering API routes with HIGHEST priority...');
-    
-    // EMERGENCY: Disable auth middleware completely for stability
-    const noAuthMiddleware = (req: any, res: any, next: any) => next();
-    
-    // Register ALL API routes BEFORE any other middleware
-    registerRoutes(app);
-    registerIntegrationHealthRoutes(app);
-    registerBatchRollbackRoutes(app, noAuthMiddleware);
-    registerStandardizedInvoiceRoutes(app, storage);
-    app.use('/api/phase9', phase9IntegrationRoutes);
-    
     // Add explicit API route protection against Vite interference
     app.use('/api/*', (req, res, next) => {
       // Ensure API routes always return proper headers
@@ -187,7 +191,7 @@ app.use((req, res, next) => {
       next();
     });
     
-    console.log('✅ API routes registered with protection');
+    console.log('✅ API routes protected from Vite interference');
 
     // Test routes for debugging (AFTER main API routes)
     app.get('/test', (req, res) => {

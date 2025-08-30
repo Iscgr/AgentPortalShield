@@ -43,20 +43,19 @@ export async function setupVite(app: Express, server: Server) {
   // 🚨 CRITICAL FIX: Enhanced API route protection with strict checking
   app.use((req, res, next) => {
     // ABSOLUTE API PROTECTION: Never let Vite handle any /api/ routes
-    if (req.path.startsWith('/api/')) {
-      console.log(`🔒 Vite middleware: PROTECTED API route ${req.path} - bypassing Vite`);
+    if (req.path.startsWith('/api/') || req.url.startsWith('/api/')) {
+      console.log(`🔒 Vite middleware: PROTECTED API route ${req.path} - bypassing Vite completely`);
+      return next();
+    }
+    
+    // Additional safety checks for API patterns
+    if (req.path.includes('/api/') || req.url.includes('/api/') || req.originalUrl?.includes('/api/')) {
+      console.log(`🚨 Vite middleware: Detected API pattern in ${req.path} - bypassing`);
       return next();
     }
     
     // For non-API routes, apply Vite middleware carefully
     console.log(`🔍 Vite middleware: Processing static route ${req.path}`);
-    
-    // Additional safety check for API-like patterns
-    if (req.path.includes('/api/') || req.url.includes('/api/')) {
-      console.log(`🚨 Vite middleware: Detected API pattern in ${req.path} - bypassing`);
-      return next();
-    }
-    
     vite.middlewares(req, res, next);
   });
 
