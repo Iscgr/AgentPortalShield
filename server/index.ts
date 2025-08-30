@@ -317,7 +317,8 @@ app.use((req, res, next) => {
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     // Create HTTP server first for Vite setup
-    const server = require('http').createServer(app);
+    const { createServer } = await import('http');
+    const server = createServer(app);
     await setupVite(app, server);
     
     // Start the server manually after Vite setup
