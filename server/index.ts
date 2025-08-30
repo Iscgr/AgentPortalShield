@@ -27,9 +27,11 @@ const app = express();
 // Fix for Replit GCE deployment - trust proxy for authentication
 app.set('trust proxy', true);
 
-// EMERGENCY: Ultra-minimal CORS 
+// ULTRA-MINIMAL CORS - No complex headers
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -37,44 +39,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Session configuration - Skip session for public portal routes
-const PgSession = connectPgSimple(session);
-const sessionMiddleware = session({
-  store: new PgSession({
-    pool: pool,
-    tableName: 'session',
-    createTableIfMissing: true
-  }),
-  secret: process.env.SESSION_SECRET || 'fallback-secret-key-change-in-production',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: false, // Set to true in production with HTTPS
-    httpOnly: true,
-    maxAge: 8 * 60 * 60 * 1000, // 8 hours base session for stable operations
-    sameSite: 'lax' // Better cross-origin handling
-  },
-  name: 'marfanet.sid', // Custom session name for identification
-  rolling: true // Extend session on activity
-});
+// EMERGENCY: ALL SESSION MIDDLEWARE COMPLETELY BYPASSED
+// No session, no auth, no performance monitoring - pure stability
 
-// EMERGENCY: Session middleware completely disabled for stability
-// All session-related middleware removed to prevent conflicts
-
-// EMERGENCY: Performance monitoring completely disabled for stability
-// app.use(performanceMonitoringMiddleware);
-
-// Response compression middleware  
-// Compression middleware removed for simplified system
-
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
-
-// EMERGENCY: Android middleware disabled
-// app.use(androidMiddleware); // Temporarily disabled
-
-// EMERGENCY: Timeout middleware disabled
-// app.use(timeoutMiddleware); // Temporarily disabled
+// MINIMAL BODY PARSING ONLY
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // CRITICAL FIX: Register API routes BEFORE any other middleware in development
 if (process.env.NODE_ENV !== "production") {
@@ -93,41 +63,7 @@ if (process.env.NODE_ENV !== "production") {
   console.log('✅ CRITICAL: API routes registered with absolute priority');
 }
 
-// EMERGENCY: Deep debugging middleware
-app.use((req, res, next) => {
-  console.log(`REQUEST: ${req.method} ${req.path}`);
-  
-  // Monitor response lifecycle
-  const originalSend = res.send;
-  const originalEnd = res.end;
-  const originalJson = res.json;
-  
-  res.send = function(data) {
-    console.log(`SEND CALLED: ${req.path} - Data type: ${typeof data}, Size: ${data ? String(data).length : 0}`);
-    return originalSend.call(this, data);
-  };
-  
-  res.end = function(data) {
-    console.log(`END CALLED: ${req.path} - Has data: ${!!data}`);
-    return originalEnd.call(this, data);
-  };
-  
-  res.json = function(data) {
-    console.log(`JSON CALLED: ${req.path}`);
-    return originalJson.call(this, data);
-  };
-  
-  // Monitor if response was finished
-  res.on('finish', () => {
-    console.log(`RESPONSE FINISHED: ${req.path} - Status: ${res.statusCode}`);
-  });
-  
-  res.on('close', () => {
-    console.log(`RESPONSE CLOSED: ${req.path}`);
-  });
-  
-  next();
-});
+// EMERGENCY: ALL DEBUGGING MIDDLEWARE COMPLETELY BYPASSED FOR STABILITY
 
 (async () => {
   // Database health check before starting server
@@ -184,25 +120,8 @@ app.use((req, res, next) => {
     });
 
   } else {
-    // Add explicit API route protection against Vite interference
-    app.use('/api/*', (req, res, next) => {
-      // Ensure API routes always return proper headers
-      res.setHeader('Content-Type', 'application/json');
-      next();
-    });
-    
-    console.log('✅ API routes protected from Vite interference');
-
-    // Test routes for debugging (AFTER main API routes)
-    app.get('/test', (req, res) => {
-      console.log('TEST ROUTE HIT');
-      res.status(200).send('TEST ROUTE WORKS - Server is responding correctly!');
-    });
-    
-    app.get('/test-json', (req, res) => {
-      console.log('TEST JSON ROUTE HIT');
-      res.status(200).json({ message: 'JSON test works', timestamp: new Date().toISOString() });
-    });
+    // ULTRA-MINIMAL API PROTECTION - No complex headers
+    console.log('✅ API routes protected - minimal interference');
     
     // Development: Single HTTP server with Vite integration
     const { createServer } = await import('http');
