@@ -30,11 +30,23 @@ export function MultiGroupConfiguration({ toast }: MultiGroupConfigurationProps)
     name: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState<any>(null);
 
-  // Load existing groups on component mount
+  // Load existing groups and telegram status on component mount
   useEffect(() => {
     loadGroups();
+    checkTelegramStatus();
   }, []);
+
+  const checkTelegramStatus = async () => {
+    try {
+      const response = await fetch('/api/telegram/status');
+      const result = await response.json();
+      setTelegramStatus(result);
+    } catch (error) {
+      console.warn('Could not check telegram status:', error);
+    }
+  };
 
   const loadGroups = async () => {
     try {
@@ -113,6 +125,7 @@ export function MultiGroupConfiguration({ toast }: MultiGroupConfigurationProps)
         throw new Error(result.message);
       }
     } catch (error: any) {
+      console.error('❌ Group configuration error:', error);
       toast({
         title: "❌ خطا در افزودن گروه",
         description: error.message || "خطا در تنظیم گروه",
@@ -197,6 +210,25 @@ export function MultiGroupConfiguration({ toast }: MultiGroupConfigurationProps)
 
   return (
     <div className="space-y-6">
+      {/* Telegram Bot Status Warning */}
+      {telegramStatus && !telegramStatus.botInitialized && (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-3 space-x-reverse">
+              <XCircle className="w-5 h-5 text-amber-600" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  ربات تلگرام تنظیم نشده است
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  برای افزودن گروه‌ها، ابتدا توکن ربات را در بخش تنظیمات تلگرام وارد کنید
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Add New Group */}
       <Card>
         <CardHeader>
@@ -251,11 +283,13 @@ export function MultiGroupConfiguration({ toast }: MultiGroupConfigurationProps)
 
           <Button 
             onClick={addGroup}
-            disabled={isLoading || !newGroup.chatId || !newGroup.name}
+            disabled={isLoading || !newGroup.chatId || !newGroup.name || (telegramStatus && !telegramStatus.botInitialized)}
             className="w-full mt-4"
           >
             <Plus className="h-4 w-4 ml-2" />
-            {isLoading ? "در حال افزودن..." : "افزودن گروه"}
+            {isLoading ? "در حال افزودن..." : 
+             (telegramStatus && !telegramStatus.botInitialized) ? "ابتدا ربات را تنظیم کنید" : 
+             "افزودن گروه"}
           </Button>
         </CardContent>
       </Card>
