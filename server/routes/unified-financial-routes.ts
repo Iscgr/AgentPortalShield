@@ -16,6 +16,7 @@ import { storage } from '../storage.js';
 import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
 import { performance } from 'perf_hooks'; // Import performance for timing
 import { isFeatureEnabled } from '../utils/featureFlags.js'; // Assuming feature flag utility exists
+import { featureFlagManager } from '../services/feature-flag-manager.js'; // Added for Phase 8B
 
 const router = Router();
 
