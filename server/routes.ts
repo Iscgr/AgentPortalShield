@@ -105,10 +105,7 @@ const authMiddleware = (req: any, res: any, next: any) => {
   next();
 };
 
-const noAuth = (req: any, res: any, next: any) => next();, role: 'admin' };
-  }
-  next();
-};
+const noAuth = (req: any, res: any, next: any) => next();
 const enhancedAuthMiddleware = (req: any, res: any, next: any) => {
   console.log('🔓 Enhanced auth middleware bypass - stability mode');
   // Force session for compatibility
