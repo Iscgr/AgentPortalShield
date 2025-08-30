@@ -17,6 +17,7 @@ import { registerIntegrationHealthRoutes } from "./routes/integration-health-rou
 import { registerFeatureFlagRoutes } from "./routes/feature-flag-routes";
 import { registerAiEngineRoutes } from "./routes/ai-engine-routes";
 import { registerDebtVerificationRoutes } from "./routes/debt-verification-routes";
+import { unifiedAuthMiddleware } from "./middleware/unified-auth";
 
 
 const app = express();
