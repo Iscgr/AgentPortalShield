@@ -1532,9 +1532,9 @@ export const employees = pgTable("employees", {
   email: text("email"),
   position: text("position"), // سمت شغلی
   department: text("department"), // بخش
-  managerId: integer("manager_id"), // مدیر مستقیم
+  // managerId: integer("manager_id"), // مدیر مستقیم - حذف شده در migration
   isActive: boolean("is_active").default(true),
-  joinedAt: timestamp("joined_at").defaultNow(),
+  // joinedAt: timestamp("joined_at").defaultNow(), // حذف شده در migration
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
@@ -1634,11 +1634,11 @@ export const dailyReports = pgTable("daily_reports", {
 // ==================== RELATIONS ====================
 
 export const employeesRelations = relations(employees, ({ one, many }) => ({
-  manager: one(employees, {
-    fields: [employees.managerId],
-    references: [employees.id]
-  }),
-  subordinates: many(employees), // زیردستان
+  // manager: one(employees, {
+  //   fields: [employees.managerId],
+  //   references: [employees.id]
+  // }),
+  // subordinates: many(employees), // زیردستان
   assignedTasks: many(employeeTasks), // وظایف تخصیص داده شده
   createdTasks: many(employeeTasks), // وظایف ایجاد شده
   telegramMessages: many(telegramMessages),
