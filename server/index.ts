@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { checkDatabaseHealth, closeDatabaseConnection, pool } from "./db";
 import { performanceMonitoringMiddleware } from "./middleware/performance";
+import { registerCrmRoutes } from "./routes/crm-routes";
 
 
 const app = express();
@@ -171,8 +172,11 @@ app.use((req, res, next) => {
   }
 
   // Register routes
+  const { storage } = await import('./storage');
+  const { unifiedAuthMiddleware } = await import('./middleware/unified-auth');
+  
   registerRoutes(app);
-  registerCrmRoutes(app, requireAuth, storage);
+  registerCrmRoutes(app, unifiedAuthMiddleware, storage);
   registerUnifiedFinancialRoutes(app);
   registerUnifiedStatisticsRoutes(app);
   registerSettingsRoutes(app, storage);
