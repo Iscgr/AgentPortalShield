@@ -47,7 +47,7 @@ export async function setupVite(app: Express, server: Server) {
       console.log(`🔒 Vite middleware: BYPASSING API route ${req.path}`);
       return next();
     }
-    
+
     // Additional safety checks for API patterns
     if (req.path.includes('/api/') || req.url.includes('/api/') || req.originalUrl?.includes('/api/')) {
       console.log(`🚨 Vite middleware: BYPASSING API pattern in ${req.path}`);

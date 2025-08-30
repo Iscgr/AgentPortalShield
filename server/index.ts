@@ -61,6 +61,7 @@ if (process.env.NODE_ENV !== "production") {
   app.use('/api/phase9', phase9IntegrationRoutes);
 
   console.log('✅ CRITICAL: API routes registered with absolute priority');
+  console.log('🔧 Setting up Vite middleware AFTER API routes...');
 }
 
 // EMERGENCY: ALL DEBUGGING MIDDLEWARE COMPLETELY BYPASSED FOR STABILITY
@@ -120,27 +121,10 @@ if (process.env.NODE_ENV !== "production") {
     });
 
   } else {
-    // DEVELOPMENT: NO VITE MIDDLEWARE - Direct API only
-    console.log('🚨 DEVELOPMENT MODE: NO VITE MIDDLEWARE - API ONLY');
-
-    // Basic fallback for non-API routes
-    app.use((req, res, next) => {
-      if (!req.path.startsWith('/api/')) {
-        res.send(`
-        <html>
-          <head><title>API Server</title></head>
-          <body>
-            <h1>API Server Running</h1>
-            <p>Server is running in API-only mode</p>
-            <p>Dashboard API: <a href="/api/dashboard">/api/dashboard</a></p>
-            <p>Time: ${new Date().toISOString()}</p>
-          </body>
-        </html>
-      `);
-      } else {
-        next();
-      }
-    });
+    // Development: Set up Vite middleware AFTER API routes
+    console.log('🔧 Setting up Vite middleware AFTER API routes...');
+    await setupVite(app);
+    console.log('✅ Vite middleware ready - serving frontend');
 
     // Start the unified HTTP server
     serverInstance = app.listen(port, host, () => {
