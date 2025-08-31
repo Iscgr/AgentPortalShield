@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  Settings as SettingsIcon, 
-  Save, 
-  TestTube, 
-  Bot, 
-  Send, 
+import {
+  Settings as SettingsIcon,
+  Save,
+  TestTube,
+  Bot,
+  Send,
   Key,
   MessageSquare,
   Palette,
@@ -55,6 +55,22 @@ import { toPersianDigits } from "@/lib/persian-date";
 import { FinancialIntegrityDashboard } from '../components/financial-integrity-dashboard';
 import { BatchRollbackManager } from '../components/batch-rollback-manager';
 import { MultiGroupConfiguration } from '../components/multi-group-configuration';
+
+// Import default template function
+const getDefaultTelegramTemplate = () => `📋 فاکتور شماره {invoice_number}
+
+🏪 نماینده: {representative_name}
+👤 صاحب فروشگاه: {shop_owner}
+📱 شناسه پنل: {panel_id}
+💰 مبلغ فاکتور: {amount} تومان
+📅 تاریخ صدور: {issue_date}
+🔍 وضعیت: {status}
+
+ℹ️ برای مشاهده جزئیات کامل فاکتور، وارد لینک زیر بشوید
+
+{portal_link}
+
+تولید شده توسط سیستم مدیریت مالی 🤖`;
 
 const telegramSettingsSchema = z.object({
   botToken: z.string().min(1, "توکن ربات الزامی است"),
@@ -206,20 +222,7 @@ export default function Settings() {
     defaultValues: {
       botToken: "",
       chatId: "",
-      template: `📋 فاکتور شماره {invoice_number}
-
-🏪 نماینده: {representative_name}
-👤 صاحب فروشگاه: {shop_owner}
-📱 شناسه پنل: {panel_id}
-💰 مبلغ فاکتور: {amount} تومان
-📅 تاریخ صدور: {issue_date}
-🔍 وضعیت: {status}
-
-ℹ️ برای مشاهده جزئیات کامل فاکتور، وارد لینک زیر بشوید
-
-{portal_link}
-
-تولید شده توسط سیستم مدیریت مالی 🤖`
+      template: getDefaultTelegramTemplate()
     }
   });
 
@@ -407,7 +410,7 @@ export default function Settings() {
 
   const testEmployeeGroupMutation = useMutation({
     mutationFn: async (groupType: string) => {
-      const response = await apiRequest('/api/telegram/test-employee-groups', { 
+      const response = await apiRequest('/api/telegram/test-employee-groups', {
         method: 'POST',
         data: { groupType }
       });
@@ -455,7 +458,7 @@ export default function Settings() {
       }
 
       // Save API key first
-      const response = await apiRequest('/api/settings/xai-grok/configure', { 
+      const response = await apiRequest('/api/settings/xai-grok/configure', {
         method: 'POST',
         data: { apiKey: data.xaiApiKey }
       });
@@ -490,10 +493,10 @@ export default function Settings() {
 
       // Update all settings in parallel
       await Promise.all(
-        settingsToUpdate.map(setting => 
-          updateSettingMutation.mutateAsync({ 
-            key: setting.key, 
-            value: setting.value 
+        settingsToUpdate.map(setting =>
+          updateSettingMutation.mutateAsync({
+            key: setting.key,
+            value: setting.value
           })
         )
       );
@@ -680,10 +683,10 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>توکن ربات تلگرام</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" 
+                            <Input
+                              placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
                               type="password"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormDescription>
@@ -713,16 +716,16 @@ export default function Settings() {
                     />
 
                     <div className="flex items-center space-x-4 space-x-reverse pt-4">
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         disabled={updateSettingMutation.isPending}
                       >
                         <Save className="w-4 h-4 mr-2" />
                         {updateSettingMutation.isPending ? "در حال ذخیره..." : "ذخیره تنظیمات"}
                       </Button>
 
-                      <Button 
-                        type="button" 
+                      <Button
+                        type="button"
                         variant="outline"
                         onClick={() => testTelegramMutation.mutate()}
                         disabled={testTelegramMutation.isPending || !telegramForm.watch('botToken')}
@@ -753,11 +756,11 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>قالب پیام</FormLabel>
                           <FormControl>
-                            <Textarea 
+                            <Textarea
                               placeholder="قالب پیام خود را وارد کنید..."
                               rows={12}
                               className="font-mono text-sm"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormDescription className="space-y-1">
@@ -772,8 +775,8 @@ export default function Settings() {
                     />
 
                     <div className="pt-4">
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         disabled={updateSettingMutation.isPending}
                         className="w-full"
                       >
@@ -799,7 +802,7 @@ export default function Settings() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={async () => {
                       try {
@@ -884,10 +887,10 @@ export default function Settings() {
                       <FormItem>
                         <FormLabel>توضیحات پرتال</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            placeholder="مشاهده وضعیت مالی و فاکتورهای شما" 
+                          <Textarea
+                            placeholder="مشاهده وضعیت مالی و فاکتورهای شما"
                             rows={3}
-                            {...field} 
+                            {...field}
                           />
                         </FormControl>
                         <FormDescription>
@@ -949,7 +952,7 @@ export default function Settings() {
                       <FormItem>
                         <FormLabel>استایل سفارشی (CSS)</FormLabel>
                         <FormControl>
-                          <Textarea 
+                          <Textarea
                             placeholder="/* استایل سفارشی CSS */
 .portal-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -961,7 +964,7 @@ export default function Settings() {
 }"
                             rows={8}
                             className="font-mono text-sm"
-                            {...field} 
+                            {...field}
                           />
                         </FormControl>
                         <FormDescription>
@@ -973,8 +976,8 @@ export default function Settings() {
                   />
 
                   <div className="pt-4">
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       disabled={updateSettingMutation.isPending}
                     >
                       <Save className="w-4 h-4 mr-2" />
@@ -1088,8 +1091,8 @@ export default function Settings() {
                     />
 
                     <div className="pt-4">
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         disabled={updateSettingMutation.isPending}
                       >
                         <Save className="w-4 h-4 mr-2" />
@@ -1291,10 +1294,10 @@ export default function Settings() {
                         <FormItem>
                           <FormLabel>کلید API xAI Grok</FormLabel>
                           <FormControl>
-                            <Input 
+                            <Input
                               placeholder="xai-..."
                               type="password"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormDescription>
@@ -1306,7 +1309,7 @@ export default function Settings() {
                     />
 
                     <div className="flex space-x-2">
-                      <Button 
+                      <Button
                         type="button"
                         variant="outline"
                         onClick={() => testGrokConnectionMutation.mutate()}
@@ -1315,7 +1318,7 @@ export default function Settings() {
                         <TestTube className="w-4 h-4 mr-2" />
                         {testGrokConnectionMutation.isPending ? "در حال تست..." : "تست اتصال"}
                       </Button>
-                      <Button 
+                      <Button
                         type="button"
                         variant="outline"
                         onClick={() => {/* TODO: Direct test */}}
@@ -1757,8 +1760,8 @@ export default function Settings() {
                         تست مستقیم ماژول‌ها
                       </h4>
                       <div className="grid grid-cols-2 gap-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => testEmployeeGroupMutation.mutate('daily-report')}
                           disabled={testEmployeeGroupMutation.isPending}
@@ -1766,8 +1769,8 @@ export default function Settings() {
                           <MessageSquare className="w-4 h-4 mr-2" />
                           تست گزارش روزانه
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => testEmployeeGroupMutation.mutate('task-assignment')}
                           disabled={testEmployeeGroupMutation.isPending}
@@ -1775,8 +1778,8 @@ export default function Settings() {
                           <Target className="w-4 h-4 mr-2" />
                           تست وظیفایف جدید
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => testEmployeeGroupMutation.mutate('leave-request')}
                           disabled={testEmployeeGroupMutation.isPending}
@@ -1784,8 +1787,8 @@ export default function Settings() {
                           <BarChart className="w-4 h-4 mr-2" />
                           تست درخواست مرخصی
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => testEmployeeGroupMutation.mutate('technical-report')}
                           disabled={testEmployeeGroupMutation.isPending}
@@ -1905,7 +1908,7 @@ export default function Settings() {
 
             {/* Save Button */}
             <div className="flex justify-end">
-              <Button 
+              <Button
                 onClick={aiForm.handleSubmit(onAiSubmit)}
                 disabled={updateSettingMutation.isPending}
                 size="lg"
@@ -2015,7 +2018,7 @@ export default function Settings() {
 
                 {!showDataCounts ? (
                   <div className="text-center">
-                    <Button 
+                    <Button
                       onClick={() => fetchDataCountsMutation.mutate()}
                       disabled={fetchDataCountsMutation.isPending}
                       className="bg-blue-600 hover:bg-blue-700"
@@ -2189,7 +2192,7 @@ export default function Settings() {
                       </div>
 
                       <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
-                        <Button 
+                        <Button
                           type="button"
                           variant="outline"
                           onClick={() => {
@@ -2203,7 +2206,7 @@ export default function Settings() {
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button 
+                            <Button
                               type="button"
                               variant="destructive"
                               disabled={resetDataMutation.isPending}
@@ -2238,7 +2241,7 @@ export default function Settings() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>انصراف</AlertDialogCancel>
-                              <AlertDialogAction 
+                              <AlertDialogAction
                                 onClick={dataResetForm.handleSubmit(onDataResetSubmit)}
                                 className="bg-red-600 hover:bg-red-700"
                               >

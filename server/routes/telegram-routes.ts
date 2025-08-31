@@ -24,6 +24,7 @@ import {
 import { eq, desc, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { EnhancedTelegramService, MessageParser, EntityExtractor, CommandHandler } from '../services/enhanced-telegram-service';
+import { getDefaultTelegramTemplate } from '../services/telegram';
 
 let telegramService: EnhancedTelegramService | null = null;
 
@@ -277,6 +278,110 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
   // ==================== STATUS ENDPOINTS ====================
 
   // Get Telegram bot status
+
+
+  // Comprehensive Telegram validation and testing
+  app.post('/api/telegram/comprehensive-test', authMiddleware, async (req, res) => {
+    try {
+      console.log('🧪 PHASE 8C: Starting comprehensive Telegram test...');
+      
+      const { storage } = await import('../storage');
+      
+      // 1. Check bot token
+      const botTokenData = await storage.getSetting('telegram_bot_token');
+      if (!botTokenData?.value) {
+        return res.status(400).json({
+          success: false,
+          message: 'توکن ربات تنظیم نشده است',
+          tests: { tokenCheck: false }
+        });
+      }
+
+      // 2. Check chat ID
+      const chatIdData = await storage.getSetting('telegram_chat_id');
+      if (!chatIdData?.value) {
+        return res.status(400).json({
+          success: false,
+          message: 'شناسه چت تنظیم نشده است',
+          tests: { tokenCheck: true, chatIdCheck: false }
+        });
+      }
+
+      // 3. Initialize service
+      if (!telegramService) {
+        await initializeTelegramService();
+      }
+
+      if (!telegramService) {
+        return res.status(500).json({
+          success: false,
+          message: 'خطا در راه‌اندازی سرویس تلگرام',
+          tests: { tokenCheck: true, chatIdCheck: true, serviceInit: false }
+        });
+      }
+
+      // 4. Test bot connection
+      const botInfo = await telegramService.apiRequest('getMe');
+
+      // 5. Test template formatting
+      const templateData = await storage.getSetting('telegram_template');
+      const template = templateData?.value || getDefaultTelegramTemplate();
+      
+      const testData = {
+        representative_name: 'احمد محمدی (تست جامع)',
+        shop_owner: 'فروشگاه نمونه',
+        panel_id: 'TEST_COMPREHENSIVE',
+        amount: '750000',
+        issue_date: '1403/12/15',
+        status: 'پرداخت نشده',
+        portal_link: `${process.env.REPL_SLUG ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co` : 'https://your-domain.com'}/portal`,
+        invoice_number: 'INV_COMP_TEST'
+      };
+
+      const templateValidation = await telegramService.validateMessageTemplate(template, testData);
+
+      // 6. Test actual message sending
+      const messageSendTest = await telegramService.testActualMessageSend(parseInt(chatIdData.value));
+
+      const allTestsPassed = templateValidation.isValid && messageSendTest;
+
+      res.json({
+        success: allTestsPassed,
+        message: allTestsPassed ? 'تمام تست‌ها موفق بود' : 'برخی تست‌ها ناموفق',
+        tests: {
+          tokenCheck: true,
+          chatIdCheck: true,
+          serviceInit: true,
+          botConnection: true,
+          templateValidation: templateValidation.isValid,
+          messageSending: messageSendTest
+        },
+        botInfo: {
+          id: botInfo.id,
+          username: botInfo.username,
+          first_name: botInfo.first_name
+        },
+        templateInfo: {
+          length: templateValidation.length,
+          missingVariables: templateValidation.missingVariables,
+          formattedPreview: templateValidation.formattedMessage.substring(0, 200) + '...'
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error: unknown) {
+      console.error('❌ PHASE 8C: Comprehensive test failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      res.status(500).json({
+        success: false,
+        message: 'خطا در تست جامع تلگرام',
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   app.get('/api/telegram/status', authMiddleware, async (req, res) => {
     try {
       // Try to initialize if not already done
@@ -325,39 +430,158 @@ export function registerTelegramRoutes(app: Express, authMiddleware: any) {
     }
   });
 
-// Test Telegram bot connection
+// AI message processing endpoint
+  app.post('/api/telegram/process-ai-message', authMiddleware, async (req, res) => {
+    try {
+      const { message, groupType, employeeId } = req.body;
+
+      if (!telegramService) {
+        return res.status(400).json({
+          success: false,
+          processed: false,
+          message: 'ربات تلگرام فعال نیست'
+        });
+      }
+
+      // Process message with AI
+      const aiResponse = await telegramService.processAIMessage(message, {
+        groupType,
+        employeeId
+      });
+
+      res.json({
+        success: true,
+        processed: true,
+        analysis: aiResponse,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error: unknown) {
+      console.error('❌ Error in AI message processing:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        processed: false,
+        error: errorMessage
+      });
+    }
+  });
+
+  // Test message template formatting
+  app.post('/api/telegram/test-template', authMiddleware, async (req, res) => {
+    try {
+      const { template, testData } = req.body;
+
+      if (!template || !testData) {
+        return res.status(400).json({
+          success: false,
+          message: 'قالب و داده‌های تست الزامی است'
+        });
+      }
+
+      // Test template with sample data
+      let formattedMessage = template
+        .replace(/{representative_name}/g, testData.representativeName || 'احمد محمدی')
+        .replace(/{shop_owner}/g, testData.shopOwner || 'فروشگاه نمونه')
+        .replace(/{panel_id}/g, testData.panelId || 'PANEL_001')
+        .replace(/{amount}/g, testData.amount || '1000000')
+        .replace(/{issue_date}/g, testData.issueDate || '1403/12/15')
+        .replace(/{status}/g, testData.status || 'پرداخت نشده')
+        .replace(/{portal_link}/g, testData.portalLink || 'https://example.com/portal')
+        .replace(/{invoice_number}/g, testData.invoiceNumber || 'INV_001')
+        .replace(/{resend_indicator}/g, '');
+
+      res.json({
+        success: true,
+        formattedMessage,
+        length: formattedMessage.length,
+        hasAllVariables: !formattedMessage.includes('{')
+      });
+
+    } catch (error: unknown) {
+      console.error('❌ Error testing template:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        success: false,
+        message: 'خطا در تست قالب',
+        error: errorMessage
+      });
+    }
+  });
+
+  // Test Telegram bot connection
   app.post('/api/telegram/test-connection', authMiddleware, async (req, res) => {
     try {
+      console.log('🔍 PHASE 8C: Testing telegram connection...');
+      
       if (!telegramService) {
         const initialized = await initializeTelegramService();
         if (!initialized) {
+          console.error('❌ PHASE 8C: Failed to initialize telegram service');
           return res.status(400).json({
             success: false,
-            message: 'ربات تلگرام تنظیم نشده است'
+            message: 'ربات تلگرام تنظیم نشده است - لطفاً توکن معتبر وارد کنید'
           });
         }
       }
 
       // Test with getMe API call
+      console.log('🤖 PHASE 8C: Calling Telegram getMe API...');
       const botInfo = await telegramService.apiRequest('getMe');
       
+      console.log('✅ PHASE 8C: Telegram connection successful:', {
+        id: botInfo.id,
+        username: botInfo.username,
+        is_bot: botInfo.is_bot
+      });
+      
+      // Test actual message sending if chatId is available
+      const { storage } = await import('../storage');
+      const chatIdData = await storage.getSetting('telegram_chat_id');
+      let messageSentTest = false;
+      
+      if (chatIdData?.value) {
+        try {
+          messageSentTest = await telegramService.testActualMessageSend(parseInt(chatIdData.value));
+        } catch (sendError) {
+          console.warn('⚠️ PHASE 8C: Message send test failed:', sendError);
+        }
+      }
+
       res.json({
         success: true,
-        message: 'اتصال موفق',
+        message: 'اتصال موفق - ربات آماده است',
         botInfo: {
           id: botInfo.id,
           username: botInfo.username,
           first_name: botInfo.first_name,
           is_bot: botInfo.is_bot
-        }
+        },
+        tests: {
+          apiConnection: true,
+          messageSending: messageSentTest,
+          chatIdConfigured: !!chatIdData?.value
+        },
+        timestamp: new Date().toISOString()
       });
     } catch (error: unknown) {
-      console.error('❌ Telegram connection test failed:', error);
+      console.error('❌ PHASE 8C: Telegram connection test failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      let userMessage = 'خطا در اتصال تلگرام';
+      if (errorMessage.includes('401')) {
+        userMessage = 'توکن ربات نامعتبر است';
+      } else if (errorMessage.includes('timeout')) {
+        userMessage = 'زمان اتصال تمام شد - لطفاً مجدداً تلاش کنید';
+      } else if (errorMessage.includes('network')) {
+        userMessage = 'مشکل در اتصال شبکه';
+      }
+      
       res.status(500).json({
         success: false,
-        message: 'خطا در اتصال تلگرام',
-        error: errorMessage
+        message: userMessage,
+        error: errorMessage,
+        timestamp: new Date().toISOString()
       });
     }
   });
