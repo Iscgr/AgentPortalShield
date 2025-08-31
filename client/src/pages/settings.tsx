@@ -347,6 +347,10 @@ export default function Settings() {
         title: "تنظیمات ذخیره شد",
         description: "تغییرات با موفقیت اعمال شد",
       });
+      // Invalidate specific settings queries instead of generic pattern
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/telegram_bot_token"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/telegram_chat_id"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/telegram_template"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
     },
     onError: (error: any) => {
@@ -379,9 +383,22 @@ export default function Settings() {
   });
 
   const onTelegramSubmit = async (data: TelegramSettingsData) => {
-    await updateSettingMutation.mutateAsync({ key: 'telegram_bot_token', value: data.botToken });
-    await updateSettingMutation.mutateAsync({ key: 'telegram_chat_id', value: data.chatId });
-    await updateSettingMutation.mutateAsync({ key: 'telegram_template', value: data.template });
+    try {
+      console.log('🔄 Saving telegram settings:', { botToken: data.botToken.substring(0, 10) + '...', chatId: data.chatId, templateLength: data.template.length });
+      
+      await updateSettingMutation.mutateAsync({ key: 'telegram_bot_token', value: data.botToken });
+      await updateSettingMutation.mutateAsync({ key: 'telegram_chat_id', value: data.chatId });
+      await updateSettingMutation.mutateAsync({ key: 'telegram_template', value: data.template });
+      
+      console.log('✅ All telegram settings saved successfully');
+    } catch (error) {
+      console.error('❌ Error saving telegram settings:', error);
+      toast({
+        title: "خطا در ذخیره تنظیمات تلگرام",
+        description: "لطفاً دوباره تلاش کنید",
+        variant: "destructive",
+      });
+    }
   };
 
 
