@@ -622,14 +622,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(invoices.representativeId, repId))
       .orderBy(invoices.issueDate, invoices.createdAt); // FIFO: Oldest first for payment processing
 
-    // Calculate real-time status for each invoice based on payments
+    // Calculate real-time status for each invoice based on payments - with error handling
     const enhancedInvoices = await Promise.all(
       invoiceResults.map(async (invoice) => {
-        const calculatedStatus = await this.calculateInvoicePaymentStatus(invoice.id);
-        return {
-          ...invoice,
-          status: calculatedStatus // Override with real-time calculated status
-        };
+        try {
+          const calculatedStatus = await this.calculateInvoicePaymentStatus(invoice.id);
+          return {
+            ...invoice,
+            status: calculatedStatus // Override with real-time calculated status
+          };
+        } catch (error) {
+          console.error(`⚠️ Error calculating status for invoice ${invoice.id}:`, error);
+          return {
+            ...invoice,
+            status: invoice.status // Keep original status if calculation fails
+          };
+        }
       })
     );
 

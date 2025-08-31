@@ -626,14 +626,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/representatives/:code", authMiddleware, async (req, res) => {
     try {
+      console.log(`🔍 SHERLOCK v32.1: Fetching representative details for code: ${req.params.code}`);
+      
       const representative = await storage.getRepresentativeByCode(req.params.code);
       if (!representative) {
+        console.log(`❌ Representative not found for code: ${req.params.code}`);
         return res.status(404).json({ error: "نماینده یافت نشد" });
       }
 
+      console.log(`✅ Representative found: ${representative.name} (ID: ${representative.id})`);
+
       // Get related data
+      console.log('🔄 Fetching invoices...');
       const invoices = await storage.getInvoicesByRepresentative(representative.id);
+      console.log(`✅ Found ${invoices.length} invoices`);
+
+      console.log('🔄 Fetching payments...');
       const payments = await storage.getPaymentsByRepresentative(representative.id);
+      console.log(`✅ Found ${payments.length} payments`);
 
       res.json({
         representative,
@@ -641,6 +651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payments
       });
     } catch (error) {
+      console.error('❌ SHERLOCK v32.1: Error in representative details endpoint:', error);
       res.status(500).json({ error: "خطا در دریافت اطلاعات نماینده" });
     }
   });
@@ -734,7 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public Portal API
   // ✅ SHERLOCK v32.0: Portal endpoint using Unified Financial Engine for consistency
-  app.get("/api/portal/:publicId", async (req, res) => {
+  app.get("/api/public/portal/:publicId", async (req, res) => {
     try {
       const { publicId } = req.params;
 
