@@ -40,6 +40,12 @@ interface PortalData {
   credit: string;
   invoices: Invoice[];
   payments: Payment[];
+  financialMeta?: {
+    paymentRatio: number;
+    debtLevel: string;
+    lastCalculation: string;
+    accuracyGuaranteed: boolean;
+  };
 }
 
 // Invoice Card Component with enhanced usage breakdown

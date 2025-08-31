@@ -174,6 +174,12 @@ interface Representative {
   credit: string; // Keep for backend compatibility, mapped to payments in UI
   createdAt: string;
   updatedAt: string;
+  financialData?: {
+    actualDebt: number;
+    paymentRatio: number;
+    debtLevel: string;
+    lastSync: string;
+  };
 }
 
 
@@ -290,7 +296,7 @@ export default function Representatives() {
       }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - data is considered fresh
-    cacheTime: 30 * 60 * 1000, // 30 minutes - cache retention
+    gcTime: 30 * 60 * 1000, // 30 minutes - cache retention
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: false, // Don't refetch on component mount if data exists
     enabled: true, // Always enabled but controlled by stale time
@@ -336,7 +342,7 @@ export default function Representatives() {
 
             // Merge batch results with enhanced representatives
             if (batchResult.data && Array.isArray(batchResult.data)) {
-              batchResult.data.forEach((financialData) => {
+              batchResult.data.forEach((financialData: any) => {
                 if (financialData?.representativeId) {
                   const repIndex = enhancedRepresentatives.findIndex(rep => rep.id === financialData.representativeId);
                   if (repIndex !== -1) {
@@ -414,7 +420,7 @@ export default function Representatives() {
     return repsData.map(rep => {
       // Use data from enhancedRepsData if available
       const actualDebt = rep.financialData?.actualDebt ?? parseFloat(rep.totalDebt || '0');
-      const totalSales = rep.financialData?.totalSales ?? parseFloat(rep.totalSales || '0');
+      const totalSales = parseFloat(rep.totalSales || '0');
 
       return {
         ...rep,
@@ -614,7 +620,11 @@ export default function Representatives() {
   };
 
   const handleCopyPortalLink = (publicId: string) => {
-    const portalLink = `${window.location.origin}/representative/${publicId}`;
+    // ✅ SHERLOCK v32.1: Always use production URL for portal links sent to representatives
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://agent-portal-shield-info9071.replit.app'
+      : window.location.origin;
+    const portalLink = `${baseUrl}/representative/${publicId}`;
     navigator.clipboard.writeText(portalLink);
     toast({
       title: "کپی شد",
@@ -1239,7 +1249,12 @@ export default function Representatives() {
                         variant="outline" 
                         size="sm" 
                         className="w-full"
-                        onClick={() => window.open(`/representative/${selectedRep.publicId}`, '_blank')}
+                        onClick={() => {
+                          const baseUrl = process.env.NODE_ENV === 'production' 
+                            ? 'https://agent-portal-shield-info9071.replit.app'
+                            : window.location.origin;
+                          window.open(`${baseUrl}/representative/${selectedRep.publicId}`, '_blank');
+                        }}
                       >
                         <ExternalLink className="w-4 h-4 ml-2" />
                         نمایش پورتال عمومی

@@ -12,7 +12,7 @@ import { useMobileOptimizations } from "@/hooks/use-mobile-optimizations";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 // Import MobileNavigation and advanced mobile components
-import MobileNavigation from "@/components/layout/mobile-navigation";
+// import MobileNavigation from "@/components/layout/mobile-navigation";
 
 
 // Pages
