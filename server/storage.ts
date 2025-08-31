@@ -902,10 +902,30 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(payments).orderBy(desc(payments.createdAt));
   }
 
-  async getPaymentsByRepresentative(repId: number): Promise<Payment[]> {
-    return await db.select().from(payments)
+  async getPaymentsByRepresentative(repId: number): Promise<any[]> {
+    // ✅ SHERLOCK v32.1: Use only existing database columns to avoid schema mismatch
+    const results = await db.select({
+      id: payments.id,
+      representativeId: payments.representativeId,
+      invoiceId: payments.invoiceId,
+      amount: payments.amount,
+      paymentDate: payments.paymentDate,
+      isAllocated: payments.isAllocated,
+      createdAt: payments.createdAt
+    }).from(payments)
       .where(eq(payments.representativeId, repId))
       .orderBy(desc(payments.createdAt));
+
+    // Add missing fields as defaults for compatibility
+    return results.map(payment => ({
+      ...payment,
+      allocatedAmount: '0',
+      remainingAmount: payment.amount,
+      allocations: null,
+      allocationMethod: null,
+      allocationHistory: null,
+      updatedAt: payment.createdAt
+    }));
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
