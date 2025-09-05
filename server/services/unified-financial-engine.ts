@@ -25,6 +25,17 @@ interface RepresentativeFinancialData {
   debtLevel: 'HEALTHY' | 'MODERATE' | 'HIGH' | 'CRITICAL' | 'PAID'; // Added 'PAID' based on the provided example in changes
 }
 
+// Define GlobalSummaryData interface
+interface GlobalSummaryData {
+  totalRepresentatives: string;
+  activeRepresentatives: string;
+  totalSystemSales: string;
+  totalSystemPaid: string;
+  totalSystemDebt: number;
+  lastCalculationTime: string;
+  dataIntegrity: string;
+}
+
 
 export interface UnifiedFinancialData {
   representativeId: number;
@@ -95,6 +106,17 @@ export class UnifiedFinancialEngine {
 
   constructor(storage: any) { // Inject storage dependency
     this.storage = storage;
+  }
+
+  /**
+   * Cache helper methods
+   */
+  private static getFromCache(key: string): { data: any; timestamp: number } | undefined {
+    return this.cache.get(key);
+  }
+
+  private static setToCache(key: string, data: any, ttl: number): void {
+    this.cache.set(key, { data, timestamp: Date.now() });
   }
 
   /**
@@ -341,9 +363,48 @@ export class UnifiedFinancialEngine {
     return freshData;
   }
 
-  /**
-   * ✅ SHERLOCK v23.0: محاسبه صحیح آمار کلی سیستم
-   */
+  // ✅ SHERLOCK v32.1: Optimized Global Summary Calculation (prevents N+1 queries)
+  async calculateGlobalSummaryOptimized(): Promise<GlobalSummaryData> {
+    const cacheKey = 'global_summary_optimized';
+    const cached = UnifiedFinancialEngine.getFromCache(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < 30000) { // 30 second cache
+      console.log('📋 Using cached global summary (30s cache)');
+      return cached.data;
+    }
+
+    try {
+      // Single batch query instead of N+1 individual queries
+      const [summaryData] = await db.execute(sql`
+        SELECT
+          (SELECT COUNT(*) FROM representatives) as totalRepresentatives,
+          (SELECT COUNT(*) FROM representatives WHERE is_active = true) as activeRepresentatives,
+          (SELECT COALESCE(SUM(CAST(amount as DECIMAL)), 0) FROM invoices) as totalSystemSales,
+          (SELECT COALESCE(SUM(CAST(amount as DECIMAL)), 0) FROM payments WHERE is_allocated = true) as totalSystemPaid,
+          (SELECT COALESCE(SUM(CAST(amount as DECIMAL)), 0) FROM invoices WHERE status IN ('unpaid', 'overdue', 'partial')) as totalSystemDebt
+      `);
+
+      const result = {
+        totalRepresentatives: summaryData.totalRepresentatives?.toString() || "0",
+        activeRepresentatives: summaryData.activeRepresentatives?.toString() || "0",
+        totalSystemSales: summaryData.totalSystemSales?.toString() || "0",
+        totalSystemPaid: summaryData.totalSystemPaid?.toString() || "0",
+        totalSystemDebt: Number(summaryData.totalSystemDebt) || 0,
+        lastCalculationTime: new Date().toISOString(),
+        dataIntegrity: "OPTIMIZED_BATCH"
+      };
+
+      // Cache for 30 seconds
+      UnifiedFinancialEngine.setToCache(cacheKey, result, 30000);
+
+      return result;
+    } catch (error) {
+      console.error('❌ Optimized global summary failed:', error);
+      throw error;
+    }
+  }
+
+  // Original method maintained for compatibility
   async calculateGlobalSummary(): Promise<GlobalFinancialSummary> {
     console.log("🧮 UNIFIED FINANCIAL ENGINE v23.0: Calculating corrected global summary...");
 
@@ -560,11 +621,11 @@ export class UnifiedFinancialEngine {
       // For very large datasets, fall back to chunked individual calculations
       const results: RepresentativeFinancialData[] = [];
       const CHUNK_SIZE = 50;
-      
+
       for (let i = 0; i < representativesData.length; i += CHUNK_SIZE) {
         const chunk = representativesData.slice(i, i + CHUNK_SIZE);
         console.log(`🔄 Processing chunk ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(representativesData.length/CHUNK_SIZE)}`);
-        
+
         const chunkResults = await Promise.all(chunk.map(async (rep) => {
           const debt = parseFloat(rep.totalDebt) || 0;
           return {
@@ -581,10 +642,10 @@ export class UnifiedFinancialEngine {
             debtLevel: this.calculateDebtLevel(debt)
           };
         }));
-        
+
         results.push(...chunkResults);
       }
-      
+
       const endTime = performance.now();
       const processingTime = Math.round(endTime - startTime);
       console.log(`✅ ATOMOS CHUNKED: Processed ${results.length} representatives in ${processingTime}ms`);
