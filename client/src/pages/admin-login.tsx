@@ -47,14 +47,30 @@ export default function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
         }
       });
 
+      // Get response text first to handle both JSON and non-JSON responses
+      const responseText = await response.text();
+      console.log("Raw response:", responseText);
+
       if (response.ok) {
         let responseData;
         try {
-          responseData = await response.json();
+          responseData = responseText ? JSON.parse(responseText) : {};
         } catch (jsonError) {
           console.error("JSON parsing error in success response:", jsonError);
-          setError("خطا در پردازش پاسخ سرور");
-          return;
+          console.error("Response was:", responseText);
+          
+          // Check if response contains success indicators even if not JSON
+          if (responseText.includes('success') || responseText.includes('موفق')) {
+            toast({
+              title: "ورود موفق",
+              description: "به پنل مدیریت خوش آمدید"
+            });
+            onLoginSuccess();
+            return;
+          } else {
+            setError("پاسخ سرور قابل پردازش نیست");
+            return;
+          }
         }
         
         toast({
@@ -63,16 +79,26 @@ export default function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
         });
         onLoginSuccess();
       } else {
-        let errorData;
+        let errorMessage = "خطا در ورود";
+        
         try {
-          errorData = await response.json();
-          setError(errorData.error || "خطا در ورود");
+          const errorData = responseText ? JSON.parse(responseText) : {};
+          errorMessage = errorData.error || `خطا در ورود: ${response.status}`;
         } catch (jsonError) {
           console.error("JSON parsing error in error response:", jsonError);
-          const responseText = await response.text();
-          console.error("Raw response:", responseText);
-          setError(`خطا در ورود: ${response.status} - ${response.statusText}`);
+          console.error("Error response was:", responseText);
+          
+          // Extract error information from HTML or plain text
+          if (responseText.includes('error') || responseText.includes('خطا')) {
+            errorMessage = `خطا در ورود: ${response.status} - ${response.statusText}`;
+          } else if (responseText.length > 0) {
+            errorMessage = `خطا در سرور: ${responseText.substring(0, 100)}`;
+          } else {
+            errorMessage = `خطا در ورود: ${response.status} - ${response.statusText}`;
+          }
         }
+        
+        setError(errorMessage);
       }
     } catch (err) {
       console.error("Network or other error:", err);
