@@ -91,6 +91,7 @@ export const payments = pgTable('payments', {
   invoiceId: integer('invoice_id').references(() => invoices.id), // Missing field added
   amount: text('amount').notNull(),
   paymentDate: timestamp('payment_date').notNull(),
+  description: text('description'), // Payment description field
 
   // Enhanced allocation system
   isAllocated: boolean('is_allocated').default(false),

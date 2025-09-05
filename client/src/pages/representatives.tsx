@@ -2143,18 +2143,16 @@ function CreatePaymentDialog({
 
       console.log(`📊 FIFO allocation complete. ${allocations.length} invoices allocated, ${remainingAmount} remaining`);
 
-      // Create payment record
+      // Create payment record with proper backend structure
       const paymentData = {
         representativeId: representative.id,
         amount: paymentAmount.toString(),
         paymentDate,
         description: description || `تخصیص خودکار پرداخت برای ${representative.name}`,
-        isAllocated: true,
-        autoAllocated: true,
-        allocations
+        selectedInvoiceId: "auto"
       };
 
-      await apiRequest(`/api/crm/payments/auto-allocate/${representative.id}`, {
+      await apiRequest("/api/payments", {
         method: "POST",
         data: paymentData
       });
@@ -2271,7 +2269,7 @@ function CreatePaymentDialog({
           isAllocated: !!selectedInvoiceId
         };
 
-        await apiRequest("/api/crm/payments", {
+        await apiRequest("/api/payments", {
           method: "POST",
           data: paymentData
         });

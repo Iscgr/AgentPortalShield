@@ -910,6 +910,7 @@ export class DatabaseStorage implements IStorage {
       invoiceId: payments.invoiceId,
       amount: payments.amount,
       paymentDate: payments.paymentDate,
+      description: payments.description,
       isAllocated: payments.isAllocated,
       createdAt: payments.createdAt
     }).from(payments)
@@ -919,6 +920,7 @@ export class DatabaseStorage implements IStorage {
     // Add missing fields as defaults for compatibility
     return results.map(payment => ({
       ...payment,
+      description: payment.description || 'پرداخت', // Add default description
       allocatedAmount: '0',
       remainingAmount: payment.amount,
       allocations: null,
