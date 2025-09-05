@@ -77,34 +77,45 @@ export function UnifiedAuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // SHERLOCK v26.0: Simplified auth - assume admin user is always authenticated
-      console.log('🔓 SHERLOCK v26.0: Simplified auth check - bypassing validation');
-      
-      setIsAuthenticated(true);
-      setUser({
-        id: 4,
-        username: 'mgr',
-        role: 'SUPER_ADMIN',
-        panelType: 'ADMIN_PANEL',
-        authenticated: true,
-        permissions: ['FULL_ACCESS'],
-        hasFullAccess: true
+      // Check actual session status from server
+      const response = await fetch('/api/auth/status', {
+        credentials: 'include',
+        method: 'GET'
       });
-      setUserType('ADMIN');
-      console.log('✅ SHERLOCK v26.0: Auto-authenticated as admin user');
+      
+      if (response.ok) {
+        const authData = await response.json();
+        if (authData.authenticated) {
+          console.log('✅ SHERLOCK v32.3: User is authenticated:', authData.user);
+          setIsAuthenticated(true);
+          setUser({
+            id: authData.user.id,
+            username: authData.user.username,
+            role: authData.user.role,
+            panelType: 'ADMIN_PANEL',
+            authenticated: true,
+            permissions: authData.user.permissions || ['FULL_ACCESS'],
+            hasFullAccess: authData.user.hasFullAccess
+          });
+          setUserType('ADMIN');
+        } else {
+          console.log('❌ SHERLOCK v32.3: User not authenticated');
+          setIsAuthenticated(false);
+          setUser(null);
+          setUserType(null);
+        }
+      } else {
+        console.log('❌ SHERLOCK v32.3: Auth check failed');
+        setIsAuthenticated(false);
+        setUser(null);
+        setUserType(null);
+      }
       
     } catch (error) {
-      console.error('❌ SHERLOCK v26.0: Auth error:', error);
-      // Even on error, authenticate as admin
-      setIsAuthenticated(true);
-      setUser({
-        id: 4,
-        username: 'mgr',
-        role: 'SUPER_ADMIN',
-        panelType: 'ADMIN_PANEL',
-        authenticated: true
-      });
-      setUserType('ADMIN');
+      console.error('❌ SHERLOCK v32.3: Auth check error:', error);
+      setIsAuthenticated(false);
+      setUser(null);
+      setUserType(null);
     } finally {
       setIsLoading(false);
     }

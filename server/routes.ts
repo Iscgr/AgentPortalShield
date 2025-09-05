@@ -297,6 +297,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 🗑️ SHERLOCK v18.2: LEGACY LOGIN ENDPOINT REMOVED - Use /api/auth/login only
 
+  // Auth status check endpoint
+  app.get("/api/auth/status", (req, res) => {
+    const session = req.session as any;
+    
+    if (session && session.authenticated && session.user) {
+      res.json({
+        authenticated: true,
+        user: {
+          id: session.user.id,
+          username: session.user.username,
+          role: session.user.role,
+          permissions: session.user.permissions,
+          hasFullAccess: session.user.role === 'SUPER_ADMIN' || (Array.isArray(session.user.permissions) && session.user.permissions.includes('FULL_ACCESS'))
+        }
+      });
+    } else {
+      res.json({ authenticated: false });
+    }
+  });
+
   app.post("/api/auth/logout", (req, res) => {
     req.session.destroy((err: any) => {
       if (err) {

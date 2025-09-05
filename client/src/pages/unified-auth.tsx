@@ -53,7 +53,8 @@ export default function UnifiedAuth() {
           description: "به پنل مدیریت خوش آمدید",
         });
         
-        setLocation('/dashboard');
+        // Force page reload to trigger auth context check
+        window.location.href = '/dashboard';
       } else {
         setLoginError(result.error || 'خطا در ورود');
       }
