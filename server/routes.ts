@@ -1125,7 +1125,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // ✅ SHERLOCK v33.1: Normalize Persian/English dates for consistency
-      const { toEnglishDigits } = await import("../../client/src/lib/persian-date");
+      const toEnglishDigits = (str: string): string => {
+        const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+        const englishDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        let result = str;
+        for (let i = 0; i < persianDigits.length; i++) {
+          result = result.replace(new RegExp(persianDigits[i], 'g'), englishDigits[i]);
+        }
+        return result;
+      };
       const normalizedPaymentDate = toEnglishDigits(paymentDate);
 
       console.log(`📅 تطبیق تاریخ: ورودی="${paymentDate}" -> عادی‌سازی شده="${normalizedPaymentDate}"`);
@@ -1148,7 +1156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newPayment = await storage.createPayment({
         representativeId,
         amount,
-        paymentDate: normalizedPaymentDate,
+        paymentDate: normalizedPaymentDate, // Now as text to match database
         description,
         isAllocated: isAllocated,
         invoiceId: invoiceId

@@ -84,31 +84,16 @@ export const telegramSendHistory = pgTable("telegram_send_history", {
   metadata: json("metadata") // Additional data
 });
 
-// Payments (پرداخت‌ها)
+// Payments (پرداخت‌ها) - simplified to match actual database
 export const payments = pgTable('payments', {
   id: serial('id').primaryKey(),
   representativeId: integer('representative_id').references(() => representatives.id),
-  invoiceId: integer('invoice_id').references(() => invoices.id), // Missing field added
+  invoiceId: integer('invoice_id').references(() => invoices.id),
   amount: text('amount').notNull(),
-  paymentDate: timestamp('payment_date').notNull(),
-  description: text('description'), // Payment description field
-
-  // Enhanced allocation system
+  paymentDate: text('payment_date').notNull(),
+  description: text('description'),
   isAllocated: boolean('is_allocated').default(false),
-  allocatedAmount: text('allocated_amount').default('0'), // مبلغ تخصیص یافته
-  remainingAmount: text('remaining_amount').default('0'), // مبلغ باقی‌مانده
-
-  // Multiple allocation support
-  allocations: json('allocations').$type<PaymentAllocation[]>(), // تخصیص‌های متعدد
-
-  // Allocation method tracking
-  allocationMethod: text('allocation_method').$type<'AUTO_FIFO' | 'AUTO_LIFO' | 'MANUAL' | 'MIXED'>(),
-
-  // Audit trail
-  allocationHistory: json('allocation_history').$type<AllocationHistoryEntry[]>(),
-
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow()
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 // Supporting types for enhanced allocation
