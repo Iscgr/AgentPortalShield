@@ -39,70 +39,58 @@ export default function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
     setError(null);
 
     try {
+      console.log('🔐 SHERLOCK v1.0: Sending login request:', { username: data.username });
+      
       const response = await fetch("/api/auth/login", {
         method: "POST",
         body: JSON.stringify(data),
         headers: {
           "Content-Type": "application/json"
-        }
+        },
+        credentials: "include" // Important for session cookies
       });
 
-      // Get response text first to handle both JSON and non-JSON responses
-      const responseText = await response.text();
-      console.log("Raw response:", responseText);
-
-      if (response.ok) {
-        let responseData;
-        try {
-          responseData = responseText ? JSON.parse(responseText) : {};
-        } catch (jsonError) {
-          console.error("JSON parsing error in success response:", jsonError);
-          console.error("Response was:", responseText);
-          
-          // Check if response contains success indicators even if not JSON
-          if (responseText.includes('success') || responseText.includes('موفق')) {
-            toast({
-              title: "ورود موفق",
-              description: "به پنل مدیریت خوش آمدید"
-            });
-            onLoginSuccess();
-            return;
-          } else {
-            setError("پاسخ سرور قابل پردازش نیست");
-            return;
-          }
-        }
+      console.log('🔐 SHERLOCK v1.0: Response status:', response.status);
+      
+      // Always try to parse as JSON first
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('🔐 SHERLOCK v1.0: Parsed response:', responseData);
+      } catch (jsonError) {
+        console.error("❌ SHERLOCK v1.0: JSON parsing failed:", jsonError);
+        const responseText = await response.text();
+        console.error("❌ Raw response was:", responseText);
         
+        setError("خطا در پردازش پاسخ سرور");
+        return;
+      }
+
+      if (response.ok && responseData.success) {
+        console.log('✅ SHERLOCK v1.0: Login successful');
         toast({
           title: "ورود موفق",
           description: "به پنل مدیریت خوش آمدید"
         });
         onLoginSuccess();
       } else {
-        let errorMessage = "خطا در ورود";
-        
-        try {
-          const errorData = responseText ? JSON.parse(responseText) : {};
-          errorMessage = errorData.error || `خطا در ورود: ${response.status}`;
-        } catch (jsonError) {
-          console.error("JSON parsing error in error response:", jsonError);
-          console.error("Error response was:", responseText);
-          
-          // Extract error information from HTML or plain text
-          if (responseText.includes('error') || responseText.includes('خطا')) {
-            errorMessage = `خطا در ورود: ${response.status} - ${response.statusText}`;
-          } else if (responseText.length > 0) {
-            errorMessage = `خطا در سرور: ${responseText.substring(0, 100)}`;
-          } else {
-            errorMessage = `خطا در ورود: ${response.status} - ${response.statusText}`;
-          }
-        }
-        
+        console.log('❌ SHERLOCK v1.0: Login failed:', responseData);
+        const errorMessage = responseData.error || "خطا در ورود به سیستم";
         setError(errorMessage);
+        toast({
+          title: "خطا در ورود",
+          description: errorMessage,
+          variant: "destructive"
+        });
       }
     } catch (err) {
-      console.error("Network or other error:", err);
+      console.error("❌ SHERLOCK v1.0: Network error:", err);
       setError("خطا در برقراری ارتباط با سرور");
+      toast({
+        title: "خطا در اتصال",
+        description: "خطا در برقراری ارتباط با سرور",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }

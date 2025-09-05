@@ -627,7 +627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/representatives/:code", authMiddleware, async (req, res) => {
     try {
       console.log(`🔍 SHERLOCK v32.1: Fetching representative details for code: ${req.params.code}`);
-      
+
       const representative = await storage.getRepresentativeByCode(req.params.code);
       if (!representative) {
         console.log(`❌ Representative not found for code: ${req.params.code}`);

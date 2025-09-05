@@ -92,6 +92,10 @@ function AuthenticatedRouter() {
 
   // SHERLOCK v3.0 FIX: Show unified auth for non-authenticated users  
   if (!adminAuthenticated) {
+    // Check if the current location is the admin login page
+    if (location === "/admin-login") {
+      return <AdminLogin />;
+    }
     return <UnifiedAuth />;
   }
 
@@ -107,6 +111,7 @@ function AuthenticatedRouter() {
         <Route path="/sales-partners" component={SalesPartners} />
         <Route path="/financial-integrity" component={FinancialIntegrityPage} />
         <Route path="/settings" component={Settings} />
+        <Route path="/admin-login" component={AdminLogin} /> {/* Explicitly route to AdminLogin */}
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>
