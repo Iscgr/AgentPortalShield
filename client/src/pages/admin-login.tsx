@@ -48,16 +48,34 @@ export default function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
       });
 
       if (response.ok) {
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (jsonError) {
+          console.error("JSON parsing error in success response:", jsonError);
+          setError("خطا در پردازش پاسخ سرور");
+          return;
+        }
+        
         toast({
           title: "ورود موفق",
           description: "به پنل مدیریت خوش آمدید"
         });
         onLoginSuccess();
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "خطا در ورود");
+        let errorData;
+        try {
+          errorData = await response.json();
+          setError(errorData.error || "خطا در ورود");
+        } catch (jsonError) {
+          console.error("JSON parsing error in error response:", jsonError);
+          const responseText = await response.text();
+          console.error("Raw response:", responseText);
+          setError(`خطا در ورود: ${response.status} - ${response.statusText}`);
+        }
       }
     } catch (err) {
+      console.error("Network or other error:", err);
       setError("خطا در برقراری ارتباط با سرور");
     } finally {
       setIsLoading(false);
