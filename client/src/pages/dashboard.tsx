@@ -409,63 +409,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Financial Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-        <StatCard
-          title="کل درآمدها"
-          value={formatCurrency(dashboardData.totalRevenue || 0)}
-          subtitle="مبلغ پرداخت شده - تومان"
-          icon={TrendingUp}
-          colorClass="text-green-600"
-          onClick={() => window.location.href = '/invoices'}
-        />
-
-        <StatCard
-          title="مطالبات معوق"
-          value={formatCurrency(dashboardData.totalDebt || 0)}
-          subtitle="مانده بدهی - تومان"
-          icon={AlertTriangle}
-          colorClass="text-red-600"
-          onClick={() => window.location.href = '/invoices'}
-        />
-
-        <StatCard
-          title="نمایندگان فعال"
-          value={toPersianDigits((dashboardData.activeRepresentatives || 0).toString())}
-          subtitle="آخرین آپلود فایل ریزجزئیات"
-          icon={Users}
-          colorClass="text-blue-600"
-          onClick={() => window.location.href = '/representatives'}
-        />
-
-        <StatCard
-          title="فاکتورهای ارسال نشده"
-          value={toPersianDigits(((dashboardData.unsentTelegramInvoices || 0)).toString())}
-          subtitle="نیازمند ارسال به تلگرام"
-          icon={FileText}
-          colorClass="text-orange-600"
-          onClick={() => window.location.href = '/invoices'}
-        />
+      {/* File Upload Section - Main Dashboard Content */}
+      <div className="max-w-4xl mx-auto">
+        <InvoiceUpload />
       </div>
-
-      
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-        {/* Invoice Generation Section */}
-        <div className="lg:col-span-2">
-          <InvoiceUpload />
-        </div>
-
-        {/* SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table */}
-        {/* This widget has been replaced by OverdueInvoicesCard */}
-        {/* <DebtorRepresentativesCard /> */}
-      </div>
-
-      {/* SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table */}
-      {/* This component is now handled by the OverdueInvoicesCard in the grid above */}
-      {/* <DebtorRepresentativesCard /> */}
-
-      
     </div>
   );
 }

@@ -353,8 +353,8 @@ export class UnifiedFinancialEngine {
       active: sql<number>`SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END)`
     }).from(representatives);
 
-    // ✅ محاسبه صحیح آمار کلی سیستم + مطالبات معوق
-    const [systemSales, systemPaid, overdueData] = await Promise.all([
+    // ✅ محاسبه صحیح آمار کلی سیستم + مطالبات معوق با safe handling
+    const results = await Promise.all([
       // فروش کل سیستم = مجموع کل فاکتورهای صادر شده
       db.select({
         totalSystemSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
@@ -374,8 +374,13 @@ export class UnifiedFinancialEngine {
       }).from(invoices)
     ]);
 
-    const totalSystemSales = systemSales[0].totalSystemSales;
-    const totalSystemPaid = systemPaid[0].totalSystemPaid;
+    // Safe destructuring with fallbacks
+    const systemSales = Array.isArray(results[0]) ? results[0] : [];
+    const systemPaid = Array.isArray(results[1]) ? results[1] : [];
+    const overdueData = Array.isArray(results[2]) ? results[2] : [];
+
+    const totalSystemSales = systemSales[0]?.totalSystemSales || 0;
+    const totalSystemPaid = systemPaid[0]?.totalSystemPaid || 0;
     const totalSystemDebt = Math.max(0, totalSystemSales - totalSystemPaid); // بدهی کل سیستم
 
     // Simple debt distribution count based on standard debt calculation
@@ -411,10 +416,10 @@ export class UnifiedFinancialEngine {
       totalSystemDebt,
 
       // ✅ SHERLOCK v28.0: مطالبات معوق
-      totalOverdueAmount: overdueData[0].totalOverdueAmount,
-      totalUnpaidAmount: overdueData[0].totalUnpaidAmount,
-      overdueInvoicesCount: overdueData[0].overdueInvoicesCount,
-      unpaidInvoicesCount: overdueData[0].unpaidInvoicesCount,
+      totalOverdueAmount: overdueData[0]?.totalOverdueAmount || 0,
+      totalUnpaidAmount: overdueData[0]?.totalUnpaidAmount || 0,
+      overdueInvoicesCount: overdueData[0]?.overdueInvoicesCount || 0,
+      unpaidInvoicesCount: overdueData[0]?.unpaidInvoicesCount || 0,
 
       healthyReps: healthy,
       moderateReps: moderate,
