@@ -119,13 +119,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Increase timeout for large file processing
+// Simplified timeout handling
 app.use((req, res, next) => {
-  // Set timeout to 10 minutes for file upload endpoints
-  if (req.path === '/api/invoices/generate') {
-    req.setTimeout(10 * 60 * 1000); // 10 minutes
-    res.setTimeout(10 * 60 * 1000); // 10 minutes
-  }
+  // Basic timeout without complex logic
+  req.setTimeout(60 * 1000); // 1 minute
   next();
 });
 
@@ -264,26 +261,15 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
 
-  // Kill any existing process on the port before starting
-  async function killExistingPort(port: number) {
-    try {
-      const { exec } = await import('child_process');
-      exec(`lsof -ti:${port} | xargs kill -9`, (error) => {
-        if (error) {
-          console.log(`No existing process on port ${port} to kill`);
-        } else {
-          console.log(`✅ Killed existing process on port ${port}`);
-        }
-      });
-    } catch (error) {
-      console.log('Could not check for existing processes');
-    }
+  // Simplified port handling - removed process killing logic
+  async function logPortInfo(port: number) {
+    console.log(`Starting server on port ${port}`);
   }
 
   const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '0.0.0.0';
 
-  // Kill existing port and start server
-  killExistingPort(Number(port));
+  // Log port info
+  logPortInfo(Number(port));
 
   // Add graceful shutdown handlers
   process.on('SIGTERM', () => {
@@ -300,77 +286,33 @@ app.use((req, res, next) => {
   let serverInstance: any;
   const startServer = async () => {
     try {
-      // Wait a moment for port to be freed
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       serverInstance = app.listen(port, host, () => {
-        console.log(`🚀 SHERLOCK v32.0: Server successfully started on port ${port}`);
-        console.log(`📱 WebView: https://${process.env.REPL_SLUG || 'localhost'}.${process.env.REPL_OWNER || 'replit'}.repl.co`);
-        console.log(`✅ Dashboard API should now be accessible at /api/dashboard`);
+        console.log(`🚀 MarFaNet Server started on port ${port}`);
+        console.log(`✅ API accessible at /api/dashboard`);
       });
 
       serverInstance.on('error', (error: any) => {
-        if (error.code === 'EADDRINUSE') {
-          console.error(`❌ Port ${port} is still in use. Retrying in 2 seconds...`);
-          setTimeout(() => {
-            serverInstance.close();
-            startServer();
-          }, 2000);
-        } else {
-          console.error('❌ Server error:', error);
-        }
+        console.error('❌ Server error:', error);
+        process.exit(1);
       });
 
     } catch (error) {
       console.error('❌ Failed to start server:', error);
-      setTimeout(startServer, 2000);
+      process.exit(1);
     }
   };
 
   startServer();
 
-  // Graceful shutdown handling for production stability
-  const gracefulShutdown = async (signal: string) => {
-    log(`Received ${signal} signal, starting graceful shutdown...`);
-
-    try {
-      // Close HTTP server
-      serverInstance.close(async () => {
-        log('HTTP server closed');
-
-        // Close database connections
-        await closeDatabaseConnection();
-
-        log('Graceful shutdown complete');
-        process.exit(0);
-      });
-
-      // Force close after 10 seconds
-      setTimeout(() => {
-        log('Force shutdown after timeout');
-        process.exit(1);
-      }, 10000);
-
-    } catch (error) {
-      log(`Error during shutdown: ${error}`, 'error');
-      process.exit(1);
-    }
-  };
-
-  // Handle various termination signals
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-  // Handle uncaught exceptions to prevent crashes
+  // Simplified error handling
   process.on('uncaughtException', (error) => {
-    log(`Uncaught Exception: ${error.message}`, 'error');
-    console.error(error.stack);
-    // Don't exit - let the server continue running
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    log(`Unhandled Rejection at promise: ${reason}`, 'error');
-    // Don't exit - let the server continue running
+    console.error('Unhandled Rejection:', reason);
+    process.exit(1);
   });
 
 })();
