@@ -37,7 +37,7 @@ export default function UnifiedAuth() {
     setLoginError('');
 
     try {
-      const response = await fetch('/api/admin/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
