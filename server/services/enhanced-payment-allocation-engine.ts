@@ -721,25 +721,7 @@ export class EnhancedPaymentAllocationEngine {
     }
   }
   
-  private static async getCurrentlyAllocatedAmount(invoiceId: number): Promise<number> {
-    // محاسبه مجموع مبالغ تخصیص یافته به این فاکتور
-    const allocatedPayments = await db.select()
-      .from(payments)
-      .where(sql`allocations IS NOT NULL`);
-    
-    let totalAllocated = 0;
-    
-    for (const payment of allocatedPayments) {
-      const allocations = payment.allocations || [];
-      for (const allocation of allocations) {
-        if (allocation.invoiceId === invoiceId) {
-          totalAllocated += allocation.allocatedAmount;
-        }
-      }
-    }
-    
-    return totalAllocated;
-  }
+  
   
   /**
    * 🔄 SHERLOCK v34.1: بروزرسانی اتمیک پرداخت با audit trail

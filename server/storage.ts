@@ -2456,7 +2456,7 @@ export class DatabaseStorage implements IStorage {
   /**
    * SHERLOCK v22.1: Update invoice status based on payment allocation
    */
-  private async updateInvoiceStatusAfterAllocation(invoiceId: number): Promise<void> {
+  async updateInvoiceStatusAfterAllocation(invoiceId: number): Promise<void> {
     // Get invoice details
     const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
     if (!invoice) return;

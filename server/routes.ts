@@ -10,7 +10,7 @@ import { unifiedAuthMiddleware, enhancedUnifiedAuthMiddleware } from "./middlewa
 import multer from "multer";
 
 // SHERLOCK v34.1: Import payment management router and its dependencies
-import { paymentManagementRouter, requireAuth } from "./routes/payment-management-router"; // Assuming this path and structure
+import { paymentManagementRouter, requireAuth } from "./routes/payment-management-router.js";
 
 // Extend Request interface to include multer file
 interface MulterRequest extends Request {
