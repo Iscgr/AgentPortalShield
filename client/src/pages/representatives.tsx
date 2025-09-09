@@ -2089,7 +2089,7 @@ function CreatePaymentDialog({
   // ✅ SHERLOCK v34.0: UNIFIED FIFO Auto-Allocation System (Enhanced Engine)
   const handleAutoAllocation = async (paymentAmount: number) => {
     try {
-      console.log('🔧 SHERLOCK v34.0 UNIFIED FIFO: Starting enhanced auto-allocation for oldest invoices first');rst');
+      console.log('🔧 SHERLOCK v34.0 UNIFIED FIFO: Starting enhanced auto-allocation for oldest invoices first');
 
       // CRITICAL: Get unpaid invoices sorted by date (OLDEST FIRST - FIFO principle)
       const unpaidInvoices = (representative as any).invoices?.filter(
