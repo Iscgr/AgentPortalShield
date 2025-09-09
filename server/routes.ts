@@ -1034,6 +1034,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Use the payment management router for all payment-related operations
   app.use('/api/payments', paymentManagementRouter);
 
+  // SHERLOCK v35.0: Allocation Monitoring Routes
+  app.get("/api/allocation/metrics", authMiddleware, async (req, res) => {
+    try {
+      console.log('📊 SHERLOCK v35.0: Fetching allocation metrics');
+      
+      const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
+      const metrics = await AllocationMonitoringService.calculateGlobalMetrics();
+      
+      res.json({
+        success: true,
+        data: metrics,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Error fetching allocation metrics:', error);
+      res.status(500).json({ error: "خطا در دریافت متریک‌های تخصیص" });
+    }
+  });
+
+  app.get("/api/allocation/trends", authMiddleware, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      console.log(`📈 SHERLOCK v35.0: Fetching allocation trends for ${days} days`);
+      
+      const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
+      const trends = await AllocationMonitoringService.analyzeTrends(days);
+      
+      res.json({
+        success: true,
+        data: trends,
+        period: `${days} days`,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Error fetching allocation trends:', error);
+      res.status(500).json({ error: "خطا در دریافت روندهای تخصیص" });
+    }
+  });
+
+  app.get("/api/allocation/alerts", authMiddleware, async (req, res) => {
+    try {
+      console.log('🚨 SHERLOCK v35.0: Generating allocation alerts');
+      
+      const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
+      const alerts = await AllocationMonitoringService.generateAlerts();
+      
+      res.json({
+        success: true,
+        data: alerts,
+        count: alerts.length,
+        criticalCount: alerts.filter(a => a.priority === 'CRITICAL').length,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Error generating allocation alerts:', error);
+      res.status(500).json({ error: "خطا در تولید هشدارهای تخصیص" });
+    }
+  });
+
+  app.get("/api/allocation/monitoring-report", authMiddleware, async (req, res) => {
+    try {
+      console.log('📋 SHERLOCK v35.0: Generating comprehensive monitoring report');
+      
+      const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
+      const report = await AllocationMonitoringService.generateMonitoringReport();
+      
+      res.json({
+        success: true,
+        data: report,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Error generating monitoring report:', error);
+      res.status(500).json({ error: "خطا در تولید گزارش مانیتورینگ" });
+    }
+  });
+
   // SHERLOCK v1.0 PAYMENT DELETION API - حذف پرداخت با همگام‌سازی کامل مالی
   app.delete("/api/payments/:id", authMiddleware, async (req, res) => {
     try {

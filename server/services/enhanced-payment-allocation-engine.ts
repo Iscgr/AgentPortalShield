@@ -75,8 +75,8 @@ export class EnhancedPaymentAllocationEngine {
   }
 
   /**
-   * 🎯 SHERLOCK v34.1: تخصیص خودکار پرداخت با دقت کامل FIFO
-   * ATOMOS COMPLIANT - Atomic transaction processing
+   * 🎯 SHERLOCK v35.0: تخصیص خودکار پرداخت با دقت کامل FIFO و قابلیت‌های پیشرفته
+   * ATOMOS COMPLIANT - Enhanced atomic transaction processing with comprehensive validation
    */
   static async autoAllocatePayment(
     paymentId: number, 
@@ -926,10 +926,10 @@ export class EnhancedPaymentAllocationEngine {
   }
 
   /**
-   * 📊 SHERLOCK v34.1: خلاصه تخصیصات نماینده
+   * 📊 SHERLOCK v35.0: خلاصه تخصیصات نماینده با قابلیت‌های پیشرفته
    */
   static async getAllocationSummary(representativeId: number): Promise<AllocationSummary> {
-    console.log(`📊 SHERLOCK v34.1: Getting allocation summary for representative ${representativeId}`);
+    console.log(`📊 SHERLOCK v35.0: Getting enhanced allocation summary for representative ${representativeId}`);
     
     const [allocatedPayments] = await db.select({
       totalAllocated: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
@@ -943,6 +943,138 @@ export class EnhancedPaymentAllocationEngine {
       totalUnallocated: allocatedPayments.totalUnallocated || 0,
       allocationHistory: [], // In production, fetch from allocation history table
       lastAllocationDate: allocatedPayments.lastAllocationDate
+    };
+  }
+
+  /**
+   * 🎯 SHERLOCK v35.0: تخصیص دسته‌ای پرداخت‌ها
+   */
+  static async batchAllocatePayments(
+    representativeId: number,
+    options: {
+      maxPayments?: number;
+      priorityMethod?: 'AMOUNT_DESC' | 'DATE_ASC' | 'FIFO';
+      strictMode?: boolean;
+    } = {}
+  ): Promise<{
+    success: boolean;
+    processedPayments: number;
+    totalAllocated: number;
+    errors: string[];
+    details: AllocationResult[];
+  }> {
+    const startTime = performance.now();
+    console.log(`🚀 SHERLOCK v35.0: Starting batch allocation for representative ${representativeId}`);
+    
+    try {
+      // Get unallocated payments for this representative
+      const unallocatedPayments = await db.select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.representativeId, representativeId),
+            eq(payments.isAllocated, false)
+          )
+        )
+        .limit(options.maxPayments || 50);
+
+      const results: AllocationResult[] = [];
+      let totalProcessed = 0;
+      let totalAllocatedAmount = 0;
+      const errors: string[] = [];
+
+      for (const payment of unallocatedPayments) {
+        try {
+          const allocationResult = await this.autoAllocatePayment(payment.id, {
+            method: 'FIFO',
+            allowPartialAllocation: true,
+            allowOverAllocation: false,
+            priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
+            strictValidation: options.strictMode || true,
+            auditMode: true
+          });
+
+          results.push(allocationResult);
+          totalProcessed++;
+          
+          if (allocationResult.success) {
+            totalAllocatedAmount += allocationResult.allocatedAmount;
+          } else {
+            errors.push(...allocationResult.errors);
+          }
+        } catch (error) {
+          errors.push(`Payment ${payment.id}: ${error.message}`);
+        }
+      }
+
+      const processingTime = performance.now() - startTime;
+      console.log(`✅ SHERLOCK v35.0: Batch allocation completed in ${Math.round(processingTime)}ms`);
+
+      return {
+        success: errors.length === 0,
+        processedPayments: totalProcessed,
+        totalAllocated: totalAllocatedAmount,
+        errors,
+        details: results
+      };
+    } catch (error) {
+      console.error('❌ SHERLOCK v35.0: Batch allocation failed:', error);
+      return {
+        success: false,
+        processedPayments: 0,
+        totalAllocated: 0,
+        errors: [error.message],
+        details: []
+      };
+    }
+  }
+
+  /**
+   * 🔍 SHERLOCK v35.0: تحلیل و گزارش تخصیص
+   */
+  static async generateAllocationReport(representativeId: number): Promise<{
+    summary: AllocationSummary;
+    recommendations: string[];
+    potentialIssues: string[];
+    optimizationSuggestions: string[];
+  }> {
+    console.log(`📊 SHERLOCK v35.0: Generating allocation report for representative ${representativeId}`);
+    
+    const summary = await this.getAllocationSummary(representativeId);
+    const recommendations: string[] = [];
+    const potentialIssues: string[] = [];
+    const optimizationSuggestions: string[] = [];
+
+    // Analyze allocation patterns
+    if (summary.totalUnallocated > 0) {
+      recommendations.push(`${summary.totalUnallocated} تومان پرداخت تخصیص نیافته وجود دارد`);
+      optimizationSuggestions.push('استفاده از تخصیص خودکار دسته‌ای');
+    }
+
+    if (summary.totalAllocated > summary.totalUnallocated * 10) {
+      recommendations.push('عملکرد تخصیص بسیار مناسب است');
+    }
+
+    // Check for potential issues
+    const recentAllocations = await db.select()
+      .from(payments)
+      .where(
+        and(
+          eq(payments.representativeId, representativeId),
+          eq(payments.isAllocated, true),
+          sql`created_at > NOW() - INTERVAL '7 days'`
+        )
+      );
+
+    if (recentAllocations.length === 0) {
+      potentialIssues.push('هیچ تخصیص جدیدی در هفته گذشته انجام نشده');
+    }
+
+    return {
+      summary,
+      recommendations,
+      potentialIssues,
+      optimizationSuggestions
     };
   }
 }

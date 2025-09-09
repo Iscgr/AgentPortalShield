@@ -207,4 +207,120 @@ paymentManagementRouter.get('/allocation-summary/:representativeId', async (req,
   }
 });
 
+// SHERLOCK v35.0: Batch allocation endpoint
+paymentManagementRouter.post('/batch-allocate/:representativeId', async (req, res) => {
+  try {
+    const representativeId = parseInt(req.params.representativeId);
+    const { maxPayments, priorityMethod, strictMode } = req.body;
+    
+    console.log(`🚀 SHERLOCK v35.0: Batch allocation request for representative ${representativeId}`);
+    
+    const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
+    
+    const result = await EnhancedPaymentAllocationEngine.batchAllocatePayments(
+      representativeId,
+      {
+        maxPayments: maxPayments || 50,
+        priorityMethod: priorityMethod || 'FIFO',
+        strictMode: strictMode !== false
+      }
+    );
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: `تخصیص دسته‌ای کامل شد - ${result.processedPayments} پرداخت پردازش شد`,
+        data: {
+          processedPayments: result.processedPayments,
+          totalAllocated: result.totalAllocated,
+          details: result.details
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: 'تخصیص دسته‌ای ناموفق',
+        details: result.errors
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Batch allocation error:', error);
+    res.status(500).json({ error: "خطا در تخصیص دسته‌ای" });
+  }
+});
+
+// SHERLOCK v35.0: Allocation report endpoint
+paymentManagementRouter.get('/allocation-report/:representativeId', async (req, res) => {
+  try {
+    const representativeId = parseInt(req.params.representativeId);
+    
+    console.log(`📊 SHERLOCK v35.0: Generating allocation report for representative ${representativeId}`);
+    
+    const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
+    
+    const report = await EnhancedPaymentAllocationEngine.generateAllocationReport(representativeId);
+    
+    res.json({
+      success: true,
+      data: report
+    });
+    
+  } catch (error) {
+    console.error('❌ Allocation report error:', error);
+    res.status(500).json({ error: "خطا در تولید گزارش تخصیص" });
+  }
+});
+
+// SHERLOCK v35.0: Smart allocation recommendation endpoint
+paymentManagementRouter.get('/smart-recommendations/:representativeId', async (req, res) => {
+  try {
+    const representativeId = parseInt(req.params.representativeId);
+    
+    console.log(`🧠 SHERLOCK v35.0: Generating smart recommendations for representative ${representativeId}`);
+    
+    // Get current allocation status
+    const unallocatedPayments = await storage.getUnallocatedPayments(representativeId);
+    const summary = await storage.getPaymentAllocationSummary(representativeId);
+    
+    const recommendations = [];
+    const priorities = [];
+    
+    if (unallocatedPayments.length > 0) {
+      recommendations.push({
+        type: 'AUTO_ALLOCATE',
+        priority: 'HIGH',
+        description: `${unallocatedPayments.length} پرداخت تخصیص نیافته برای تخصیص خودکار`,
+        action: 'batch-allocate',
+        estimatedBenefit: `تخصیص ${unallocatedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)} تومان`
+      });
+    }
+    
+    if (parseFloat(summary.totalUnallocatedAmount) > 1000000) {
+      priorities.push({
+        type: 'URGENT',
+        message: 'مبلغ بالای پرداخت‌های تخصیص نیافته نیاز به توجه فوری دارد'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        recommendations,
+        priorities,
+        summary,
+        nextActions: [
+          'بررسی پرداخت‌های تخصیص نیافته',
+          'اجرای تخصیص خودکار دسته‌ای',
+          'تولید گزارش کامل تخصیص'
+        ]
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Smart recommendations error:', error);
+    res.status(500).json({ error: "خطا در تولید پیشنهادات هوشمند" });
+  }
+});
+
 export default paymentManagementRouter;
