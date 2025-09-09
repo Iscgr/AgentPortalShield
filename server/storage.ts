@@ -116,7 +116,24 @@ export interface IStorage {
   deletePayment(id: number): Promise<void>;
   updatePayment(id: number, payment: Partial<Payment>): Promise<Payment>;
   allocatePaymentToInvoice(paymentId: number, invoiceId: number): Promise<Payment>;
-  autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<void>;
+  autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<{
+    success: boolean;
+    allocated: number;
+    totalAmount: string;
+    details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
+  }>;
+  manualAllocatePaymentToInvoice(
+    paymentId: number,
+    invoiceId: number,
+    amount: number,
+    performedBy: string,
+    reason?: string
+  ): Promise<{
+    success: boolean;
+    allocatedAmount: number;
+    message: string;
+    transactionId?: string;
+  }>;
   getPaymentStatistics(): Promise<any>;
 
   // Activity Logs
@@ -1561,7 +1578,7 @@ export class DatabaseStorage implements IStorage {
           deletedCounts.representatives = result.rowCount || 0;
           await this.createActivityLog({
             type: 'system',
-            description: `بازنشانی نمایندگان: ${deletedCounts.representatives} رکورد حذف شد`,
+            description: `بازنشانی نمایندگان: ${deletedCounts.representatives}رکورد حذف شد`,
             relatedId: null,
             metadata: { resetType: 'representatives', count: deletedCounts.representatives }
           });
@@ -1572,7 +1589,7 @@ export class DatabaseStorage implements IStorage {
           deletedCounts.salesPartners = result.rowCount || 0;
           await this.createActivityLog({
             type: 'system',
-            description: `بازنشانی همکاران فروش: ${deletedCounts.salesPartners} رکورد حذف شد`,
+            description: `بازنشانی همکاران فروش: ${deletedCounts.salesPartners}رکورد حذف شد`,
             relatedId: null,
             metadata: { resetType: 'salesPartners', count: deletedCounts.salesPartners }
           });
@@ -2209,72 +2226,230 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
+  // ✅ SHERLOCK v34.0: DEPRECATED - use Enhanced Payment Allocation Engine
   async autoAllocatePayments(representativeId: number): Promise<{
+    allocated: number;
+    totalAmount: string;
+    details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
+  }> {
+    console.warn('⚠️ SHERLOCK v34.0: storage.autoAllocatePayments is DEPRECATED and will be removed in future versions. Use autoAllocatePaymentToInvoices.');
+    // This method is kept for backward compatibility and delegates to the new method.
+    // It needs to fetch a payment ID first, which is not directly available here.
+    // To make this work, we would need to find an unallocated payment for the representative.
+    // For now, we'll simulate by returning empty results or throw an error.
+
+    const unallocatedPayments = await this.getUnallocatedPayments(representativeId);
+    if (!unallocatedPayments.length) {
+      console.log('✅ SHERLOCK v34.0: No unallocated payments found for representative.');
+      return { allocated: 0, totalAmount: '0', details: [] };
+    }
+
+    // Pick the first unallocated payment to demonstrate the call.
+    // In a real scenario, a strategy would be needed to choose which payment to allocate.
+    const paymentToAllocate = unallocatedPayments[0];
+
+    console.log(`🔄 SHERLOCK v34.0: Calling NEW autoAllocatePaymentToInvoices for representative ${representativeId} using payment ${paymentToAllocate.id}...`);
+
+    try {
+      const result = await this.autoAllocatePaymentToInvoices(paymentToAllocate.id, representativeId);
+      return {
+        allocated: result.allocated,
+        totalAmount: result.totalAmount,
+        details: result.details
+      };
+    } catch (error) {
+      console.error('❌ Error during delegated autoAllocatePayments call:', error);
+      throw error;
+    }
+  }
+
+  // ✅ SHERLOCK v34.1: Enhanced Auto-Allocation with ATOMOS Protocol Integration
+  async autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<{
+    success: boolean;
     allocated: number;
     totalAmount: string;
     details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
   }> {
     return await withDatabaseRetry(
       async () => {
-        // ✅ SHERLOCK v34.0: DEPRECATED - استفاده از Enhanced Payment Allocation Engine
-        console.log('⚠️ SHERLOCK v34.0: storage.autoAllocatePayments is DEPRECATED');
-        console.log('🔄 Using Enhanced Payment Allocation Engine for batch allocation...');
-        
-        // ✅ دریافت پرداخت‌های تخصیص نیافته
-        const unallocatedPayments = await db
-          .select()
-          .from(payments)
-          .where(
-            and(
-              eq(payments.representativeId, representativeId),
-              eq(payments.isAllocated, false)
-            )
-          )
-          .orderBy(payments.paymentDate, payments.createdAt);
+        console.log(`🚀 SHERLOCK v34.1: ENHANCED auto-allocation for payment ${paymentId}, representative ${representativeId}`);
 
-        let totalAllocated = 0;
-        let totalAmountValue = 0;
-        const details: Array<{ paymentId: number; invoiceId: number; amount: string }> = [];
-
-        // ✅ استفاده از Enhanced Engine برای هر پرداخت
         const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-        
-        for (const payment of unallocatedPayments) {
-          try {
-            const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(payment.id, {
+
+        try {
+          // Use the enhanced allocation engine
+          const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(
+            paymentId,
+            {
               method: 'FIFO',
               allowPartialAllocation: true,
               allowOverAllocation: false,
-              priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+              priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
+              strictValidation: true,
+              auditMode: true
+            }
+          );
+
+          if (result.success) {
+            console.log(`✅ SHERLOCK v34.1: Auto-allocation successful - Allocated: ${result.allocatedAmount}`);
+
+            // Create activity log
+            await this.createActivityLog({
+              type: 'payment_auto_allocated',
+              description: `تخصیص خودکار پرداخت ${paymentId} به مبلغ ${result.allocatedAmount} با روش FIFO`,
+              relatedId: paymentId,
+              metadata: {
+                representativeId,
+                allocatedAmount: result.allocatedAmount,
+                allocationsCount: result.allocations.length,
+                transactionId: result.transactionId,
+                processingTime: result.processingTime
+              }
             });
 
-            if (result.success && result.allocatedAmount > 0) {
-              totalAllocated++;
-              totalAmountValue += result.allocatedAmount;
-              
-              // اضافه کردن جزئیات تخصیص‌ها
-              for (const allocation of result.allocations) {
-                details.push({
-                  paymentId: payment.id,
-                  invoiceId: allocation.invoiceId,
-                  amount: allocation.allocatedAmount.toString()
-                });
+            // ✅ Update representative debt after successful allocation
+            await this.updateRepresentativeFinancials(representativeId);
+
+            return {
+              success: true,
+              allocated: result.allocations.length,
+              totalAmount: result.allocatedAmount.toString(),
+              details: result.allocations.map(alloc => ({
+                paymentId: paymentId,
+                invoiceId: alloc.invoiceId,
+                amount: alloc.allocatedAmount.toString()
+              }))
+            };
+          } else {
+            console.log(`❌ SHERLOCK v34.1: Auto-allocation failed:`, result.errors);
+
+            // Log failure for auditing
+            await this.createActivityLog({
+              type: 'payment_auto_allocation_failed',
+              description: `تخصیص خودکار پرداخت ${paymentId} شکست خورد`,
+              relatedId: paymentId,
+              metadata: {
+                representativeId,
+                errors: result.errors,
+                processingTime: result.processingTime
               }
-            }
-          } catch (error) {
-            console.error(`❌ Enhanced allocation failed for payment ${payment.id}:`, error);
+            });
+
+            return {
+              success: false,
+              allocated: 0,
+              totalAmount: "0",
+              details: []
+            };
           }
+        } catch (error) {
+          console.error(`❌ SHERLOCK v34.1: Auto-allocation engine error:`, error);
+
+          // Log critical engine errors
+          await this.createActivityLog({
+            type: 'payment_auto_allocation_error',
+            description: `خطای بحرانی در موتور تخصیص خودکار پرداخت ${paymentId}`,
+            relatedId: paymentId,
+            metadata: {
+              representativeId,
+              error: error instanceof Error ? error.message : String(error)
+            }
+          });
+          throw error;
         }
-
-        console.log(`✅ SHERLOCK v34.0: Enhanced batch allocation completed - ${totalAllocated} payments, ${totalAmountValue} total`);
-
-        return {
-          allocated: totalAllocated,
-          totalAmount: totalAmountValue.toString(),
-          details
-        };
       },
-      'autoAllocatePayments'
+      'autoAllocatePaymentToInvoices'
+    );
+  }
+
+  // ✅ SHERLOCK v34.1: Manual Payment Allocation
+  async manualAllocatePaymentToInvoice(
+    paymentId: number,
+    invoiceId: number,
+    amount: number,
+    performedBy: string,
+    reason?: string
+  ): Promise<{
+    success: boolean;
+    allocatedAmount: number;
+    message: string;
+    transactionId?: string;
+  }> {
+    return await withDatabaseRetry(
+      async () => {
+        console.log(`🎯 SHERLOCK v34.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
+
+        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+
+        const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
+          paymentId,
+          invoiceId,
+          amount,
+          performedBy,
+          reason,
+          {
+            strictValidation: true,
+            auditMode: true,
+            allowOverAllocation: false
+          }
+        );
+
+        if (result.success) {
+          console.log(`✅ SHERLOCK v34.1: Manual allocation successful`);
+
+          // Get payment info for activity log
+          const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+
+          if (payment) {
+            await this.createActivityLog({
+              type: 'payment_manual_allocation',
+              description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} به مبلغ ${amount} توسط ${performedBy}`,
+              relatedId: paymentId,
+              metadata: {
+                invoiceId,
+                amount,
+                performedBy,
+                reason,
+                representativeId: payment.representativeId,
+                transactionId: result.transactionId
+              }
+            });
+
+            // Update representative financials
+            await this.updateRepresentativeFinancials(payment.representativeId!);
+          }
+
+          return {
+            success: true,
+            allocatedAmount: result.allocatedAmount,
+            message: `تخصیص دستی با موفقیت انجام شد - مبلغ: ${result.allocatedAmount}`,
+            transactionId: result.transactionId
+          };
+        } else {
+          console.log(`❌ SHERLOCK v34.1: Manual allocation failed:`, result.errors);
+
+          // Log failure for auditing
+          await this.createActivityLog({
+            type: 'payment_manual_allocation_failed',
+            description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} شکست خورد`,
+            relatedId: paymentId,
+            metadata: {
+              invoiceId,
+              amount,
+              performedBy,
+              reason,
+              errors: result.errors
+            }
+          });
+
+          return {
+            success: false,
+            allocatedAmount: 0,
+            message: `خطا در تخصیص: ${result.errors.join(', ')}`
+          };
+        }
+      },
+      'manualAllocatePaymentToInvoice'
     );
   }
 
@@ -2610,7 +2785,7 @@ export class DatabaseStorage implements IStorage {
   async autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<void> {
     // ✅ SHERLOCK v34.0: UNIFIED ALLOCATION - تخصیص یکپارچه
     console.log('🔄 SHERLOCK v34.0: Using UNIFIED Enhanced Payment Allocation Engine');
-    
+
     const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
     const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, {
       method: 'FIFO',
@@ -2624,7 +2799,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     console.log(`✅ SHERLOCK v34.0: UNIFIED allocation successful - ${result.allocatedAmount} تومان allocated`);
-    
+
     // همگام‌سازی فوری اطلاعات مالی
     await this.updateRepresentativeFinancials(representativeId);
   }

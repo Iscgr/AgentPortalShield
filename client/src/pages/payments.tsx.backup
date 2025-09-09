@@ -1,19 +1,22 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircle, CheckCircle, CreditCard, DollarSign, TrendingUp, RefreshCw, Plus, Eye, FileText, Calendar, Search } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
-import { Skeleton } from "@/components/ui/skeleton";
+/**
+ * SHERLOCK v34.1: COMPREHENSIVE PAYMENT ALLOCATION MANAGEMENT
+ * ATOMOS COMPLIANT - Complete payment allocation interface with manual and auto features
+ */
+
+import React, { useState, useEffect } from 'react';
+import axios from '../lib/axios';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Textarea } from '../components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Label } from '../components/ui/label';
+import { Separator } from '../components/ui/separator';
+import { CheckCircle, XCircle, Clock, AlertTriangle, Zap, Target, DollarSign } from 'lucide-react';
 
 interface Payment {
   id: number;
@@ -21,644 +24,558 @@ interface Payment {
   invoiceId?: number;
   amount: string;
   paymentDate: string;
-  description: string;
+  description?: string;
   isAllocated: boolean;
   createdAt: string;
-  representativeName?: string;
-  representativeCode?: string;
-  invoiceNumber?: string;
 }
 
 interface Invoice {
   id: number;
   invoiceNumber: string;
+  representativeId: number;
   amount: string;
   issueDate: string;
-  dueDate: string;
+  dueDate?: string;
   status: string;
+  createdAt: string;
 }
 
 interface Representative {
   id: number;
-  code: string;
   name: string;
+  code: string;
   totalDebt: string;
-  totalSales: string;
 }
 
-interface AllocationSummary {
-  totalPayments: number;
-  allocatedPayments: number;
-  unallocatedPayments: number;
-  totalPaidAmount: string;
-  totalUnallocatedAmount: string;
+interface AllocationResult {
+  success: boolean;
+  allocatedAmount: number;
+  remainingAmount: number;
+  allocations: any[];
+  errors: string[];
+  warnings: string[];
+  transactionId: string;
+  processingTime: number;
 }
 
-export default function UnifiedPayments() {
-  const [activeTab, setActiveTab] = useState("payments");
-  const [selectedRepresentative, setSelectedRepresentative] = useState<string>("");
-  const [newPayment, setNewPayment] = useState({
-    representativeId: "",
-    amount: "",
-    paymentDate: "",
-    description: ""
-  });
-  const [autoAllocateTarget, setAutoAllocateTarget] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState("");
-  
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+const PaymentManagement: React.FC = () => {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [unallocatedPayments, setUnallocatedPayments] = useState<Payment[]>([]);
+  const [representatives, setRepresentatives] = useState<Representative[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedRepresentative, setSelectedRepresentative] = useState<number | null>(null);
+  const [autoAllocationResults, setAutoAllocationResults] = useState<any>(null);
+  const [manualAllocationDialog, setManualAllocationDialog] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
-  // Fetch representatives
-  const { data: representatives = [] } = useQuery<Representative[]>({
-    queryKey: ["/api/representatives"],
-    select: (data: any) => {
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.data)) return data.data;
-      return [];
+  // Manual allocation form states
+  const [manualForm, setManualForm] = useState({
+    paymentId: '',
+    invoiceId: '',
+    amount: '',
+    reason: ''
+  });
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedRepresentative) {
+      loadRepresentativeData(selectedRepresentative);
     }
-  });
+  }, [selectedRepresentative]);
 
-  // Fetch all payments with representative details
-  const { data: allPayments = [], isLoading: paymentsLoading, refetch: refetchPayments } = useQuery<Payment[]>({
-    queryKey: ["/api/payments"],
-    select: (data: any) => {
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.data)) return data.data;
-      return [];
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      const [paymentsRes, repsRes] = await Promise.all([
+        axios.get('/api/payments'),
+        axios.get('/api/representatives')
+      ]);
+
+      setPayments(paymentsRes.data.data || []);
+      setRepresentatives(repsRes.data.data || []);
+
+    } catch (error) {
+      console.error('❌ خطا در بارگذاری داده‌های اولیه:', error);
     }
-  });
+    setLoading(false);
+  };
 
-  // Fetch unallocated payments for management
-  const { data: unallocatedPayments = [], refetch: refetchUnallocated } = useQuery<Payment[]>({
-    queryKey: ["/api/payments/unallocated"],
-    select: (data: any) => {
-      if (Array.isArray(data)) return data;
-      return [];
+  const loadRepresentativeData = async (representativeId: number) => {
+    try {
+      const [unallocatedRes, invoicesRes] = await Promise.all([
+        axios.get(`/api/payments/unallocated/${representativeId}`),
+        axios.get(`/api/invoices/representative/${representativeId}`)
+      ]);
+
+      setUnallocatedPayments(unallocatedRes.data.data || []);
+      setInvoices(invoicesRes.data.invoices || []);
+
+    } catch (error) {
+      console.error('❌ خطا در بارگذاری داده‌های نماینده:', error);
     }
-  });
+  };
 
-  // Fetch unpaid invoices for selected representative
-  const { data: unpaidInvoices = [] } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices/unpaid", selectedRepresentative],
-    enabled: !!selectedRepresentative,
-    select: (data: any) => {
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.data)) return data.data;
-      return [];
+  const handleAutoAllocation = async () => {
+    if (!selectedRepresentative) {
+      alert('لطفاً ابتدا یک نماینده انتخاب کنید');
+      return;
     }
-  });
 
-  // Fetch allocation summary for selected representative
-  const { data: allocationSummary, refetch: refetchSummary } = useQuery<AllocationSummary>({
-    queryKey: ["/api/payments/allocation-summary", selectedRepresentative],
-    enabled: !!selectedRepresentative,
-    select: (data: any) => {
-      return data || {
-        totalPayments: 0,
-        allocatedPayments: 0,
-        unallocatedPayments: 0,
-        totalPaidAmount: "0",
-        totalUnallocatedAmount: "0"
-      };
-    }
-  });
+    setLoading(true);
+    try {
+      console.log(`🚀 SHERLOCK v34.1: Starting auto-allocation for representative ${selectedRepresentative}`);
 
-  // Create payment mutation
-  const createPaymentMutation = useMutation({
-    mutationFn: async (paymentData: any) => {
-      const response = await apiRequest('/api/payments', {
-        method: 'POST',
-        data: paymentData
+      const response = await axios.post(`/api/payments/auto-allocate/${selectedRepresentative}`, {
+        rules: {
+          method: 'FIFO',
+          allowPartialAllocation: true,
+          allowOverAllocation: false,
+          priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
+          strictValidation: true,
+          auditMode: true
+        }
       });
-      return response;
-    },
-    onSuccess: () => {
-      toast({
-        title: "پرداخت ثبت شد",
-        description: "پرداخت جدید با موفقیت ثبت و تخصیص یافت",
-      });
-      setNewPayment({
-        representativeId: "",
-        amount: "",
-        paymentDate: "",
-        description: ""
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
-      refetchPayments();
-      refetchUnallocated();
-      refetchSummary();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "خطا در ثبت پرداخت",
-        description: error.message || "عملیات ناموفق بود",
-        variant: "destructive"
-      });
-    }
-  });
 
-  // Auto-allocate mutation
-  const autoAllocateMutation = useMutation({
-    mutationFn: async (representativeId: string) => {
-      const response = await fetch(`/api/payments/auto-allocate/${representativeId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "خطا در تخصیص خودکار");
+      if (response.data.success) {
+        setAutoAllocationResults(response.data);
+        console.log(`✅ Auto-allocation completed:`, response.data.summary);
+
+        // Reload data
+        await loadRepresentativeData(selectedRepresentative);
+        await loadInitialData();
+
+      } else {
+        console.error('❌ Auto-allocation failed:', response.data);
+        alert('خطا در تخصیص خودکار: ' + (response.data.error || 'خطای نامشخص'));
       }
-      
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "تخصیص خودکار انجام شد",
-        description: `${data.allocatedCount} پرداخت به فاکتورها تخصیص یافت`,
-      });
-      refetchPayments();
-      refetchUnallocated();
-      refetchSummary();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "خطا در تخصیص خودکار",
-        description: error.message,
-        variant: "destructive"
-      });
+    } catch (error) {
+      console.error('❌ Auto-allocation error:', error);
+      alert('خطا در تخصیص خودکار');
     }
-  });
+    setLoading(false);
+  };
 
-  const handleCreatePayment = () => {
-    if (!newPayment.representativeId || !newPayment.amount) {
-      toast({
-        title: "اطلاعات ناقص",
-        description: "لطفاً نماینده و مبلغ را وارد کنید",
-        variant: "destructive"
-      });
+  const handleManualAllocation = async () => {
+    if (!manualForm.paymentId || !manualForm.invoiceId || !manualForm.amount) {
+      alert('لطفاً تمام فیلدهای لازم را پر کنید');
       return;
     }
 
-    createPaymentMutation.mutate({
-      representativeId: parseInt(newPayment.representativeId),
-      amount: newPayment.amount,
-      paymentDate: newPayment.paymentDate || new Date().toISOString().split('T')[0],
-      description: newPayment.description
+    setLoading(true);
+    try {
+      console.log(`🎯 SHERLOCK v34.1: Manual allocation:`, manualForm);
+
+      const response = await axios.post('/api/payments/manual-allocate', {
+        paymentId: parseInt(manualForm.paymentId),
+        invoiceId: parseInt(manualForm.invoiceId),
+        amount: parseFloat(manualForm.amount),
+        reason: manualForm.reason || 'تخصیص دستی'
+      });
+
+      if (response.data.success) {
+        console.log(`✅ Manual allocation successful:`, response.data.data);
+        alert('تخصیص دستی با موفقیت انجام شد');
+
+        // Reset form and close dialog
+        setManualForm({ paymentId: '', invoiceId: '', amount: '', reason: '' });
+        setManualAllocationDialog(false);
+        setSelectedPayment(null);
+
+        // Reload data
+        if (selectedRepresentative) {
+          await loadRepresentativeData(selectedRepresentative);
+        }
+        await loadInitialData();
+
+      } else {
+        console.error('❌ Manual allocation failed:', response.data);
+        alert('خطا در تخصیص دستی: ' + (response.data.error || 'خطای نامشخص'));
+      }
+    } catch (error) {
+      console.error('❌ Manual allocation error:', error);
+      alert('خطا در تخصیص دستی');
+    }
+    setLoading(false);
+  };
+
+  const openManualAllocationDialog = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setManualForm({
+      paymentId: payment.id.toString(),
+      invoiceId: '',
+      amount: payment.amount,
+      reason: ''
     });
+    setManualAllocationDialog(true);
   };
 
-  const handleAutoAllocate = () => {
-    if (!autoAllocateTarget) {
-      toast({
-        title: "نماینده انتخاب نشده",
-        description: "لطفاً نماینده مورد نظر را انتخاب کنید",
-        variant: "destructive"
-      });
-      return;
-    }
-    autoAllocateMutation.mutate(autoAllocateTarget);
-  };
-
-  const filteredPayments = allPayments.filter(payment => {
-    const matchesSearch = 
-      payment.representativeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.representativeCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
-
-  const getPaymentStatusBadge = (isAllocated: boolean) => {
+  const getStatusBadge = (isAllocated: boolean) => {
     return isAllocated ? (
-      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-        <CheckCircle className="w-3 h-3 ml-1" />
+      <Badge variant="default" className="bg-green-500">
+        <CheckCircle className="w-4 h-4 mr-1" />
         تخصیص یافته
       </Badge>
     ) : (
-      <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-        <AlertCircle className="w-3 h-3 ml-1" />
-        در انتظار تخصیص
+      <Badge variant="secondary">
+        <Clock className="w-4 h-4 mr-1" />
+        تخصیص نیافته
       </Badge>
     );
   };
 
-  if (paymentsLoading) {
+  const formatCurrency = (amount: string | number) => {
+    return new Intl.NumberFormat('fa-IR').format(Number(amount)) + ' تومان';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fa-IR');
+  };
+
+  if (loading && payments.length === 0) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-        <Skeleton className="h-96" />
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg">در حال بارگذاری...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            مدیریت پرداخت‌ها
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            ثبت، مدیریت و تخصیص پرداخت‌های نمایندگان
-          </p>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">
+          🎯 مدیریت تخصیص پرداخت‌ها
+        </h1>
+        <div className="text-sm text-gray-500">
+          SHERLOCK v34.1 - ATOMOS Protocol
         </div>
-        <Button 
-          onClick={() => setActiveTab("new-payment")}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          <Plus className="w-4 h-4 ml-2" />
-          پرداخت جدید
-        </Button>
       </div>
 
-      {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="payments">فهرست پرداخت‌ها</TabsTrigger>
-          <TabsTrigger value="new-payment">پرداخت جدید</TabsTrigger>
-          <TabsTrigger value="management">مدیریت تخصیص</TabsTrigger>
-          <TabsTrigger value="reports">گزارشات</TabsTrigger>
+      {/* Representative Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Target className="w-5 h-5 mr-2" />
+            انتخاب نماینده
+          </CardTitle>
+          <CardDescription>
+            برای شروع فرآیند تخصیص، ابتدا نماینده مورد نظر را انتخاب کنید
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div>
+              <Label htmlFor="representative-select">نماینده</Label>
+              <Select 
+                value={selectedRepresentative?.toString() || ''} 
+                onValueChange={(value) => setSelectedRepresentative(parseInt(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="نماینده را انتخاب کنید..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {representatives.map(rep => (
+                    <SelectItem key={rep.id} value={rep.id.toString()}>
+                      {rep.name} ({rep.code}) - بدهی: {formatCurrency(rep.totalDebt)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Button 
+                onClick={handleAutoAllocation} 
+                disabled={!selectedRepresentative || loading}
+                className="w-full"
+                size="lg"
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                تخصیص خودکار (FIFO)
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Auto-allocation Results */}
+      {autoAllocationResults && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              {autoAllocationResults.success ? (
+                <CheckCircle className="w-5 h-5 mr-2 text-green-500" />
+              ) : (
+                <XCircle className="w-5 h-5 mr-2 text-red-500" />
+              )}
+              نتایج تخصیص خودکار
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {autoAllocationResults.summary?.totalProcessed || 0}
+                </div>
+                <div className="text-sm text-gray-500">پرداخت پردازش شده</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {formatCurrency(autoAllocationResults.summary?.totalAllocated || 0)}
+                </div>
+                <div className="text-sm text-gray-500">مبلغ تخصیص یافته</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">
+                  {autoAllocationResults.summary?.totalErrors || 0}
+                </div>
+                <div className="text-sm text-gray-500">خطا</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {Math.round(autoAllocationResults.summary?.processingTime || 0)}ms
+                </div>
+                <div className="text-sm text-gray-500">زمان پردازش</div>
+              </div>
+            </div>
+
+            {autoAllocationResults.results && autoAllocationResults.results.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2">جزئیات تخصیص:</h4>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {autoAllocationResults.results.map((result: any, index: number) => (
+                    <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                      <span>پرداخت {result.paymentId}</span>
+                      {result.success ? (
+                        <div className="text-green-600">
+                          ✅ {formatCurrency(result.allocatedAmount)} تخصیص یافت
+                        </div>
+                      ) : (
+                        <div className="text-red-600">
+                          ❌ {result.errors?.[0] || 'خطا در تخصیص'}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs defaultValue="unallocated" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="unallocated">پرداخت‌های تخصیص نیافته</TabsTrigger>
+          <TabsTrigger value="allocated">پرداخت‌های تخصیص یافته</TabsTrigger>
+          <TabsTrigger value="invoices">فاکتورهای قابل تخصیص</TabsTrigger>
         </TabsList>
 
-        {/* Payments List Tab */}
-        <TabsContent value="payments" className="space-y-4">
+        <TabsContent value="unallocated" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <CardTitle>فهرست کلیه پرداخت‌ها</CardTitle>
-                <div className="relative w-full lg:w-80">
-                  <Search className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="جستجو پرداخت..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pr-10"
-                  />
-                </div>
-              </div>
+              <CardTitle>پرداخت‌های تخصیص نیافته</CardTitle>
+              <CardDescription>
+                {selectedRepresentative 
+                  ? `${unallocatedPayments.length} پرداخت تخصیص نیافته برای نماینده انتخاب شده`
+                  : 'لطفاً ابتدا یک نماینده انتخاب کنید'
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>تاریخ</TableHead>
-                      <TableHead>نماینده</TableHead>
-                      <TableHead>مبلغ</TableHead>
-                      <TableHead>وضعیت</TableHead>
-                      <TableHead>فاکتور</TableHead>
-                      <TableHead>توضیحات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPayments.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-mono text-sm">
-                          {payment.paymentDate}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{payment.representativeName}</div>
-                            <div className="text-sm text-gray-500 font-mono">{payment.representativeCode}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono font-semibold">
-                          {formatCurrency(parseFloat(payment.amount))}
-                        </TableCell>
-                        <TableCell>
-                          {getPaymentStatusBadge(payment.isAllocated)}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {payment.invoiceNumber || '-'}
-                        </TableCell>
-                        <TableCell className="max-w-40 truncate">
-                          {payment.description || '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* New Payment Tab */}
-        <TabsContent value="new-payment" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>ثبت پرداخت جدید</CardTitle>
-                <CardDescription>
-                  پرداخت جدید ثبت شده به طور خودکار به قدیمی‌ترین فاکتورهای نماینده تخصیص می‌یابد
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="representative">نماینده</Label>
-                  <Select 
-                    value={newPayment.representativeId} 
-                    onValueChange={(value) => {
-                      setNewPayment(prev => ({ ...prev, representativeId: value }));
-                      setSelectedRepresentative(value);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب نماینده" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {representatives.map((rep) => (
-                        <SelectItem key={rep.id} value={rep.id.toString()}>
-                          {rep.name} ({rep.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="amount">مبلغ (ریال)</Label>
-                  <Input
-                    type="number"
-                    value={newPayment.amount}
-                    onChange={(e) => setNewPayment(prev => ({ ...prev, amount: e.target.value }))}
-                    placeholder="مبلغ پرداخت"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="paymentDate">تاریخ پرداخت</Label>
-                  <Input
-                    type="date"
-                    value={newPayment.paymentDate}
-                    onChange={(e) => setNewPayment(prev => ({ ...prev, paymentDate: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">توضیحات</Label>
-                  <Input
-                    value={newPayment.description}
-                    onChange={(e) => setNewPayment(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="توضیحات اختیاری"
-                  />
-                </div>
-
-                <Button 
-                  onClick={handleCreatePayment} 
-                  disabled={createPaymentMutation.isPending}
-                  className="w-full"
-                >
-                  {createPaymentMutation.isPending ? (
-                    <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
-                  ) : (
-                    <CreditCard className="w-4 h-4 ml-2" />
-                  )}
-                  ثبت پرداخت
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Unpaid Invoices for Selected Representative */}
-            {selectedRepresentative && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>فاکتورهای پرداخت نشده</CardTitle>
-                  <CardDescription>
-                    فاکتورهای نماینده انتخاب شده که هنوز پرداخت نشده‌اند
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-80 overflow-y-auto">
-                    {unpaidInvoices.length > 0 ? (
-                      unpaidInvoices.map((invoice) => (
-                        <div key={invoice.id} className="p-3 border rounded-lg">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <div className="font-mono text-sm">{invoice.invoiceNumber}</div>
-                              <div className="text-xs text-gray-500">
-                                صادره: {invoice.issueDate}
-                              </div>
-                            </div>
-                            <div className="text-left">
-                              <div className="font-semibold">
-                                {formatCurrency(parseFloat(invoice.amount))}
-                              </div>
-                              <Badge variant="destructive" className="text-xs">
-                                {invoice.status}
-                              </Badge>
-                            </div>
+              {selectedRepresentative ? (
+                <div className="space-y-4">
+                  {unallocatedPayments.length > 0 ? (
+                    unallocatedPayments.map(payment => (
+                      <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg">
+                        <div>
+                          <div className="font-medium">پرداخت #{payment.id}</div>
+                          <div className="text-sm text-gray-500">
+                            {formatDate(payment.paymentDate)} - {payment.description || 'بدون توضیح'}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center text-gray-500 py-8">
-                        فاکتور پرداخت نشده‌ای وجود ندارد
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Management Tab */}
-        <TabsContent value="management" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>تخصیص خودکار پرداخت‌ها</CardTitle>
-                <CardDescription>
-                  پرداخت‌های بدون تخصیص را به طور خودکار به فاکتورهای نماینده تخصیص دهید
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>انتخاب نماینده برای تخصیص</Label>
-                  <Select value={autoAllocateTarget} onValueChange={setAutoAllocateTarget}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب نماینده" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {representatives.map((rep) => (
-                        <SelectItem key={rep.id} value={rep.id.toString()}>
-                          {rep.name} ({rep.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button 
-                  onClick={handleAutoAllocate}
-                  disabled={autoAllocateMutation.isPending}
-                  className="w-full"
-                >
-                  {autoAllocateMutation.isPending ? (
-                    <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4 ml-2" />
-                  )}
-                  تخصیص خودکار
-                </Button>
-
-                {allocationSummary && (
-                  <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <h4 className="font-medium mb-2">خلاصه تخصیص</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>کل پرداخت‌ها:</span>
-                        <span>{toPersianDigits(allocationSummary.totalPayments.toString())}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>تخصیص یافته:</span>
-                        <span>{toPersianDigits(allocationSummary.allocatedPayments.toString())}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>بدون تخصیص:</span>
-                        <span>{toPersianDigits(allocationSummary.unallocatedPayments.toString())}</span>
-                      </div>
-                      <div className="flex justify-between font-semibold">
-                        <span>مجموع مبلغ:</span>
-                        <span>{formatCurrency(parseFloat(allocationSummary.totalPaidAmount))}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>پرداخت‌های بدون تخصیص</CardTitle>
-                <CardDescription>
-                  فهرست پرداخت‌هایی که هنوز به فاکتور خاصی تخصیص نیافته‌اند
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-80 overflow-y-auto">
-                  {unallocatedPayments.length > 0 ? (
-                    unallocatedPayments.map((payment) => (
-                      <div key={payment.id} className="p-3 border border-yellow-200 dark:border-yellow-800 rounded-lg bg-yellow-50 dark:bg-yellow-950">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="font-medium">{payment.representativeName}</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              {payment.paymentDate}
-                            </div>
+                        <div className="flex items-center space-x-2 space-x-reverse">
+                          <div className="text-lg font-bold text-blue-600">
+                            {formatCurrency(payment.amount)}
                           </div>
-                          <div className="text-left">
-                            <div className="font-semibold">
-                              {formatCurrency(parseFloat(payment.amount))}
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              بدون تخصیص
-                            </Badge>
-                          </div>
+                          {getStatusBadge(payment.isAllocated)}
+                          <Button 
+                            onClick={() => openManualAllocationDialog(payment)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            تخصیص دستی
+                          </Button>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-gray-500 py-8">
-                      همه پرداخت‌ها تخصیص یافته‌اند
+                    <div className="text-center py-8 text-gray-500">
+                      هیچ پرداخت تخصیص نیافته‌ای برای این نماینده وجود ندارد
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  لطفاً ابتدا یک نماینده انتخاب کنید
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* Reports Tab */}
-        <TabsContent value="reports" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      کل پرداخت‌ها
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {toPersianDigits(allPayments.length.toString())}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                    <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      تخصیص یافته
-                    </p>
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {toPersianDigits(allPayments.filter(p => p.isAllocated).length.toString())}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      در انتظار تخصیص
-                    </p>
-                    <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                      {toPersianDigits(unallocatedPayments.length.toString())}
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900 rounded-full flex items-center justify-center">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
+        <TabsContent value="allocated" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>مجموع مالی پرداخت‌ها</CardTitle>
+              <CardTitle>پرداخت‌های تخصیص یافته</CardTitle>
+              <CardDescription>
+                تاریخچه پرداخت‌هایی که تخصیص یافته‌اند
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-600 dark:text-green-400 mb-2">
-                  {formatCurrency(
-                    allPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0)
-                  )}
-                </div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  مجموع کل پرداخت‌های دریافتی
-                </p>
+              <div className="space-y-4">
+                {payments.filter(p => p.isAllocated && (!selectedRepresentative || p.representativeId === selectedRepresentative)).map(payment => (
+                  <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg bg-green-50">
+                    <div>
+                      <div className="font-medium">پرداخت #{payment.id}</div>
+                      <div className="text-sm text-gray-500">
+                        {formatDate(payment.paymentDate)} - {payment.description || 'بدون توضیح'}
+                      </div>
+                      {payment.invoiceId && (
+                        <div className="text-sm text-green-600">
+                          تخصیص یافته به فاکتور #{payment.invoiceId}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <div className="text-lg font-bold text-green-600">
+                        {formatCurrency(payment.amount)}
+                      </div>
+                      {getStatusBadge(payment.isAllocated)}
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="invoices" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>فاکتورهای قابل تخصیص</CardTitle>
+              <CardDescription>
+                فاکتورهایی که می‌توانند پرداخت دریافت کنند
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {selectedRepresentative ? (
+                <div className="space-y-4">
+                  {invoices.filter(inv => ['unpaid', 'partial', 'overdue'].includes(inv.status)).map(invoice => (
+                    <div key={invoice.id} className="flex justify-between items-center p-4 border rounded-lg">
+                      <div>
+                        <div className="font-medium">فاکتور {invoice.invoiceNumber}</div>
+                        <div className="text-sm text-gray-500">
+                          صادره: {formatDate(invoice.issueDate)}
+                          {invoice.dueDate && ` - سررسید: ${formatDate(invoice.dueDate)}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 space-x-reverse">
+                        <div className="text-lg font-bold">
+                          {formatCurrency(invoice.amount)}
+                        </div>
+                        <Badge 
+                          variant={
+                            invoice.status === 'overdue' ? 'destructive' : 
+                            invoice.status === 'partial' ? 'secondary' : 'default'
+                          }
+                        >
+                          {invoice.status === 'unpaid' && 'پرداخت نشده'}
+                          {invoice.status === 'partial' && 'پرداخت جزئی'}
+                          {invoice.status === 'overdue' && 'معوق'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  لطفاً ابتدا یک نماینده انتخاب کنید
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Manual Allocation Dialog */}
+      <Dialog open={manualAllocationDialog} onOpenChange={setManualAllocationDialog}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تخصیص دستی پرداخت</DialogTitle>
+            <DialogDescription>
+              پرداخت #{selectedPayment?.id} - مبلغ: {selectedPayment && formatCurrency(selectedPayment.amount)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="invoice-select">فاکتور مقصد</Label>
+              <Select 
+                value={manualForm.invoiceId} 
+                onValueChange={(value) => setManualForm(prev => ({...prev, invoiceId: value}))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="فاکتور را انتخاب کنید..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {invoices.filter(inv => ['unpaid', 'partial', 'overdue'].includes(inv.status)).map(invoice => (
+                    <SelectItem key={invoice.id} value={invoice.id.toString()}>
+                      {invoice.invoiceNumber} - {formatCurrency(invoice.amount)} ({invoice.status})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="amount-input">مبلغ تخصیص</Label>
+              <Input
+                id="amount-input"
+                type="number"
+                value={manualForm.amount}
+                onChange={(e) => setManualForm(prev => ({...prev, amount: e.target.value}))}
+                placeholder="مبلغ تخصیص را وارد کنید"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="reason-input">دلیل تخصیص (اختیاری)</Label>
+              <Textarea
+                id="reason-input"
+                value={manualForm.reason}
+                onChange={(e) => setManualForm(prev => ({...prev, reason: e.target.value}))}
+                placeholder="دلیل این تخصیص دستی را بنویسید..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualAllocationDialog(false)}>
+              انصراف
+            </Button>
+            <Button onClick={handleManualAllocation} disabled={loading}>
+              {loading ? 'در حال تخصیص...' : 'تخصیص دستی'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+};
+
+export default PaymentManagement;
