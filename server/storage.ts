@@ -2782,27 +2782,6 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<void> {
-    // ✅ SHERLOCK v34.0: UNIFIED ALLOCATION - تخصیص یکپارچه
-    console.log('🔄 SHERLOCK v34.0: Using UNIFIED Enhanced Payment Allocation Engine');
-
-    const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-    const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, {
-      method: 'FIFO',
-      allowPartialAllocation: true,
-      allowOverAllocation: false,
-      priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
-    });
-
-    if (!result.success) {
-      throw new Error(`Enhanced auto-allocation failed: ${result.errors.join(', ')}`);
-    }
-
-    console.log(`✅ SHERLOCK v34.0: UNIFIED allocation successful - ${result.allocatedAmount} تومان allocated`);
-
-    // همگام‌سازی فوری اطلاعات مالی
-    await this.updateRepresentativeFinancials(representativeId);
-  }
 
   // Financial Synchronization Methods Implementation
   async getTotalRevenue(): Promise<string> {
