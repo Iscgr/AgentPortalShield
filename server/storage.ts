@@ -2265,54 +2265,6 @@ export class DatabaseStorage implements IStorage {
           allocated: totalAllocated,
           totalAmount: totalAmountValue.toString(),
           details
-        };.length} unpaid invoices for auto-allocation (oldest first)`);
-
-        let allocated = 0;
-        let totalAmount = 0;
-        const details: Array<{ paymentId: number; invoiceId: number; amount: string }> = [];
-
-        // Simple FIFO allocation strategy
-        for (const payment of unallocatedPayments) {
-          for (const invoice of unpaidInvoices) {
-            // Check if invoice isn't already fully paid
-            const existingPayments = await db
-              .select()
-              .from(payments)
-              .where(
-                and(
-                  eq(payments.invoiceId, invoice.id),
-                  eq(payments.isAllocated, true)
-                )
-              );
-
-            const paidAmount = existingPayments.reduce((sum, p) =>
-              sum + parseFloat(p.amount), 0);
-            const remainingAmount = parseFloat(invoice.amount) - paidAmount;
-
-            if (remainingAmount > 0 && parseFloat(payment.amount) <= remainingAmount) {
-              // Allocate this payment to this invoice
-              await this.allocatePaymentToInvoice(payment.id, invoice.id);
-
-              allocated++;
-              totalAmount += parseFloat(payment.amount);
-              details.push({
-                paymentId: payment.id,
-                invoiceId: invoice.id,
-                amount: payment.amount
-              });
-
-              // ✅ SHERLOCK v22.1: Update invoice status after allocation
-              await this.updateInvoiceStatusAfterAllocation(invoice.id);
-
-              break; // This payment is now allocated, move to next payment
-            }
-          }
-        }
-
-        return {
-          allocated,
-          totalAmount: totalAmount.toString(),
-          details
         };
       },
       'autoAllocatePayments'
