@@ -2621,53 +2621,7 @@ export class DatabaseStorage implements IStorage {
         }
 
         console.log(`✅ SHERLOCK v34.0: Redirected to Enhanced Engine - ${result.allocatedAmount} allocated`);
-        return;riority regardless of invoice type
-
-        if (unpaidInvoices.length === 0) {
-          return; // No unpaid invoices to allocate to
-        }
-
-        console.log(`🔄 SHERLOCK v1.0: Auto-allocating payment ${paymentId} to representative ${representativeId}`);
-        console.log(`📋 Found ${unpaidInvoices.length} unpaid invoices, oldest: ${unpaidInvoices[0].invoiceNumber} (${unpaidInvoices[0].issueDate})`);
-
-        // Find the oldest unpaid invoice and allocate payment to it
-        const oldestInvoice = unpaidInvoices[0];
-
-        // Update payment to be allocated to this invoice
-        await db
-          .update(payments)
-          .set({
-            invoiceId: oldestInvoice.id,
-            isAllocated: true
-          })
-          .where(eq(payments.id, paymentId));
-
-        // Check if payment amount covers the invoice amount
-        const paymentAmount = parseFloat(payment.amount);
-        const invoiceAmount = parseFloat(oldestInvoice.amount);
-
-        if (paymentAmount >= invoiceAmount) {
-          // Mark invoice as paid
-          await db
-            .update(invoices)
-            .set({ status: "paid" })
-            .where(eq(invoices.id, oldestInvoice.id));
-        }
-
-        // Update representative financials
-        await this.updateRepresentativeFinancials(representativeId);
-
-        await this.createActivityLog({
-          type: "payment_auto_allocated",
-          description: `پرداخت خودکار تخصیص یافت: ${payment.amount} به فاکتور ${oldestInvoice.invoiceNumber}`,
-          relatedId: paymentId,
-          metadata: {
-            paymentId,
-            invoiceId: oldestInvoice.id,
-            amount: payment.amount,
-            representativeId
-          }
-        });
+        return;
       },
       'autoAllocatePaymentToInvoices'
     );
