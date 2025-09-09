@@ -937,16 +937,20 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     // Update representative's financials after payment
-    await this.updateRepresentativeFinancials(newPayment.representativeId);
+    if (newPayment.representativeId) {
+      await this.updateRepresentativeFinancials(newPayment.representativeId);
+    }
 
-    const rep = await db.select().from(representatives)
-      .where(eq(representatives.id, newPayment.representativeId));
+    if (newPayment.representativeId) {
+      const rep = await db.select().from(representatives)
+        .where(eq(representatives.id, newPayment.representativeId));
 
-    await this.createActivityLog({
-      type: "payment_received",
-      description: `پرداخت ${newPayment.amount} تومانی از نماینده "${rep[0]?.name}" ثبت شد`,
-      relatedId: newPayment.id
-    });
+      await this.createActivityLog({
+        type: "payment_received",
+        description: `پرداخت ${newPayment.amount} تومانی از نماینده "${rep[0]?.name}" ثبت شد`,
+        relatedId: newPayment.id
+      });
+    }
 
     return newPayment;
   }
@@ -967,7 +971,9 @@ export class DatabaseStorage implements IStorage {
           .returning();
 
         // Update representative's financials after payment change
-        await this.updateRepresentativeFinancials(originalPayment.representativeId);
+        if (originalPayment.representativeId) {
+          await this.updateRepresentativeFinancials(originalPayment.representativeId);
+        }
 
         await this.createActivityLog({
           type: "payment_updated",
@@ -993,7 +999,9 @@ export class DatabaseStorage implements IStorage {
         await db.delete(payments).where(eq(payments.id, id));
 
         // Update representative's financials after payment deletion
-        await this.updateRepresentativeFinancials(payment.representativeId);
+        if (payment.representativeId) {
+          await this.updateRepresentativeFinancials(payment.representativeId);
+        }
 
         await this.createActivityLog({
           type: "payment_deleted",
@@ -2028,7 +2036,7 @@ export class DatabaseStorage implements IStorage {
             recordsMetadata.totalActiveRecords = newUsageData.records.length;
 
             // Enhanced validation for new data structure
-            recordsMetadata.verificationPassed = newUsageData.records.every(record =>
+            recordsMetadata.verificationPassed = newUsageData.records.every((record: any) =>
               record.description &&
               record.amount >= 0 &&
               record.admin_username &&
@@ -2036,12 +2044,12 @@ export class DatabaseStorage implements IStorage {
             );
 
             // Enhanced integrity validation
-            recordsMetadata.dataIntegrityValidated = newUsageData.records.every(record =>
+            recordsMetadata.dataIntegrityValidated = newUsageData.records.every((record: any) =>
               parseFloat(record.amount) > 0 && record.description.trim().length > 0
             );
 
             // ✅ CRITICAL: Transform records to ensure consistency
-            newUsageData.records = newUsageData.records.map(record => ({
+            newUsageData.records = newUsageData.records.map((record: any) => ({
               ...record,
               amount: parseFloat(record.amount).toString(),
               quantity: record.quantity || 1,
@@ -2054,8 +2062,7 @@ export class DatabaseStorage implements IStorage {
           await db.update(invoices)
             .set({
               amount: editData.editedAmount.toString(),
-              usageData: newUsageData, // Use the processed usage data
-              updatedAt: new Date()
+              usageData: newUsageData // Use the processed usage data
             })
             .where(eq(invoices.id, editData.invoiceId));
 
