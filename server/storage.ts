@@ -2209,7 +2209,11 @@ export class DatabaseStorage implements IStorage {
   }> {
     return await withDatabaseRetry(
       async () => {
-        // SHERLOCK v11.5: Get unallocated payments ordered by oldest first (FIFO principle)
+        // ✅ SHERLOCK v34.0: DEPRECATED - استفاده از Enhanced Payment Allocation Engine
+        console.log('⚠️ SHERLOCK v34.0: storage.autoAllocatePayments is DEPRECATED');
+        console.log('🔄 Using Enhanced Payment Allocation Engine for batch allocation...');
+        
+        // ✅ دریافت پرداخت‌های تخصیص نیافته
         const unallocatedPayments = await db
           .select()
           .from(payments)
@@ -2219,21 +2223,49 @@ export class DatabaseStorage implements IStorage {
               eq(payments.isAllocated, false)
             )
           )
-          .orderBy(payments.paymentDate, payments.createdAt); // FIFO: Process oldest payments first
+          .orderBy(payments.paymentDate, payments.createdAt);
 
-        // SHERLOCK v11.5: Get unpaid invoices for this representative - FIFO (oldest first)
-        const unpaidInvoices = await db
-          .select()
-          .from(invoices)
-          .where(
-            and(
-              eq(invoices.representativeId, representativeId),
-              inArray(invoices.status, ['unpaid', 'overdue', 'partial'])
-            )
-          )
-          .orderBy(invoices.issueDate, invoices.createdAt); // FIFO: Oldest invoices first
+        let totalAllocated = 0;
+        let totalAmountValue = 0;
+        const details: Array<{ paymentId: number; invoiceId: number; amount: string }> = [];
 
-        console.log(`🔧 SHERLOCK v11.5 FIFO: Found ${unpaidInvoices.length} unpaid invoices for auto-allocation (oldest first)`);
+        // ✅ استفاده از Enhanced Engine برای هر پرداخت
+        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+        
+        for (const payment of unallocatedPayments) {
+          try {
+            const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(payment.id, {
+              method: 'FIFO',
+              allowPartialAllocation: true,
+              allowOverAllocation: false,
+              priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+            });
+
+            if (result.success && result.allocatedAmount > 0) {
+              totalAllocated++;
+              totalAmountValue += result.allocatedAmount;
+              
+              // اضافه کردن جزئیات تخصیص‌ها
+              for (const allocation of result.allocations) {
+                details.push({
+                  paymentId: payment.id,
+                  invoiceId: allocation.invoiceId,
+                  amount: allocation.allocatedAmount.toString()
+                });
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Enhanced allocation failed for payment ${payment.id}:`, error);
+          }
+        }
+
+        console.log(`✅ SHERLOCK v34.0: Enhanced batch allocation completed - ${totalAllocated} payments, ${totalAmountValue} total`);
+
+        return {
+          allocated: totalAllocated,
+          totalAmount: totalAmountValue.toString(),
+          details
+        };.length} unpaid invoices for auto-allocation (oldest first)`);
 
         let allocated = 0;
         let totalAmount = 0;
@@ -2619,21 +2651,25 @@ export class DatabaseStorage implements IStorage {
   async autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<void> {
     return await withDatabaseRetry(
       async () => {
-        // Get payment details
-        const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
-        if (!payment) {
-          throw new Error(`Payment with id ${paymentId} not found`);
+        // ✅ SHERLOCK v34.0: DEPRECATED - استفاده از Enhanced Payment Allocation Engine
+        console.log('⚠️ SHERLOCK v34.0: storage.autoAllocatePaymentToInvoices is DEPRECATED');
+        console.log('🔄 Redirecting to Enhanced Payment Allocation Engine for consistency...');
+        
+        // ✅ Redirect به سیستم یکپارچه
+        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+        const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, {
+          method: 'FIFO',
+          allowPartialAllocation: true,
+          allowOverAllocation: false,
+          priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+        });
+
+        if (!result.success) {
+          throw new Error(`Enhanced auto-allocation failed: ${result.errors.join(', ')}`);
         }
 
-        // SHERLOCK v1.0 FIX: Get unpaid invoices including both manual and automatic types
-        // Order by issue date (oldest first) to handle mixed invoice types correctly
-        const unpaidInvoices = await db.select()
-          .from(invoices)
-          .where(and(
-            eq(invoices.representativeId, representativeId),
-            or(eq(invoices.status, "unpaid"), eq(invoices.status, "overdue"))
-          ))
-          .orderBy(invoices.issueDate); // Oldest issue date gets priority regardless of invoice type
+        console.log(`✅ SHERLOCK v34.0: Redirected to Enhanced Engine - ${result.allocatedAmount} allocated`);
+        return;riority regardless of invoice type
 
         if (unpaidInvoices.length === 0) {
           return; // No unpaid invoices to allocate to

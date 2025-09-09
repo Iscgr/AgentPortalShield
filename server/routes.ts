@@ -300,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth status check endpoint
   app.get("/api/auth/status", (req, res) => {
     const session = req.session as any;
-    
+
     if (session && session.authenticated && session.user) {
       res.json({
         authenticated: true,
@@ -1141,6 +1141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ✅ SHERLOCK v33.2: ENHANCED ALLOCATION LOGIC WITH FINANCIAL SYNC
       let isAllocated = false;
       let invoiceId = null;
+      let finalPaymentStatus = null;
 
       // Determine allocation status before creating payment
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
@@ -1162,42 +1163,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceId: invoiceId
       });
 
-      let finalPaymentStatus = newPayment;
+      finalPaymentStatus = newPayment; // Initialize with the newly created payment
 
-      // ✅ ENHANCED: Execute allocation with proper error handling and status update
+      // ✅ SHERLOCK v34.0: UNIFIED ALLOCATION - استفاده انحصاری از Enhanced Payment Allocation Engine
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
-        console.log(`💰 SHERLOCK v33.2: Executing manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
+        console.log(`💰 SHERLOCK v34.0: Executing UNIFIED manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
 
         try {
-          // Allocate payment to specific invoice
-          await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
+          // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص دستی
+          const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+          const allocationResult = await enhancedPaymentAllocationEngine.manualAllocatePayment(
+            newPayment.id,
+            parseInt(selectedInvoiceId),
+            parseFloat(amount),
+            'ADMIN_USER' // یا شناسه کاربری واقعی
+          );
 
-          // ✅ CRITICAL: Update payment record to reflect allocation
+          if (!allocationResult.success) {
+            throw new Error(`Manual allocation failed: ${allocationResult.errors.join(', ')}`);
+          }
+
+          // بروزرسانی وضعیت پرداخت
           finalPaymentStatus = await storage.updatePayment(newPayment.id, {
             isAllocated: true,
             invoiceId: parseInt(selectedInvoiceId)
           });
 
-          // Update invoice status after allocation
-          const calculatedStatus = await storage.calculateInvoicePaymentStatus(parseInt(selectedInvoiceId));
-          await storage.updateInvoice(parseInt(selectedInvoiceId), { status: calculatedStatus });
+          console.log(`✅ SHERLOCK v34.0: UNIFIED manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
 
-          console.log(`✅ SHERLOCK v33.2: Payment ${newPayment.id} successfully allocated to Invoice ${selectedInvoiceId}, status: ${calculatedStatus}`);
         } catch (allocationError) {
-          console.error(`❌ SHERLOCK v33.2: Manual allocation failed for Payment ${newPayment.id}:`, allocationError);
-          // Ensure payment remains unallocated on failure
-          finalPaymentStatus = await storage.updatePayment(newPayment.id, { isAllocated: false, invoiceId: null });
+          console.error(`❌ SHERLOCK v34.0: UNIFIED manual allocation failed:`, allocationError);
+          throw new Error(`خطا در تخصیص دستی یکپارچه: ${allocationError.message}`);
         }
-      }
-      // Auto-allocate if requested
-      else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v33.2: Executing auto-allocation - Payment ${newPayment.id} for Representative ${representativeId}`);
+      } else if (selectedInvoiceId === "auto") {
+        console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation with FIFO for Representative ${representativeId}`);
+
         try {
-          await storage.autoAllocatePaymentToInvoices(newPayment.id, representativeId);
-          // Get updated payment status after auto-allocation
-          finalPaymentStatus = await storage.getPayment(newPayment.id);
+          // ✅ SHERLOCK v34.0: استفاده انحصاری از Enhanced Payment Allocation Engine برای تخصیص خودکار FIFO
+          const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+          const allocationResult = await enhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
+            method: 'FIFO', // ✅ قدیمی‌ترین فاکتور اول (created_at based)
+            allowPartialAllocation: true,
+            allowOverAllocation: false,
+            priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+          });
+
+          if (!allocationResult.success) {
+            throw new Error(`FIFO auto-allocation failed: ${allocationResult.errors.join(', ')}`);
+          }
+
+          // بروزرسانی وضعیت پرداخت
+          finalPaymentStatus = await storage.updatePayment(newPayment.id, {
+            isAllocated: allocationResult.allocatedAmount > 0
+          });
+
+          console.log(`✅ SHERLOCK v34.0: UNIFIED FIFO auto-allocation completed - ${allocationResult.allocatedAmount} allocated, ${allocationResult.remainingAmount} remaining`);
+
         } catch (autoAllocationError) {
-          console.error(`❌ SHERLOCK v33.2: Auto-allocation failed for Payment ${newPayment.id}:`, autoAllocationError);
+          console.error(`❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:`, autoAllocationError);
+          throw new Error(`خطا در تخصیص خودکار یکپارچه FIFO: ${allocationError.message}`);
         }
       }
       // If no allocation specified, payment remains unallocated

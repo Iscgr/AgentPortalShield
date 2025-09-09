@@ -327,20 +327,26 @@ export class EnhancedPaymentAllocationEngine {
     
     switch (rules.method) {
       case 'FIFO':
-        orderBy = [invoices.createdAt];
+        // ✅ SHERLOCK v34.0: CRITICAL FIX - ترکیب created_at و issue_date برای FIFO دقیق
+        // اول بر اساس تاریخ ایجاد، سپس تاریخ صدور برای تضمین ترتیب صحیح
+        orderBy = [invoices.createdAt, invoices.issueDate];
         break;
       case 'LIFO':
-        orderBy = [desc(invoices.createdAt)];
+        orderBy = [desc(invoices.createdAt), desc(invoices.issueDate)];
         break;
       case 'OLDEST_FIRST':
-        orderBy = [invoices.dueDate];
+        // ✅ برای قدیمی‌ترین، ترکیب issue_date و created_at
+        orderBy = [invoices.issueDate, invoices.createdAt];
         break;
       case 'HIGHEST_AMOUNT_FIRST':
-        orderBy = [desc(sql`CAST(amount as DECIMAL)`)];
+        orderBy = [desc(sql`CAST(amount as DECIMAL)`), invoices.createdAt];
         break;
       default:
-        orderBy = [invoices.createdAt];
+        // ✅ پیش‌فرض: FIFO دقیق
+        orderBy = [invoices.createdAt, invoices.issueDate];
     }
+    
+    console.log(`🎯 SHERLOCK v34.0: FIFO ORDER - Using ${rules.method} method with precise ordering`);
     
     return await db.select()
       .from(invoices)
