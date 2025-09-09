@@ -2608,30 +2608,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<void> {
-    return await withDatabaseRetry(
-      async () => {
-        // ✅ SHERLOCK v34.0: DEPRECATED - استفاده از Enhanced Payment Allocation Engine
-        console.log('⚠️ SHERLOCK v34.0: storage.autoAllocatePaymentToInvoices is DEPRECATED');
-        console.log('🔄 Redirecting to Enhanced Payment Allocation Engine for consistency...');
-        
-        // ✅ Redirect به سیستم یکپارچه
-        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-        const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, {
-          method: 'FIFO',
-          allowPartialAllocation: true,
-          allowOverAllocation: false,
-          priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
-        });
+    // ✅ SHERLOCK v34.0: UNIFIED ALLOCATION - تخصیص یکپارچه
+    console.log('🔄 SHERLOCK v34.0: Using UNIFIED Enhanced Payment Allocation Engine');
+    
+    const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+    const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, {
+      method: 'FIFO',
+      allowPartialAllocation: true,
+      allowOverAllocation: false,
+      priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+    });
 
-        if (!result.success) {
-          throw new Error(`Enhanced auto-allocation failed: ${result.errors.join(', ')}`);
-        }
+    if (!result.success) {
+      throw new Error(`Enhanced auto-allocation failed: ${result.errors.join(', ')}`);
+    }
 
-        console.log(`✅ SHERLOCK v34.0: Redirected to Enhanced Engine - ${result.allocatedAmount} allocated`);
-        return;
-      },
-      'autoAllocatePaymentToInvoices'
-    );
+    console.log(`✅ SHERLOCK v34.0: UNIFIED allocation successful - ${result.allocatedAmount} تومان allocated`);
+    
+    // همگام‌سازی فوری اطلاعات مالی
+    await this.updateRepresentativeFinancials(representativeId);
   }
 
   // Financial Synchronization Methods Implementation

@@ -1150,7 +1150,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceId = null;    // Will be set after successful allocation
         console.log(`💰 SHERLOCK v33.2: Manual allocation planned - Payment to Invoice ${selectedInvoiceId}`);
       } else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v33.2: Auto-allocation planned for Representative ${representativeId}`);
+        console.log(`🔄 SHERLOCK v34.0: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
+        // Auto-allocation will be performed using Enhanced Payment Allocation Engine
+        isAllocated = false; // Start as unallocated, will be updated after auto-allocation
+        invoiceId = null;
+        console.log(`🎯 SHERLOCK v34.0: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
       }
 
       // Create the payment initially as unallocated for manual assignments
@@ -1196,33 +1200,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error(`خطا در تخصیص دستی یکپارچه: ${allocationError.message}`);
         }
       } else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation with FIFO for Representative ${representativeId}`);
+          console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation for Representative ${representativeId}`);
 
-        try {
-          // ✅ SHERLOCK v34.0: استفاده انحصاری از Enhanced Payment Allocation Engine برای تخصیص خودکار FIFO
-          const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-          const allocationResult = await enhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
-            method: 'FIFO', // ✅ قدیمی‌ترین فاکتور اول (created_at based)
-            allowPartialAllocation: true,
-            allowOverAllocation: false,
-            priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
-          });
+          try {
+            // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص خودکار
+            const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+            const allocationResult = await enhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
+              method: 'FIFO',
+              allowPartialAllocation: true,
+              allowOverAllocation: false,
+              priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+            });
 
-          if (!allocationResult.success) {
-            throw new Error(`FIFO auto-allocation failed: ${allocationResult.errors.join(', ')}`);
+            if (allocationResult.success && allocationResult.allocatedAmount > 0) {
+              // دریافت وضعیت به‌روز شده پرداخت
+              const updatedPayments = await storage.getPaymentsByRepresentative(representativeId);
+              const thisPayment = updatedPayments.find(p => p.id === newPayment.id);
+
+              finalPaymentStatus = thisPayment || newPayment;
+              console.log(`✅ SHERLOCK v34.0: UNIFIED auto-allocation successful - Payment ${newPayment.id} allocated ${allocationResult.allocatedAmount} تومان`);
+              console.log(`📋 SHERLOCK v34.0: Allocation details:`, allocationResult.allocations);
+            } else {
+              console.log(`⚠️ SHERLOCK v34.0: Auto-allocation completed but no allocation possible:`, allocationResult.warnings);
+              finalPaymentStatus = newPayment;
+            }
+          } catch (autoAllocationError) {
+            console.error(`❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:`, autoAllocationError);
+            // Keep payment as unallocated if auto-allocation fails
+            finalPaymentStatus = newPayment;
+
+            // Log detailed error for debugging
+            await storage.createActivityLog({
+              type: "payment_auto_allocation_failed",
+              description: `تخصیص خودکار پرداخت ${newPayment.id} ناموفق: ${autoAllocationError.message}`,
+              relatedId: representativeId,
+              metadata: {
+                paymentId: newPayment.id,
+                error: autoAllocationError.message,
+                engine: "Enhanced Payment Allocation Engine"
+              }
+            });
           }
-
-          // بروزرسانی وضعیت پرداخت
-          finalPaymentStatus = await storage.updatePayment(newPayment.id, {
-            isAllocated: allocationResult.allocatedAmount > 0
-          });
-
-          console.log(`✅ SHERLOCK v34.0: UNIFIED FIFO auto-allocation completed - ${allocationResult.allocatedAmount} allocated, ${allocationResult.remainingAmount} remaining`);
-
-        } catch (autoAllocationError) {
-          console.error(`❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:`, autoAllocationError);
-          throw new Error(`خطا در تخصیص خودکار یکپارچه FIFO: ${allocationError.message}`);
-        }
       }
       // If no allocation specified, payment remains unallocated
       else {
