@@ -66,6 +66,12 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 // Import Debt Verification Routes
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
 
+// ATOMOS v2.0: Import Advanced System Routes
+import advancedSystemRoutes from './routes/advanced-system-routes.js';
+
+// Import Advanced Security Middleware
+import { adaptiveRateLimit, securityHeaders } from './middleware/advanced-security.js';
+
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession extends Express.Session {
   authenticated?: boolean;
@@ -104,6 +110,12 @@ const upload = multer({
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  // ATOMOS v2.0: Apply advanced security headers
+  app.use(securityHeaders);
+  
+  // ATOMOS v2.0: Apply adaptive rate limiting
+  app.use(adaptiveRateLimit);
 
   // Initialize default admin user
   try {
@@ -172,6 +184,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
+  
+  // ATOMOS v2.0: Register Advanced System Routes
+  app.use('/api/system', advancedSystemRoutes);
+  
+  console.log('✅ ATOMOS v2.0: Advanced system routes registered successfully');
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
