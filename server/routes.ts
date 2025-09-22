@@ -185,49 +185,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
 
-  // ✅ DATA RECONCILIATION ENDPOINT - Fix dataIntegrity status
+  // ✅ PERFORMANCE OPTIMIZATION: Async Data Reconciliation Endpoint
   app.post("/api/system/data-reconciliation", authMiddleware, async (req, res) => {
     try {
-      console.log("🔄 Starting comprehensive data reconciliation...");
+      console.log("🚀 PERFORMANCE: Starting ASYNC comprehensive data reconciliation...");
       
-      const reconciliationResult = await unifiedFinancialEngine.executeDataReconciliation();
+      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
+      const asyncService = AsyncReconciliationService.getInstance();
       
-      if (reconciliationResult.success) {
-        // Cache the reconciliation result for the data integrity calculation
-        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-        UnifiedFinancialEngine.batchCache.set('last_reconciliation_status', {
-          data: reconciliationResult,
-          timestamp: Date.now()
-        });
+      // Extract configuration from request body
+      const config = {
+        batchSize: req.body.batchSize || 10,
+        maxConcurrency: req.body.maxConcurrency || 2,
+        delayBetweenBatches: req.body.delayBetweenBatches || 500,
+        includeOrphanedPayments: req.body.includeOrphanedPayments !== false,
+        includeAllocationConsistency: req.body.includeAllocationConsistency !== false,
+        includeDebtRecalculation: req.body.includeDebtRecalculation !== false
+      };
 
-        // Force global cache invalidation to refresh all data
-        UnifiedFinancialEngine.forceInvalidateGlobal("post_reconciliation_complete");
+      // Start async reconciliation
+      const jobId = await asyncService.startAsyncReconciliation(config);
 
-        console.log("✅ Data reconciliation completed successfully");
-        
-        res.json({
-          success: true,
-          message: "تطبیق داده‌ها با موفقیت انجام شد",
-          results: reconciliationResult,
-          dataIntegrityStatus: reconciliationResult.finalDataIntegrityStatus,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        console.log("❌ Data reconciliation failed");
-        res.status(500).json({
-          success: false,
-          message: "خطا در تطبیق داده‌ها",
-          error: reconciliationResult,
-          timestamp: new Date().toISOString()
-        });
-      }
+      console.log(`✅ PERFORMANCE: Async reconciliation started with job ID: ${jobId}`);
+      
+      res.status(202).json({
+        success: true,
+        message: "تطبیق داده‌ها آغاز شد - لطفاً پیشرفت را پیگیری کنید",
+        jobId: jobId,
+        statusUrl: `/api/system/reconciliation-status/${jobId}`,
+        resultUrl: `/api/system/reconciliation-result/${jobId}`,
+        config: config,
+        timestamp: new Date().toISOString()
+      });
+      
     } catch (error) {
-      console.error("❌ Data reconciliation endpoint error:", error);
+      console.error("❌ PERFORMANCE: Async reconciliation startup error:", error);
       res.status(500).json({
         success: false,
-        message: "خطا در اجرای تطبیق داده‌ها",
+        message: "خطا در شروع تطبیق داده‌ها",
         error: error.message,
         timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // ✅ PERFORMANCE OPTIMIZATION: Job Status Endpoint
+  app.get("/api/system/reconciliation-status/:jobId", authMiddleware, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      
+      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
+      const asyncService = AsyncReconciliationService.getInstance();
+      
+      const jobStatus = asyncService.getJobStatus(jobId);
+      
+      if (!jobStatus) {
+        return res.status(404).json({
+          success: false,
+          message: "کار مورد نظر یافت نشد",
+          error: `Job ${jobId} not found`
+        });
+      }
+
+      // Calculate estimated time remaining
+      const { AsyncJobManager } = await import('./services/async-job-manager.js');
+      const jobManager = AsyncJobManager.getInstance();
+      const estimatedTimeRemaining = jobManager.estimateTimeRemaining(jobId);
+
+      res.json({
+        success: true,
+        job: jobStatus,
+        estimatedTimeRemaining: estimatedTimeRemaining,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("❌ PERFORMANCE: Job status error:", error);
+      res.status(500).json({
+        success: false,
+        message: "خطا در دریافت وضعیت کار",
+        error: error.message
+      });
+    }
+  });
+
+  // ✅ PERFORMANCE OPTIMIZATION: Job Result Endpoint
+  app.get("/api/system/reconciliation-result/:jobId", authMiddleware, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      
+      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
+      const asyncService = AsyncReconciliationService.getInstance();
+      
+      const jobStatus = asyncService.getJobStatus(jobId);
+      
+      if (!jobStatus) {
+        return res.status(404).json({
+          success: false,
+          message: "کار مورد نظر یافت نشد",
+          error: `Job ${jobId} not found`
+        });
+      }
+
+      if (jobStatus.status !== 'completed') {
+        return res.status(202).json({
+          success: false,
+          message: "کار هنوز تکمیل نشده است",
+          status: jobStatus.status,
+          progress: jobStatus.progress
+        });
+      }
+
+      // Cache the result for dashboard data integrity status
+      if (jobStatus.result) {
+        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+        UnifiedFinancialEngine.batchCache.set('last_reconciliation_status', {
+          data: jobStatus.result,
+          timestamp: Date.now()
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "تطبیق داده‌ها با موفقیت تکمیل شد",
+        results: jobStatus.result,
+        dataIntegrityStatus: jobStatus.result?.finalDataIntegrityStatus,
+        job: {
+          id: jobStatus.id,
+          status: jobStatus.status,
+          startedAt: jobStatus.startedAt,
+          completedAt: jobStatus.completedAt
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("❌ PERFORMANCE: Job result error:", error);
+      res.status(500).json({
+        success: false,
+        message: "خطا در دریافت نتیجه کار",
+        error: error.message
+      });
+    }
+  });
+
+  // ✅ PERFORMANCE OPTIMIZATION: Cancel Job Endpoint
+  app.delete("/api/system/reconciliation-job/:jobId", authMiddleware, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      
+      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
+      const asyncService = AsyncReconciliationService.getInstance();
+      
+      const cancelled = asyncService.cancelJob(jobId);
+      
+      if (cancelled) {
+        res.json({
+          success: true,
+          message: "کار با موفقیت لغو شد",
+          jobId: jobId
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "امکان لغو کار وجود ندارد",
+          error: "Job is not in a cancellable state"
+        });
+      }
+      
+    } catch (error) {
+      console.error("❌ PERFORMANCE: Job cancellation error:", error);
+      res.status(500).json({
+        success: false,
+        message: "خطا در لغو کار",
+        error: error.message
+      });
+    }
+  });
+
+  // ✅ PERFORMANCE OPTIMIZATION: Active Jobs List Endpoint
+  app.get("/api/system/reconciliation-jobs", authMiddleware, async (req, res) => {
+    try {
+      const { AsyncJobManager } = await import('./services/async-job-manager.js');
+      const jobManager = AsyncJobManager.getInstance();
+      
+      const limit = parseInt(req.query.limit as string) || 10;
+      const activeJobs = jobManager.getActiveJobs();
+      const recentJobs = jobManager.getRecentJobs(limit);
+      
+      res.json({
+        success: true,
+        activeJobs: activeJobs,
+        recentJobs: recentJobs,
+        totalActive: activeJobs.length,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("❌ PERFORMANCE: Jobs list error:", error);
+      res.status(500).json({
+        success: false,
+        message: "خطا در دریافت لیست کارها",
+        error: error.message
       });
     }
   });

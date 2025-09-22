@@ -71,98 +71,88 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUnifiedAuth } from "@/contexts/unified-auth-context";
+import { useBatchFinancialData } from "@/contexts/batch-financial-context";
 import InvoiceEditDialog from "@/components/invoice-edit-dialog";
 import DebtVerificationPanel from "@/components/debt-verification-panel";
 
-// ✅ SHERLOCK v32.4: Enhanced Real-time debt display with comprehensive cache invalidation
+// ✅ PERFORMANCE OPTIMIZATION: Batch-enabled Real-time debt display
 function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId: number, fallbackDebt?: string }) {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { requestRepresentativeData, batchStatus } = useBatchFinancialData();
 
   const { data: financialData, isLoading, error, refetch } = useQuery({
     queryKey: [`unified-financial-representative-${representativeId}`],
     queryFn: async () => {
-      console.log(`🔄 SHERLOCK v32.4: Calculating real-time debt for representative ${representativeId}`);
-      return apiRequest(`/api/unified-financial/representative/${representativeId}`);
+      console.log(`🚀 BATCH PERFORMANCE: Requesting debt data for representative ${representativeId}`);
+      
+      // ✅ USE BATCH CONTEXT instead of individual API call
+      const batchData = await requestRepresentativeData(representativeId);
+      return batchData;
     },
     select: (response: any) => response.data || response,
-    staleTime: 8000, // 8 seconds for more responsive updates
-    gcTime: 30000, // Reduced cache time
-    retry: 2, // Allow more retries for reliability
-    refetchOnWindowFocus: true, // Enable refetch on focus for freshest data
-    refetchOnMount: true, // Always refetch on mount for accuracy
+    staleTime: 15000, // Increased to 15 seconds - batch provides fresher data
+    gcTime: 60000, // Increased cache time since batching is more efficient
+    retry: 1, // Reduced retries since batch handles errors better
+    refetchOnWindowFocus: false, // Disabled - batch handles updates
+    refetchOnMount: false, // Disabled - batch provides data efficiently
     enabled: !!representativeId // Only run if ID exists
   });
 
-  // ✅ Comprehensive cache invalidation helper
-  const invalidateAllRelatedCaches = async (reason: string = 'payment-update') => {
-    console.log(`🔄 SHERLOCK v32.4: Starting comprehensive cache invalidation - ${reason}`);
+  // ✅ PERFORMANCE OPTIMIZATION: Targeted cache invalidation (Query Storm Prevention)
+  const invalidateTargetedCaches = async (reason: string = 'payment-update') => {
+    console.log(`🎯 PERFORMANCE: Starting TARGETED cache invalidation for rep ${representativeId} - ${reason}`);
     setIsRefreshing(true);
     
     try {
-      // ✅ STANDARDIZED CACHE INVALIDATION - All query patterns used across the app
+      // ✅ TARGETED INVALIDATION: Only this representative + essential global caches
       const invalidationPromises = [
-        // Individual representative financial data
+        // 1. Individual representative financial data (REQUIRED)
         queryClient.invalidateQueries({ 
           queryKey: [`unified-financial-representative-${representativeId}`] 
         }),
-        // Main representatives list - BOTH patterns for compatibility
+        
+        // 2. Representative list data (REQUIRED for UI updates)
         queryClient.invalidateQueries({ 
           queryKey: ["/api/representatives"] 
         }),
         queryClient.invalidateQueries({ 
           queryKey: ["representatives"] 
         }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["enhanced-representatives-data"] 
-        }),
-        // Financial engines and unified data
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/unified-financial"] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["unified-financial"] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["unified-financial", "debtors"] 
-        }),
-        // Dashboard and monitoring
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/dashboard"] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["allocation-monitoring-report"] 
-        }),
-        // Payment and invoice related
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/payments"] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/invoices"] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["payments"] 
-        }),
-        // Statistics and reports
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/unified-statistics/representatives"] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["debtor-representatives"] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["global-financial-summary"] 
+        
+        // 3. Enhanced data with this specific representative (CONDITIONAL)
+        queryClient.invalidateQueries({
+          queryKey: ["enhanced-representatives-data"],
+          predicate: (query) => {
+            // Only invalidate if this representative is included in the query
+            const queryKey = query.queryKey;
+            if (Array.isArray(queryKey) && queryKey.length > 1) {
+              const repIds = queryKey[1];
+              return Array.isArray(repIds) && repIds.includes(representativeId);
+            }
+            return false;
+          }
         })
       ];
-      
+
+      // ✅ THROTTLED GLOBAL UPDATES: Only for specific types of changes
+      if (reason.includes('allocation') || reason.includes('payment')) {
+        // Only invalidate global data for allocation/payment changes
+        invalidationPromises.push(
+          queryClient.invalidateQueries({ 
+            queryKey: ["unified-financial", "debtors"] 
+          })
+        );
+      }
+
       await Promise.all(invalidationPromises);
-      console.log(`✅ SHERLOCK v32.4: Cache invalidation completed for representative ${representativeId}`);
+      console.log(`✅ PERFORMANCE: Targeted cache invalidation completed for representative ${representativeId}`);
       
-      // Force refetch immediately after cache invalidation
+      // ✅ THROTTLED REFETCH: Only refetch this specific representative data
       await refetch();
       
     } catch (error) {
-      console.error(`❌ SHERLOCK v32.4: Cache invalidation error:`, error);
+      console.error(`❌ PERFORMANCE: Targeted cache invalidation error:`, error);
       // Still try to refetch even if some invalidations failed
       await refetch();
     } finally {
@@ -170,38 +160,42 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     }
   };
 
-  // Force refresh when payment operations complete
+  // ✅ PERFORMANCE: Throttled event handling to prevent Query Storm
   React.useEffect(() => {
-    const handlePaymentUpdate = () => {
-      console.log(`🔄 SHERLOCK v32.4: Payment update event received for representative ${representativeId}`);
-      invalidateAllRelatedCaches('individual-payment-update');
+    const handlePaymentUpdate = (event?: CustomEvent) => {
+      const eventType = event?.type || 'payment-update';
+      const reason = eventType.includes('allocation') ? 'allocation-update' : 'payment-update';
+      console.log(`🎯 PERFORMANCE: Throttled payment update for rep ${representativeId} - ${reason}`);
+      invalidateTargetedCaches(reason);
     };
 
-    const handleGlobalPaymentUpdate = () => {
-      console.log(`🔄 SHERLOCK v32.4: Global payment update event received`);
-      invalidateAllRelatedCaches('global-payment-update');
+    // ✅ THROTTLING: Debounced update function to prevent rapid-fire updates
+    let throttleTimer: NodeJS.Timeout | null = null;
+    const throttledUpdate = (event?: CustomEvent) => {
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+      }
+      throttleTimer = setTimeout(() => {
+        handlePaymentUpdate(event);
+      }, 300); // 300ms debounce
     };
 
-    const handleAllocationCompleted = () => {
-      console.log(`🔄 SHERLOCK v32.4: Allocation completed event received`);
-      invalidateAllRelatedCaches('allocation-completed');
-    };
-
-    // Listen for multiple payment update events
-    window.addEventListener(`payment-updated-${representativeId}`, handlePaymentUpdate);
-    window.addEventListener('global-payment-updated', handleGlobalPaymentUpdate);
-    window.addEventListener('allocation-completed', handleAllocationCompleted);
-    window.addEventListener('batch-allocation-completed', handleAllocationCompleted);
-    window.addEventListener('manual-allocation-completed', handlePaymentUpdate);
+    // ✅ TARGETED EVENT LISTENING: Only this representative + critical global events
+    window.addEventListener(`payment-updated-${representativeId}`, throttledUpdate);
+    window.addEventListener('allocation-completed', throttledUpdate);
+    window.addEventListener('manual-allocation-completed', throttledUpdate);
+    
+    // ✅ REMOVED GLOBAL EVENT STORM: No longer listen to every global event
 
     return () => {
-      window.removeEventListener(`payment-updated-${representativeId}`, handlePaymentUpdate);
-      window.removeEventListener('global-payment-updated', handleGlobalPaymentUpdate);
-      window.removeEventListener('allocation-completed', handleAllocationCompleted);
-      window.removeEventListener('batch-allocation-completed', handleAllocationCompleted);
-      window.removeEventListener('manual-allocation-completed', handlePaymentUpdate);
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+      }
+      window.removeEventListener(`payment-updated-${representativeId}`, throttledUpdate);
+      window.removeEventListener('allocation-completed', throttledUpdate);
+      window.removeEventListener('manual-allocation-completed', throttledUpdate);
     };
-  }, [representativeId, queryClient, invalidateAllRelatedCaches]);
+  }, [representativeId, queryClient]);
 
   // Show fallback immediately if available with loading indicator
   if (isLoading && fallbackDebt) {
@@ -428,12 +422,34 @@ export default function Representatives() {
           
           console.log(`✅ SHERLOCK v32.4: Global cache invalidation completed`);
           
-          // Emit local update events for all representatives
-          representatives?.forEach((rep: Representative) => {
-            window.dispatchEvent(new CustomEvent(`payment-updated-${rep.id}`, {
-              detail: { type: 'global-allocation', timestamp: Date.now() }
-            }));
-          });
+          // ✅ PERFORMANCE: Throttled representative updates to prevent Query Storm
+          if (representatives && representatives.length > 0) {
+            console.log(`🎯 PERFORMANCE: Emitting targeted updates for ${Math.min(representatives.length, 50)} representatives (throttled)`);
+            
+            // ✅ BATCH THROTTLING: Only emit for first 50 representatives to prevent storm
+            const representativesToUpdate = representatives.slice(0, 50);
+            
+            representativesToUpdate.forEach((rep: Representative, index: number) => {
+              // ✅ STAGGERED EMISSION: Add small delay to prevent simultaneous requests
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent(`payment-updated-${rep.id}`, {
+                  detail: { type: 'throttled-global-allocation', timestamp: Date.now() }
+                }));
+              }, index * 50); // 50ms delay between each
+            });
+            
+            // ✅ BULK UPDATE EVENT: For remaining representatives, use bulk event
+            if (representatives.length > 50) {
+              console.log(`🎯 PERFORMANCE: Using bulk update for remaining ${representatives.length - 50} representatives`);
+              window.dispatchEvent(new CustomEvent('bulk-representatives-updated', {
+                detail: { 
+                  type: 'bulk-global-allocation', 
+                  affectedCount: representatives.length - 50,
+                  timestamp: Date.now() 
+                }
+              }));
+            }
+          }
           
         } catch (error) {
           console.error(`❌ SHERLOCK v32.4: Global cache invalidation error:`, error);

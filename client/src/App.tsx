@@ -6,6 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UnifiedAuthProvider, useUnifiedAuth } from "@/contexts/unified-auth-context";
+import { BatchFinancialProvider } from "@/contexts/batch-financial-context";
 import { useMobileOptimizations } from "@/hooks/use-mobile-optimizations";
 
 // Layout components
@@ -145,11 +146,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <UnifiedAuthProvider>
-          <Router>
-            <div className={`min-h-screen bg-background ${isMobile ? 'mobile-optimized' : ''}`}>
-              <AuthenticatedRouter />
-            </div>
-          </Router>
+          <BatchFinancialProvider>
+            <Router>
+              <div className={`min-h-screen bg-background ${isMobile ? 'mobile-optimized' : ''}`}>
+                <AuthenticatedRouter />
+              </div>
+            </Router>
+          </BatchFinancialProvider>
         </UnifiedAuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
