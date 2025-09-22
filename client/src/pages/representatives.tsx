@@ -2418,7 +2418,7 @@ function CreatePaymentDialog({
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("auto");
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>(""); // Changed default to empty string
   const [isLoading, setIsLoading] = useState(false);
 
   // ✅ SHERLOCK v34.0: UNIFIED FIFO Auto-Allocation System (Enhanced Engine)
@@ -2484,7 +2484,9 @@ function CreatePaymentDialog({
         amount: paymentAmount.toString(),
         paymentDate,
         description: description || `تخصیص خودکار پرداخت برای ${representative.name}`,
-        selectedInvoiceId: "auto"
+        invoiceId: null, // Auto allocation means no specific invoiceId is initially set here
+        isAllocated: true, // Mark as allocated as it will be processed by auto-allocation
+        allocationMethod: 'AUTO'
       };
 
       await apiRequest("/api/payments", {
@@ -2579,29 +2581,36 @@ function CreatePaymentDialog({
     try {
       setIsLoading(true);
 
-      if (!amount || !paymentDate) {
+      if (!amount || parseFloat(amount) <= 0) {
         toast({
           title: "خطا",
-          description: "مبلغ و تاریخ پرداخت الزامی است",
+          description: "مبلغ پرداخت باید بزرگتر از صفر باشد",
           variant: "destructive"
         });
         return;
       }
 
-      const paymentAmount = parseFloat(amount);
+      if (!selectedInvoiceId) {
+        toast({
+          title: "خطا",
+          description: "انتخاب فاکتور برای تخصیص الزامی است",
+          variant: "destructive"
+        });
+        return;
+      }
 
-      // Auto-allocation logic (Smart Payment Processing)
       if (selectedInvoiceId === "auto") {
-        await handleAutoAllocation(paymentAmount);
+        await handleAutoAllocation(parseFloat(amount));
       } else {
         // Manual allocation to specific invoice
         const paymentData = {
           representativeId: representative.id,
-          amount,
-          paymentDate,
-          description: description || `پرداخت برای ${representative.name}`,
-          invoiceId: selectedInvoiceId ? parseInt(selectedInvoiceId) : null,
-          isAllocated: !!selectedInvoiceId
+          amount: parseFloat(amount),
+          paymentDate: paymentDate,
+          description: description || `پرداخت تخصیص یافته به فاکتور ${selectedInvoiceId}`,
+          invoiceId: parseInt(selectedInvoiceId),
+          allocationMethod: 'MANUAL',
+          isAllocated: true
         };
 
         await apiRequest("/api/payments", {
@@ -2630,7 +2639,7 @@ function CreatePaymentDialog({
       setAmount("");
       setPaymentDate("");
       setDescription("");
-      setSelectedInvoiceId("auto");
+      setSelectedInvoiceId(""); // Reset to empty
 
       // ✅ SHERLOCK v24.0: همگام‌سازی با force cache invalidation
       try {
@@ -2740,22 +2749,24 @@ function CreatePaymentDialog({
 
           <div>
             <Label htmlFor="invoiceId" className="text-white">تخصیص به فاکتور</Label>
-            <Select value={selectedInvoiceId} onValueChange={setSelectedInvoiceId}>
-              <SelectTrigger 
+            <Select value={selectedInvoiceId || ""} onValueChange={setSelectedInvoiceId} required>
+              <SelectTrigger
                 className="bg-white/10 border-white/20 text-white mt-1"
                 data-testid="select-invoice-allocation"
               >
-                <SelectValue placeholder="انتخاب روش تخصیص" />
+                <SelectValue placeholder="انتخاب فاکتور برای تخصیص (الزامی)" />
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-white/20">
                 <SelectItem value="auto" className="text-white hover:bg-white/10">
                   🤖 تخصیص خودکار (پیشنهادی)
                 </SelectItem>
-                {representative && (representative as any).invoices?.filter((inv: any) => inv.status !== 'paid').map((invoice: Invoice) => (
-                  <SelectItem key={invoice.id} value={invoice.id.toString()} className="text-white hover:bg-white/10">
-                    📄 {invoice.invoiceNumber} - {formatCurrency(parseFloat(invoice.amount))}
-                  </SelectItem>
-                ))}
+                {representative && (representative as any).invoices
+                  ?.filter((invoice: any) => invoice.status !== 'paid') // فقط فاکتورهای پرداخت نشده
+                  .map((invoice: Invoice) => (
+                    <SelectItem key={invoice.id} value={invoice.id.toString()} className="text-white hover:bg-white/10">
+                      📄 {invoice.invoiceNumber} - {formatCurrency(parseFloat(invoice.amount))} تومان - {invoice.status === 'partial' ? 'نیمه پرداخت' : 'پرداخت نشده'}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-blue-300 mt-1">

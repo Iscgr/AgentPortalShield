@@ -6,6 +6,9 @@
 import { Router } from 'express';
 import { storage } from '../storage.js';
 import { unifiedAuthMiddleware } from '../middleware/unified-auth.js';
+import { EnhancedPaymentAllocationEngine } from '../services/enhanced-payment-allocation-engine.js';
+import { db, payments, invoices } from '../db.js'; // Assuming db, payments, and invoices are exported from '../db.js'
+import { eq } from 'drizzle-orm'; // Assuming eq is exported from drizzle-orm
 
 export const paymentManagementRouter = Router();
 export const requireAuth = unifiedAuthMiddleware;
@@ -210,13 +213,13 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
 
     if (result.success) {
       const processingTime = Date.now() - startTime;
-      
+
       // ✅ POST-SUCCESS DEBT SYNC - as required by architect plan
       try {
         console.log(`🔄 SHERLOCK v35.1: Initiating post-success debt sync for representative ${representativeId}`);
-        
+
         const { UnifiedFinancialEngine } = await import('../services/unified-financial-engine.js');
-        
+
         // Force cache invalidation first
         UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
           cascadeGlobal: true,
@@ -224,13 +227,13 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
           immediate: true,
           includePortal: true
         });
-        
+
         // Recalculate representative debt
         const engine = new UnifiedFinancialEngine(storage);
         const updatedFinancialData = await engine.calculateRepresentative(representativeId);
-        
+
         console.log(`✅ SHERLOCK v35.1: Debt sync completed for representative ${representativeId}`);
-        
+
         // ✅ COMPREHENSIVE ACTIVITY LOGGING
         await storage.createActivityLog({
           type: 'payment_manual_allocation',
@@ -251,7 +254,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
             timestamp: new Date().toISOString()
           }
         });
-        
+
         // ✅ STRUCTURED PAYLOAD RESPONSE suitable for frontend
         res.json({
           success: true,
@@ -284,10 +287,10 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
             version: 'SHERLOCK_v35.1'
           }
         });
-        
+
       } catch (syncError: any) {
         console.error(`⚠️ SHERLOCK v35.1: Debt sync failed but allocation successful:`, syncError);
-        
+
         // Still log the allocation even if sync fails
         await storage.createActivityLog({
           type: 'payment_manual_allocation',
@@ -306,7 +309,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
             timestamp: new Date().toISOString()
           }
         });
-        
+
         // Return success but with sync warning
         res.json({
           success: true,
@@ -340,7 +343,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
     } else {
       // Allocation failed
       console.log(`❌ SHERLOCK v35.1: Manual allocation failed: ${result.message}`);
-      
+
       res.status(400).json({
         success: false,
         error: result.message,
@@ -361,7 +364,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
 
   } catch (error: any) {
     console.error('❌ Manual allocation error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: "خطا در تخصیص دستی",
       details: {
@@ -566,7 +569,7 @@ paymentManagementRouter.post('/recalculate/:representativeId', async (req, res) 
       // Recalculate representative financial data
       const engine = new UnifiedFinancialEngine(storage);
       const freshFinancialData = await engine.calculateRepresentative(representativeId);
-      
+
       const processingTime = Date.now() - startTime;
 
       // Log the recalculation activity
@@ -674,5 +677,97 @@ paymentManagementRouter.post('/recalculate/:representativeId', async (req, res) 
     });
   }
 });
+
+// Add a new endpoint for creating payments with mandatory allocation
+paymentManagementRouter.post('/create', requireAuth, async (req, res) => {
+  try {
+    const { representativeId, amount, paymentDate, description, invoiceId } = req.body;
+    const performedBy = (req.session as any)?.username || 'ADMIN';
+    const startTime = Date.now();
+
+    console.log(`🎯 TITAN-O: Creating payment with MANDATORY allocation`);
+
+    // Validation - Invoice ID is now MANDATORY
+    if (!representativeId || !amount || amount <= 0 || !invoiceId) {
+      return res.status(400).json({
+        success: false,
+        error: "پارامترهای الزامی ناقص است - تخصیص فاکتور اجباری است",
+        details: {
+          representativeId: !representativeId,
+          amount: !amount || amount <= 0,
+          invoiceId: !invoiceId
+        }
+      });
+    }
+
+    // Create the payment record first
+    const newPayment = await storage.createPayment({
+      representativeId: parseInt(representativeId),
+      amount: parseFloat(amount),
+      paymentDate: new Date(paymentDate),
+      description: description || `Payment registered by ${performedBy}`,
+      status: 'PENDING_ALLOCATION', // Initially pending
+      performedBy
+    });
+
+    if (!newPayment || !newPayment.id) {
+      throw new Error('Failed to create payment record');
+    }
+
+    // MANDATORY manual allocation - NO generic payments allowed
+    console.log(`🎯 TITAN-O: Creating payment with MANDATORY allocation to invoice ${invoiceId}`);
+
+    const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
+      newPayment.id,
+      parseInt(invoiceId),
+      parseFloat(amount),
+      performedBy,
+      `Mandatory allocation during payment creation: ${description || 'Payment registered'}`
+    );
+
+    if (result.success) {
+      // Update payment status to allocated
+      await storage.updatePaymentStatus(newPayment.id, 'ALLOCATED');
+
+      res.json({
+        success: true,
+        data: {
+          paymentId: newPayment.id,
+          allocation: result,
+          representativeId: parseInt(representativeId),
+          invoiceId: parseInt(invoiceId),
+          method: 'MANDATORY_ALLOCATION'
+        },
+        message: `پرداخت با موفقیت ثبت و به فاکتور ${invoiceId} تخصیص یافت`
+      });
+    } else {
+      // If allocation failed, delete the payment record and return an error
+      await db.delete(payments).where(eq(payments.id, newPayment.id));
+
+      res.status(400).json({
+        success: false,
+        error: "خطا در تخصیص اجباری پرداخت",
+        details: result.errors,
+        message: "پرداخت لغو شد - تخصیص اجباری موفق نبود"
+      });
+    }
+
+  } catch (error: any) {
+    console.error('❌ Payment creation error:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطای سیستمی در ثبت پرداخت",
+      details: {
+        message: error.message,
+        timestamp: new Date().toISOString()
+      },
+      meta: {
+        operation: 'payment_creation_system_error',
+        version: 'TITAN-O'
+      }
+    });
+  }
+});
+
 
 export default paymentManagementRouter;

@@ -525,16 +525,23 @@ export class EnhancedPaymentAllocationEngine {
           throw new Error(`Invoice ${invoiceId} not found`);
         }
 
-        // ✅ Validate amounts
+        // ✅ Enhanced validation with detailed logging
         const paymentAmount = parseFloat(payment.amount);
         const invoiceAmount = parseFloat(invoice.amount);
 
+        console.log(`🎯 ATOMOS v36.1: Validation - Payment: ${paymentAmount}, Invoice: ${invoiceAmount}, Requested: ${amount}`);
+
         if (amount <= 0) {
-          throw new Error('Allocation amount must be positive');
+          throw new Error('مبلغ تخصیص باید مثبت باشد');
         }
 
         if (amount > paymentAmount) {
-          throw new Error(`Allocation amount ${amount} exceeds payment amount ${paymentAmount}`);
+          throw new Error(`مبلغ تخصیص ${amount} بیشتر از مبلغ پرداخت ${paymentAmount} است`);
+        }
+
+        // Check if payment is already allocated
+        if (payment.isAllocated) {
+          throw new Error(`پرداخت ${paymentId} قبلاً تخصیص یافته است`);
         }
 
         // ✅ Check current invoice paid amount
@@ -560,38 +567,42 @@ export class EnhancedPaymentAllocationEngine {
         // ✅ TITAN-O FIXED: Corrected allocation logic following auto-allocation pattern
         const remainingPaymentAmount = paymentAmount - amount;
 
-        // ✅ CORRECTED MANUAL ALLOCATION LOGIC
+        // ✅ TITAN-O FIXED: Enhanced manual allocation with detailed logging
+        console.log(`🎯 TITAN-O: Processing allocation - Full: ${Math.abs(remainingPaymentAmount) <= 0.01}`);
+        
         if (Math.abs(remainingPaymentAmount) <= 0.01) {
-          // Full allocation - update original payment to link to specified invoice
+          // Full allocation - update original payment
           await tx.update(payments)
             .set({ 
               isAllocated: true,
-              invoiceId: invoiceId
+              invoiceId: invoiceId,
+              description: `${payment.description || 'پرداخت'} - تخصیص کامل به فاکتور ${invoiceId}`
             })
             .where(eq(payments.id, paymentId));
 
-          console.log(`✅ CORRECTED: Payment ${paymentId} fully allocated to invoice ${invoiceId}`);
+          console.log(`✅ TITAN-O: Payment ${paymentId} fully allocated to invoice ${invoiceId}`);
         } else {
-          // Partial allocation - create new allocated payment for specified invoice
+          // Partial allocation - create allocated portion
           await tx.insert(payments).values({
             representativeId: payment.representativeId!,
             invoiceId: invoiceId,
             amount: amount.toString(),
             paymentDate: payment.paymentDate,
-            description: `Manual allocation from payment ${paymentId}`,
+            description: `تخصیص دستی از پرداخت ${paymentId} به فاکتور ${invoiceId}`,
             isAllocated: true
           });
           
-          // Update original payment to show remaining amount (unallocated)
+          // Update original payment with remaining amount
           await tx.update(payments)
             .set({ 
               amount: remainingPaymentAmount.toString(),
               isAllocated: false,
-              invoiceId: null
+              invoiceId: null,
+              description: `${payment.description || 'پرداخت'} - باقیمانده پس از تخصیص ${amount} تومان`
             })
             .where(eq(payments.id, paymentId));
 
-          console.log(`✅ CORRECTED: Created allocated payment of ${amount} to invoice ${invoiceId}, remaining ${remainingPaymentAmount} stays unallocated`);
+          console.log(`✅ TITAN-O: Created allocated payment of ${amount} to invoice ${invoiceId}, remaining ${remainingPaymentAmount} unallocated`);
         }
 
         // 🎯 CRITICAL FIX 2: Update invoice status with accurate calculation

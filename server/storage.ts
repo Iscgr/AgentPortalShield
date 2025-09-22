@@ -961,6 +961,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
+    // TITAN-O: Validate payment creation - discourage generic payments
+    if (!payment.invoiceId && !payment.isAllocated) {
+      console.warn(`⚠️ TITAN-O: Creating unallocated payment for representative ${payment.representativeId}`);
+    }
+    
     const [newPayment] = await db
       .insert(payments)
       .values(payment)
