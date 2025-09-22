@@ -560,8 +560,9 @@ export class EnhancedPaymentAllocationEngine {
         // ✅ TITAN-O FIXED: Corrected allocation logic following auto-allocation pattern
         const remainingPaymentAmount = paymentAmount - amount;
 
-        if (remainingPaymentAmount <= 0.01) {
-          // Full allocation - mark original payment as allocated to this invoice
+        // ✅ CORRECTED MANUAL ALLOCATION LOGIC
+        if (Math.abs(remainingPaymentAmount) <= 0.01) {
+          // Full allocation - update original payment to link to specified invoice
           await tx.update(payments)
             .set({ 
               isAllocated: true,
@@ -569,28 +570,28 @@ export class EnhancedPaymentAllocationEngine {
             })
             .where(eq(payments.id, paymentId));
 
-          console.log(`✅ TITAN-O: Original payment ${paymentId} fully allocated to invoice ${invoiceId}`);
+          console.log(`✅ CORRECTED: Payment ${paymentId} fully allocated to invoice ${invoiceId}`);
         } else {
-          // Partial allocation - update original payment with allocated amount and invoice link
-          await tx.update(payments)
-            .set({
-              isAllocated: true,
-              invoiceId: invoiceId,
-              amount: amount.toString()
-            })
-            .where(eq(payments.id, paymentId));
-          
-          // Create remaining unallocated payment
+          // Partial allocation - create new allocated payment for specified invoice
           await tx.insert(payments).values({
             representativeId: payment.representativeId!,
-            amount: remainingPaymentAmount.toString(),
+            invoiceId: invoiceId,
+            amount: amount.toString(),
             paymentDate: payment.paymentDate,
-            description: `Remaining from manual allocation ${paymentId}`,
-            isAllocated: false,
-            invoiceId: null
+            description: `Manual allocation from payment ${paymentId}`,
+            isAllocated: true
           });
+          
+          // Update original payment to show remaining amount (unallocated)
+          await tx.update(payments)
+            .set({ 
+              amount: remainingPaymentAmount.toString(),
+              isAllocated: false,
+              invoiceId: null
+            })
+            .where(eq(payments.id, paymentId));
 
-          console.log(`✅ TITAN-O: Original payment ${paymentId} allocated ${amount} to invoice ${invoiceId}, created remaining ${remainingPaymentAmount} unallocated`);
+          console.log(`✅ CORRECTED: Created allocated payment of ${amount} to invoice ${invoiceId}, remaining ${remainingPaymentAmount} stays unallocated`);
         }
 
         // 🎯 CRITICAL FIX 2: Update invoice status with accurate calculation

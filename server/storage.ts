@@ -268,7 +268,7 @@ export interface IStorage {
   }>;
   // Force refresh portal cache
   forceRefreshPortalCache(representativeCode: string): Promise<void>;
-  // Update invoice status after payment
+  // Update invoice status after allocation
   updateInvoiceStatusAfterAllocation(invoiceId: number): Promise<void>;
 }
 
@@ -1269,7 +1269,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // ✅ SHERLOCK v22.1 CRITICAL FIX: Include 'partial' status in debt calculation
-      // remainingDebt = unpaid/overdue/partial invoices - allocated payments (NEVER negative)
+      // remainingDebt = unpaid/overdue/partial invoices - allocated payments
       const debtorReps = await db
         .select({
           id: representatives.id,
@@ -2938,53 +2938,52 @@ export class DatabaseStorage implements IStorage {
    * SHERLOCK v36.0: Enhanced invoice status calculation after allocation with TITAN-O fixes
    */
   async updateInvoiceStatusAfterAllocation(invoiceId: number): Promise<void> {
-    try {
-      console.log(`🔄 SHERLOCK v36.0: TITAN-O Updating invoice ${invoiceId} status after allocation`);
+    return await withDatabaseRetry(
+      async () => {
+        // Get invoice amount
+        const [invoice] = await db.select({
+          id: invoices.id,
+          amount: invoices.amount
+        }).from(invoices).where(eq(invoices.id, invoiceId));
 
-      // Get the invoice details
-      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
-      if (!invoice) {
-        throw new Error(`Invoice ${invoiceId} not found`);
-      }
+        if (!invoice) {
+          throw new Error(`Invoice ${invoiceId} not found`);
+        }
 
-      const invoiceAmount = parseFloat(invoice.amount);
+        const invoiceAmount = parseFloat(invoice.amount);
 
-      // ✅ TITAN-O FIX: Calculate total allocated payments for this invoice - including direct allocations
-      const [totalPaidResult] = await db.select({
-        total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
-      }).from(payments)
-      .where(and(
-        eq(payments.invoiceId, invoiceId),
-        eq(payments.isAllocated, true)
-      ));
+        // Get total payments allocated to this invoice
+        const [paymentResult] = await db.select({
+          total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+        }).from(payments)
+        .where(and(
+          eq(payments.invoiceId, invoiceId),
+          eq(payments.isAllocated, true)
+        ));
 
-      const totalPaid = totalPaidResult.total || 0;
-      const paymentRatio = invoiceAmount > 0 ? (totalPaid / invoiceAmount) : 0;
+        const totalPaid = paymentResult.total || 0;
+        const paymentRatio = invoiceAmount > 0 ? (totalPaid / invoiceAmount) : 0;
 
-      console.log(`📊 SHERLOCK v36.0: TITAN-O Invoice ${invoiceId} - Amount: ${invoiceAmount}, Paid: ${totalPaid}, Ratio: ${paymentRatio.toFixed(3)}`);
+        // Determine new status
+        let newStatus = 'unpaid';
+        if (paymentRatio >= 0.999) { // 99.9% tolerance
+          newStatus = 'paid';
+        } else if (totalPaid > 0.01) {
+          newStatus = 'partial';
+        }
 
-      // ✅ Enhanced status calculation with proper tolerance
-      let newStatus = 'unpaid';
-      if (paymentRatio >= 0.999) { // 99.9% tolerance for floating point precision
-        newStatus = 'paid';
-      } else if (totalPaid > 0.01) {
-        newStatus = 'partial';
-      }
+        // Update invoice status
+        await db.update(invoices)
+          .set({ 
+            status: newStatus,
+            updatedAt: new Date()
+          })
+          .where(eq(invoices.id, invoiceId));
 
-      // Update invoice status
-      await db.update(invoices)
-        .set({
-          status: newStatus,
-          updatedAt: new Date()
-        })
-        .where(eq(invoices.id, invoiceId));
-
-      console.log(`✅ SHERLOCK v36.0: TITAN-O Invoice ${invoiceId} status updated to '${newStatus}'`);
-
-    } catch (error) {
-      console.error(`❌ SHERLOCK v36.0: TITAN-O Failed to update invoice status for ${invoiceId}:`, error);
-      throw error;
-    }
+        console.log(`✅ Invoice ${invoiceId} status updated to '${newStatus}' (paid: ${totalPaid}/${invoiceAmount})`);
+      },
+      'updateInvoiceStatusAfterAllocation'
+    );
   }
 
   async getPaymentAllocationSummary(representativeId: number): Promise<{
@@ -3020,6 +3019,7 @@ export class DatabaseStorage implements IStorage {
       'getPaymentAllocationSummary'
     );
   }
+
 
   // SHERLOCK v18.4 - DEPRECATED: Use UNIFIED Financial Engine directly
   // This method is now deprecated. Use: unifiedFinancialEngine.calculateRepresentative()

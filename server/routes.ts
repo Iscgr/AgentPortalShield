@@ -1649,10 +1649,10 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         try {
           // Update invoice status based on new payment allocation
           await storage.updateInvoiceStatusAfterAllocation(parseInt(selectedInvoiceId));
-          
+
           finalPaymentStatus = newPayment;
           console.log(`✅ TITAN-O FIXED: Manual allocation completed successfully`);
-          
+
           // Create activity log for manual allocation
           await storage.createActivityLog({
             type: 'payment_manual_allocation_direct',
@@ -1671,39 +1671,6 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         } catch (allocationError) {
           console.error(`❌ TITAN-O: Manual allocation error:`, allocationError);
           finalPaymentStatus = newPayment;
-        }ompleted successfully for Payment ${newPayment.id}`);
-        } catch (error) {
-          console.error(`❌ SHERLOCK v36.0: Manual allocation failed:`, error);
-          finalPaymentStatus = newPayment;
-        }
-      } else if (selectedInvoiceId === "auto") {
-        console.log(`🚀 SHERLOCK v34.0: Executing UNIFIED auto-allocation - Payment ${newPayment.id}`);
-
-        try {
-          // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص خودکار برای تخصیص دستی
-          const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-          const allocationResult = await enhancedPaymentAllocationEngine.manualAllocatePayment(
-            newPayment.id,
-            parseInt(selectedInvoiceId),
-            parseFloat(amount),
-            'ADMIN_USER' // یا شناسه کاربری واقعی
-          );
-
-          if (!allocationResult.success) {
-            throw new Error(`Manual allocation failed: ${allocationResult.errors.join(', ')}`);
-          }
-
-          // بروزرسانی وضعیت پرداخت
-          finalPaymentStatus = await storage.updatePayment(newPayment.id, {
-            isAllocated: true,
-            invoiceId: parseInt(selectedInvoiceId)
-          });
-
-          console.log(`✅ SHERLOCK v34.0: UNIFIED manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
-
-        } catch (allocationError) {
-          console.error(`❌ SHERLOCK v34.0: UNIFIED manual allocation failed:`, allocationError);
-          throw new Error(`خطا در تخصیص دستی یکپارچه: ${allocationError.message}`);
         }
       } else if (selectedInvoiceId === "auto") {
           console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation for Representative ${representativeId}`);
