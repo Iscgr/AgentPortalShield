@@ -233,7 +233,12 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     </div>;
   }
 
-  const debt = financialData.actualDebt || 0;
+  // ✅ CRITICAL FIX: Use totalDebt as fallback since Batch API returns totalDebt, not actualDebt
+  const debt = financialData.actualDebt ?? financialData.totalDebt ?? (
+    financialData.totalSales && financialData.totalPaid != null 
+      ? financialData.totalSales - financialData.totalPaid 
+      : 0
+  );
 
   return (
     <span className={`transition-colors duration-200 ${
