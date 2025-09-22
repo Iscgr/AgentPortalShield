@@ -113,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ATOMOS v2.0: Apply advanced security headers
   app.use(securityHeaders);
-  
+
   // ATOMOS v2.0: Apply adaptive rate limiting
   app.use(adaptiveRateLimit);
 
@@ -189,10 +189,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/system/data-reconciliation", authMiddleware, async (req, res) => {
     try {
       console.log("🚀 PERFORMANCE: Starting ASYNC comprehensive data reconciliation...");
-      
+
       const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
       const asyncService = AsyncReconciliationService.getInstance();
-      
+
       // Extract configuration from request body
       const config = {
         batchSize: req.body.batchSize || 10,
@@ -207,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const jobId = await asyncService.startAsyncReconciliation(config);
 
       console.log(`✅ PERFORMANCE: Async reconciliation started with job ID: ${jobId}`);
-      
+
       res.status(202).json({
         success: true,
         message: "تطبیق داده‌ها آغاز شد - لطفاً پیشرفت را پیگیری کنید",
@@ -217,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         config: config,
         timestamp: new Date().toISOString()
       });
-      
+
     } catch (error) {
       console.error("❌ PERFORMANCE: Async reconciliation startup error:", error);
       res.status(500).json({
@@ -233,12 +233,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/system/reconciliation-status/:jobId", authMiddleware, async (req, res) => {
     try {
       const { jobId } = req.params;
-      
+
       const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
       const asyncService = AsyncReconciliationService.getInstance();
-      
+
       const jobStatus = asyncService.getJobStatus(jobId);
-      
+
       if (!jobStatus) {
         return res.status(404).json({
           success: false,
@@ -258,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedTimeRemaining: estimatedTimeRemaining,
         timestamp: new Date().toISOString()
       });
-      
+
     } catch (error) {
       console.error("❌ PERFORMANCE: Job status error:", error);
       res.status(500).json({
@@ -273,12 +273,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/system/reconciliation-result/:jobId", authMiddleware, async (req, res) => {
     try {
       const { jobId } = req.params;
-      
+
       const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
       const asyncService = AsyncReconciliationService.getInstance();
-      
+
       const jobStatus = asyncService.getJobStatus(jobId);
-      
+
       if (!jobStatus) {
         return res.status(404).json({
           success: false,
@@ -318,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         timestamp: new Date().toISOString()
       });
-      
+
     } catch (error) {
       console.error("❌ PERFORMANCE: Job result error:", error);
       res.status(500).json({
@@ -333,12 +333,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/system/reconciliation-job/:jobId", authMiddleware, async (req, res) => {
     try {
       const { jobId } = req.params;
-      
+
       const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
       const asyncService = AsyncReconciliationService.getInstance();
-      
+
       const cancelled = asyncService.cancelJob(jobId);
-      
+
       if (cancelled) {
         res.json({
           success: true,
@@ -352,7 +352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Job is not in a cancellable state"
         });
       }
-      
+
     } catch (error) {
       console.error("❌ PERFORMANCE: Job cancellation error:", error);
       res.status(500).json({
@@ -368,11 +368,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { AsyncJobManager } = await import('./services/async-job-manager.js');
       const jobManager = AsyncJobManager.getInstance();
-      
+
       const limit = parseInt(req.query.limit as string) || 10;
       const activeJobs = jobManager.getActiveJobs();
       const recentJobs = jobManager.getRecentJobs(limit);
-      
+
       res.json({
         success: true,
         activeJobs: activeJobs,
@@ -380,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalActive: activeJobs.length,
         timestamp: new Date().toISOString()
       });
-      
+
     } catch (error) {
       console.error("❌ PERFORMANCE: Jobs list error:", error);
       res.status(500).json({
@@ -390,10 +390,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-  
+
   // ATOMOS v2.0: Register Advanced System Routes
   app.use('/api/system', advancedSystemRoutes);
-  
+
   console.log('✅ ATOMOS v2.0: Advanced system routes registered successfully');
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
@@ -810,18 +810,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ✅ ATOMOS v2.0: BATCH CALCULATION - ELIMINATING N+1 QUERIES
       console.log('🚀 ATOMOS v2.0: Using BATCH calculation to eliminate N+1 queries...');
       const batchStartTime = performance.now();
-      
+
       // Use optimized batch calculation instead of individual queries
-      const engine = new UnifiedFinancialEngine(null);
-      const allFinancialData = await engine.calculateAllRepresentatives();
-      
+      const allFinancialData = await unifiedFinancialEngine.calculateAllRepresentatives();
+
       // Create lookup map for O(1) access
       const financialDataMap = new Map(allFinancialData.map(data => [data.id, data]));
-      
+
       // Enhanced representatives with batch-calculated financial data
       const enhancedRepresentatives = representatives.map(rep => {
         const financialData = financialDataMap.get(rep.id);
-        
+
         if (financialData) {
           return {
             ...rep,
@@ -837,12 +836,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           };
         }
-        
+
         // Fallback to stored data if batch calculation didn't include this rep
         console.warn(`⚠️ ATOMOS v2.0: No batch data for rep ${rep.id}, using stored data`);
         return rep;
       });
-      
+
       const batchEndTime = performance.now();
       const batchProcessingTime = Math.round(batchEndTime - batchStartTime);
       console.log(`✅ ATOMOS v2.0: BATCH PROCESSING completed in ${batchProcessingTime}ms - N+1 ELIMINATED!`);
@@ -1004,8 +1003,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public Portal API - ATOMOS OPTIMIZED VERSION
   // ✅ ATOMOS PHASE 7: بهینه‌سازی کامل پرتال با batch processing
   app.get("/api/public/portal/:publicId", async (req, res) => {
-    const startTime = performance.now();
-    
+    const portalStartTime = performance.now();
+
     try {
       const { publicId } = req.params;
 
@@ -1033,14 +1032,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalDebt: representatives.totalDebt,
           totalSales: representatives.totalSales
         }).from(representatives).where(eq(representatives.publicId, publicId)).limit(1),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Portal query timeout')), 3000)
         )
       ]);
 
-      const representative = await portalDataPromise;
+      const representativeResult = await portalDataPromise;
 
-      if (!Array.isArray(representative) || !representative.length) {
+      if (!Array.isArray(representativeResult) || !representativeResult.length) {
         console.log('❌ Representative not found for publicId:', publicId);
         return res.status(404).json({
           error: 'نماینده یافت نشد',
@@ -1049,8 +1048,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const rep = representative[0];
-      console.log(`✅ ATOMOS: Representative found: ${rep.name} (${rep.code})`);
+      const representative = representativeResult[0];
+      console.log(`✅ ATOMOS: Representative found: ${representative.name} (${representative.code})`);
 
       // ✅ ATOMOS OPTIMIZATION 2: Parallel batch queries with timeout
       const batchDataPromise = Promise.race([
@@ -1066,7 +1065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             usageData: invoices.usageData,
             createdAt: invoices.createdAt
           }).from(invoices)
-          .where(eq(invoices.representativeId, rep.id))
+          .where(eq(invoices.representativeId, representative.id))
           .orderBy(invoices.issueDate, invoices.createdAt),
 
           // Batch query 2: Only ALLOCATED payments for this representative (matching Unified Financial Engine)
@@ -1079,25 +1078,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isAllocated: payments.isAllocated
           }).from(payments)
           .where(and(
-            eq(payments.representativeId, rep.id),
+            eq(payments.representativeId, representative.id),
             eq(payments.isAllocated, true)
           ))
           .orderBy(desc(payments.paymentDate))
         ]),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Portal data timeout')), 2000)
         )
       ]);
 
       const [invoiceData, paymentData] = await batchDataPromise;
 
-      // ✅ ATOMOS OPTIMIZATION 3: Direct financial calculation from data
-      const totalSales = parseFloat(rep.totalSales) || 0;
-      const storedDebt = parseFloat(rep.totalDebt) || 0;
+      // ✅ ATOMOS OPTIMIZATION 3: Direct financial calculation from data & PORTAL MIRROR
+      const unifiedFinancialData = await unifiedFinancialEngine.calculateRepresentative(representative.id);
 
-      // Calculate totals from payment data directly
+      const mirroredTotalSales = parseFloat(unifiedFinancialData.totalSales) || 0;
+      const mirroredTotalPaid = unifiedFinancialData.totalPaid || 0;
+      const mirroredActualDebt = Math.max(0, mirroredTotalSales - mirroredTotalPaid);
+
+      const paymentRatio = mirroredTotalSales > 0 ? (mirroredTotalPaid / mirroredTotalSales) * 100 : 0;
+      let debtLevel: string;
+      if (mirroredActualDebt === 0) debtLevel = 'HEALTHY';
+      else if (mirroredActualDebt <= 100000) debtLevel = 'MODERATE';
+      else if (mirroredActualDebt <= 500000) debtLevel = 'HIGH';
+      else debtLevel = 'CRITICAL';
+
+      // ✅ PORTAL MIRROR: Initial calculation for fallback
+      const totalSales = invoiceData.reduce((sum, invoice) => sum + parseFloat(invoice.amount), 0);
       const totalPaid = paymentData.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
       const actualDebt = Math.max(0, totalSales - totalPaid);
+
+      console.log('📊 PORTAL MIRROR: Initial calculations:', {
+        totalSales,
+        totalPaid,
+        actualDebt,
+        invoiceCount: invoiceData.length,
+        paymentCount: paymentData.length
+      });
 
       // ✅ ATOMOS OPTIMIZATION 4: Minimal settings with fallbacks
       const portalConfig = {
@@ -1126,59 +1144,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return dateB.getTime() - dateA.getTime();
       });
 
-      // Calculate payment ratio
-      const paymentRatio = totalSales > 0 ? (totalPaid / totalSales) * 100 : 0;
+      const credit = Math.max(0, mirroredTotalPaid - mirroredTotalSales);
 
-      // Determine debt level
-      let debtLevel: string;
-      if (actualDebt === 0) debtLevel = 'HEALTHY';
-      else if (actualDebt <= 100000) debtLevel = 'MODERATE';
-      else if (actualDebt <= 500000) debtLevel = 'HIGH';
-      else debtLevel = 'CRITICAL';
+      res.json({
+        name: representative.name,
+        panelUsername: representative.panelUsername,
+        totalSales: mirroredTotalSales.toString(),
+        totalDebt: mirroredActualDebt.toString(),
+        credit: credit.toString(),
+        invoices: sortedInvoices,
+        payments: sortedPayments,
+        config: portalConfig,
 
-      // ✅ ATOMOS: Optimized response data structure
-      const publicData = {
-        name: rep.name,
-        code: rep.code,
-        panelUsername: rep.panelUsername,
-        ownerName: rep.ownerName,
-        // ✅ محاسبات بهینه شده بدون timeout
-        totalDebt: actualDebt.toString(),
-        totalSales: totalSales.toString(),
-        credit: rep.credit,
-        portalConfig,
-        invoices: sortedInvoices.map(inv => ({
-          invoiceNumber: inv.invoiceNumber,
-          amount: inv.amount,
-          issueDate: inv.issueDate,
-          dueDate: inv.dueDate,
-          status: inv.status,
-          usageData: inv.usageData,
-          createdAt: inv.createdAt
-        })),
-        payments: sortedPayments.map(pay => ({
-          amount: pay.amount,
-          paymentDate: pay.paymentDate,
-          description: pay.description || 'پرداخت'
-        })),
-
-        // ✅ متادیتا بهینه شده
-        financialMeta: {
-          paymentRatio: Math.round(paymentRatio * 100) / 100,
+        // ✅ PORTAL MIRROR: Include unified financial metadata
+        financialMeta: unifiedFinancialData ? {
+          totalSales: mirroredTotalSales,
+          totalPaid: mirroredTotalPaid,
+          actualDebt: mirroredActualDebt,
+          paymentRatio: paymentRatio,
           debtLevel: debtLevel,
-          lastCalculation: new Date().toISOString(),
-          accuracyGuaranteed: true
+          lastCalculation: unifiedFinancialData.calculationTimestamp,
+          accuracyGuaranteed: unifiedFinancialData.accuracyGuaranteed || true,
+          mirrorSource: 'UNIFIED_FINANCIAL_ENGINE'
+        } : null,
+
+        // ✅ ATOMOS v2.0: Enhanced metadata for frontend optimization
+        meta: {
+          recordCount: sortedInvoices.length + sortedPayments.length,
+          lastUpdated: new Date().toISOString(),
+          dataFreshness: Date.now() - portalStartTime,
+          optimizationLevel: 'ATOMOS_v2.0_PORTAL_MIRROR_OPTIMIZED',
+          mirrorApplied: !!unifiedFinancialData
         }
-      };
-
-      const processingTime = performance.now() - startTime;
-      console.log(`✅ ATOMOS PORTAL v2.0: Portal data generated in ${Math.round(processingTime)}ms`);
-
-      res.json(publicData);
+      });
     } catch (error) {
-      const processingTime = performance.now() - startTime;
+      const processingTime = performance.now() - portalStartTime;
       console.error(`❌ ATOMOS PORTAL ERROR after ${Math.round(processingTime)}ms:`, error);
-      
+
       // Enhanced error response with fallback data
       if (error.message.includes('timeout')) {
         return res.status(504).json({

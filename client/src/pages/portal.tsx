@@ -550,43 +550,75 @@ export default function Portal() {
     );
   }
 
-  // ✅ SHERLOCK v32.1: اتصال به سیستم مالی استاندارد - محاسبات Real-time
+  // ✅ PORTAL FINANCIAL MIRROR: اتصال مستقیم به سیستم مالی یکپارچه
   let totalSales: number, totalDebt: number, credit: number, invoices: Invoice[], payments: Payment[];
   
   try {
-    console.log('🔍 Portal data received:', data);
-    console.log('🔍 Financial meta from standardized engine:', data.financialMeta);
+    console.log('🔍 PORTAL MIRROR: Portal data received:', data);
+    console.log('🔍 PORTAL MIRROR: Financial meta from unified engine:', data.financialMeta);
     
-    // ✅ اولویت با سیستم مالی استاندارد (Unified Financial Engine)
+    // ✅ MIRROR STRATEGY: استفاده مستقیم از داده‌های محاسبه شده unified engine
     if (data.financialMeta && data.financialMeta.accuracyGuaranteed) {
-      console.log('🎯 Using STANDARDIZED financial data from Unified Engine');
-      totalSales = parseFloat(String(data.totalSales || '0'));
-      totalDebt = parseFloat(String(data.totalDebt || '0'));
+      console.log('🎯 PORTAL MIRROR: Using MIRROR data from Unified Financial Engine');
+      
+      // Mirror exact values from unified financial calculations
+      totalSales = data.financialMeta.totalSales || parseFloat(String(data.totalSales || '0'));
+      totalDebt = data.financialMeta.actualDebt || data.financialMeta.totalDebt || parseFloat(String(data.totalDebt || '0'));
+      
+      console.log('🔥 PORTAL MIRROR: Mirrored financial values:', {
+        totalSalesFromMeta: data.financialMeta.totalSales,
+        actualDebtFromMeta: data.financialMeta.actualDebt,
+        totalDebtFromMeta: data.financialMeta.totalDebt,
+        finalTotalSales: totalSales,
+        finalTotalDebt: totalDebt
+      });
     } else {
-      console.log('⚠️ Fallback to basic data extraction');
-      totalSales = parseFloat(String(data.totalSales || '0'));
-      totalDebt = parseFloat(String(data.totalDebt || '0'));
+      console.log('⚠️ PORTAL MIRROR: Fallback to database values - calculating real-time');
+      
+      // Calculate from raw data as backup
+      const invoiceSum = Array.isArray(data.invoices) ? 
+        data.invoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0) : 0;
+      const paymentSum = Array.isArray(data.payments) ? 
+        data.payments.reduce((sum, pay) => sum + (parseFloat(pay.amount) || 0), 0) : 0;
+      
+      totalSales = invoiceSum || parseFloat(String(data.totalSales || '0'));
+      totalDebt = Math.max(0, invoiceSum - paymentSum) || parseFloat(String(data.totalDebt || '0'));
+      
+      console.log('📊 PORTAL MIRROR: Calculated from raw data:', {
+        invoiceSum,
+        paymentSum,
+        calculatedDebt: totalSales - paymentSum,
+        finalTotalSales: totalSales,
+        finalTotalDebt: totalDebt
+      });
     }
     
     credit = parseFloat(String(data.credit || '0'));
     invoices = Array.isArray(data.invoices) ? data.invoices : [];
     payments = Array.isArray(data.payments) ? data.payments : [];
     
-    // Validate numeric values
-    if (isNaN(totalSales)) totalSales = 0;
-    if (isNaN(totalDebt)) totalDebt = 0;
+    // Enhanced validation with fallback to database values
+    if (isNaN(totalSales) || totalSales === 0) {
+      totalSales = parseFloat(String(data.totalSales || '0'));
+      console.log('🔧 PORTAL MIRROR: Sales fallback to DB value:', totalSales);
+    }
+    if (isNaN(totalDebt) || totalDebt === 0) {
+      totalDebt = parseFloat(String(data.totalDebt || '0'));
+      console.log('🔧 PORTAL MIRROR: Debt fallback to DB value:', totalDebt);
+    }
     if (isNaN(credit)) credit = 0;
     
-    console.log('✅ Portal final values:', {
+    console.log('✅ PORTAL MIRROR: Final mirrored values:', {
       totalSales: totalSales.toLocaleString(),
       totalDebt: totalDebt.toLocaleString(),
       credit: credit.toLocaleString(),
       invoicesCount: invoices.length,
-      paymentsCount: payments.length
+      paymentsCount: payments.length,
+      mirrorSource: data.financialMeta ? 'UNIFIED_ENGINE' : 'RAW_CALCULATION'
     });
     
   } catch (error) {
-    console.error('❌ Portal data extraction error:', error);
+    console.error('❌ PORTAL MIRROR: Data extraction error:', error);
     totalSales = 0;
     totalDebt = 0;
     credit = 0;
