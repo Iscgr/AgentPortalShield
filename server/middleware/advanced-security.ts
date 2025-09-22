@@ -39,6 +39,7 @@ class AdvancedSecurityManager {
   createAdaptiveRateLimit() {
     return rateLimit({
       windowMs: this.config.rateLimiting.windowMs,
+      trustProxy: process.env.NODE_ENV === 'production' ? 1 : false, // Match Express trust proxy setting
       skip: (req: Request) => {
         // Skip rate limiting for development assets and Vite HMR
         if (process.env.NODE_ENV === 'development') {
