@@ -1611,17 +1611,17 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
       console.log(`📅 تطبیق تاریخ: ورودی="${paymentDate}" -> عادی‌سازی شده="${normalizedPaymentDate}"`);
 
-      // ✅ SHERLOCK v33.2: ENHANCED ALLOCATION LOGIC WITH FINANCIAL SYNC
+      // ✅ SHERLOCK v36.0: CORRECTED ALLOCATION LOGIC - تنظیم صحیح invoiceId در تخصیص دستی
       let isAllocated = false;
       let invoiceId = null;
       let finalPaymentStatus = null;
 
       // Determine allocation status before creating payment
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
-        // For manual allocation, start as unallocated and update after successful allocation
-        isAllocated = false; // Will be updated after successful allocation
-        invoiceId = null;    // Will be set after successful allocation
-        console.log(`💰 SHERLOCK v33.2: Manual allocation planned - Payment to Invoice ${selectedInvoiceId}`);
+        // ✅ TITAN-O FIX: برای تخصیص دستی، invoiceId را از همان ابتدا تنظیم کنیم
+        isAllocated = true; // Will be allocated to specific invoice
+        invoiceId = parseInt(selectedInvoiceId); // Set the actual invoice ID
+        console.log(`💰 SHERLOCK v36.0: CORRECTED Manual allocation - Payment to Invoice ${selectedInvoiceId}`);
       } else if (selectedInvoiceId === "auto") {
         console.log(`🔄 SHERLOCK v35.1: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
         // Auto-allocation will be performed using Enhanced Payment Allocation Engine
@@ -1630,7 +1630,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         console.log(`🎯 SHERLOCK v35.1: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
       }
 
-      // Create the payment initially as unallocated for manual assignments
+      // Create the payment with correct allocation status
       const newPayment = await storage.createPayment({
         representativeId,
         amount,
@@ -1642,12 +1642,25 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
       finalPaymentStatus = newPayment; // Initialize with the newly created payment
 
-      // ✅ SHERLOCK v34.0: UNIFIED ALLOCATION - استفاده انحصاری از Enhanced Payment Allocation Engine
+      // ✅ SHERLOCK v36.0: CORRECTED ALLOCATION LOGIC - تخصیص دستی بدون نیاز به engine اضافی
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
-        console.log(`💰 SHERLOCK v34.0: Executing UNIFIED manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
+        console.log(`💰 SHERLOCK v36.0: CORRECTED manual allocation - Payment ${newPayment.id} already allocated to Invoice ${selectedInvoiceId}`);
 
         try {
-          // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص دستی
+          // ✅ TITAN-O FIX: تخصیص دستی از همان ابتدا انجام شده، فقط وضعیت فاکتور را بروزرسانی می‌کنیم
+          await storage.updateInvoiceStatusAfterAllocation(parseInt(selectedInvoiceId));
+          
+          finalPaymentStatus = newPayment;
+          console.log(`✅ SHERLOCK v36.0: Manual allocation completed successfully for Payment ${newPayment.id}`);
+        } catch (error) {
+          console.error(`❌ SHERLOCK v36.0: Manual allocation failed:`, error);
+          finalPaymentStatus = newPayment;
+        }
+      } else if (selectedInvoiceId === "auto") {
+        console.log(`🚀 SHERLOCK v34.0: Executing UNIFIED auto-allocation - Payment ${newPayment.id}`);
+
+        try {
+          // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص خودکار برای تخصیص دستی
           const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
           const allocationResult = await enhancedPaymentAllocationEngine.manualAllocatePayment(
             newPayment.id,

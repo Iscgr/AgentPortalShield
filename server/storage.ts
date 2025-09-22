@@ -269,7 +269,7 @@ export interface IStorage {
   // Force refresh portal cache
   forceRefreshPortalCache(representativeCode: string): Promise<void>;
   // Update invoice status after payment
-  updateInvoiceStatusAfterPayment(invoiceId: number): Promise<void>;
+  updateInvoiceStatusAfterAllocation(invoiceId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2320,7 +2320,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     // Use Enhanced Payment Allocation Engine for proper allocation
     const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-    
+
     try {
       const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, {
         method: 'FIFO',
@@ -2472,7 +2472,7 @@ export class DatabaseStorage implements IStorage {
 
             // Update payment status
             await tx.update(payments)
-              .set({ 
+              .set({
                 isAllocated: true,
                 // If partial allocation, split the payment (create new payment for remainder)
               })
@@ -2522,7 +2522,7 @@ export class DatabaseStorage implements IStorage {
                 }
 
                 await tx.update(invoices)
-                  .set({ 
+                  .set({
                     status: newStatus,
                     updatedAt: new Date()
                   })
@@ -2626,10 +2626,10 @@ export class DatabaseStorage implements IStorage {
       try {
         const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
         // ✅ DEBT SYNC FIX: Use correct method - forceInvalidateRepresentative + calculateRepresentative
-        UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, { 
-          cascadeGlobal: true, 
-          reason: 'payment_auto_allocation', 
-          immediate: true 
+        UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
+          cascadeGlobal: true,
+          reason: 'payment_auto_allocation',
+          immediate: true
         });
         await new UnifiedFinancialEngine(null).calculateRepresentative(representativeId);
         console.log(`✅ DEBT SYNC: Representative ${representativeId} debt synchronized after auto-allocation`);
@@ -2666,7 +2666,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     // Use Enhanced Payment Allocation Engine for proper allocation
     const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-    
+
     try {
       const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
         paymentId,
@@ -2908,10 +2908,10 @@ export class DatabaseStorage implements IStorage {
         if (payment?.representativeId) {
           const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
           // ✅ DEBT SYNC FIX: Use correct method - forceInvalidateRepresentative + calculateRepresentative
-          UnifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, { 
-            cascadeGlobal: true, 
-            reason: 'payment_manual_allocation', 
-            immediate: true 
+          UnifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, {
+            cascadeGlobal: true,
+            reason: 'payment_manual_allocation',
+            immediate: true
           });
           await new UnifiedFinancialEngine(null).calculateRepresentative(payment.representativeId);
           console.log(`✅ DEBT SYNC: Representative ${payment.representativeId} debt synchronized after manual allocation`);
@@ -2935,44 +2935,55 @@ export class DatabaseStorage implements IStorage {
   }
 
   /**
-   * SHERLOCK v22.1: Update invoice status based on payment allocation
+   * SHERLOCK v36.0: Enhanced invoice status calculation after allocation with TITAN-O fixes
    */
   async updateInvoiceStatusAfterAllocation(invoiceId: number): Promise<void> {
-    // Get invoice details
-    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
-    if (!invoice) return;
+    try {
+      console.log(`🔄 SHERLOCK v36.0: TITAN-O Updating invoice ${invoiceId} status after allocation`);
 
-    // Calculate total allocated payments for this invoice
-    const allocatedPayments = await db.select({
-      total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
-    }).from(payments).where(
-      and(
+      // Get the invoice details
+      const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+      if (!invoice) {
+        throw new Error(`Invoice ${invoiceId} not found`);
+      }
+
+      const invoiceAmount = parseFloat(invoice.amount);
+
+      // ✅ TITAN-O FIX: Calculate total allocated payments for this invoice - including direct allocations
+      const [totalPaidResult] = await db.select({
+        total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+      }).from(payments)
+      .where(and(
         eq(payments.invoiceId, invoiceId),
         eq(payments.isAllocated, true)
-      )
-    );
+      ));
 
-    const totalAllocated = allocatedPayments[0]?.total || 0;
-    const invoiceAmount = parseFloat(invoice.amount);
+      const totalPaid = totalPaidResult.total || 0;
+      const paymentRatio = invoiceAmount > 0 ? (totalPaid / invoiceAmount) : 0;
 
-    // Determine new status
-    let newStatus: string;
-    if (totalAllocated >= invoiceAmount) {
-      newStatus = 'paid';
-    } else if (totalAllocated > 0) {
-      newStatus = 'partial';
-    } else {
-      newStatus = 'unpaid';
-    }
+      console.log(`📊 SHERLOCK v36.0: TITAN-O Invoice ${invoiceId} - Amount: ${invoiceAmount}, Paid: ${totalPaid}, Ratio: ${paymentRatio.toFixed(3)}`);
 
-    // Update invoice status if changed
-    if (invoice.status !== newStatus) {
-      await db
-        .update(invoices)
-        .set({ status: newStatus })
+      // ✅ Enhanced status calculation with proper tolerance
+      let newStatus = 'unpaid';
+      if (paymentRatio >= 0.999) { // 99.9% tolerance for floating point precision
+        newStatus = 'paid';
+      } else if (totalPaid > 0.01) {
+        newStatus = 'partial';
+      }
+
+      // Update invoice status
+      await db.update(invoices)
+        .set({
+          status: newStatus,
+          updatedAt: new Date()
+        })
         .where(eq(invoices.id, invoiceId));
 
-      console.log(`📝 SHERLOCK v22.1: Updated invoice ${invoice.invoiceNumber} status: ${invoice.status} → ${newStatus}`);
+      console.log(`✅ SHERLOCK v36.0: TITAN-O Invoice ${invoiceId} status updated to '${newStatus}'`);
+
+    } catch (error) {
+      console.error(`❌ SHERLOCK v36.0: TITAN-O Failed to update invoice status for ${invoiceId}:`, error);
+      throw error;
     }
   }
 
@@ -3064,7 +3075,7 @@ export class DatabaseStorage implements IStorage {
       () => db.select()
         .from(aiConfiguration)
         .where(eq(aiConfiguration.configCategory, category))
-        .orderBy(desc(aiConfiguration.updatedAt)),
+        .orderBy(aiConfiguration.configCategory, desc(aiConfiguration.updatedAt)),
       'getAiConfigurationsByCategory'
     );
   }
