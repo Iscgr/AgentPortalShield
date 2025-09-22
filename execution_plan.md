@@ -186,3 +186,26 @@
 ```bash
 npm test -- test/synapse_validation.test.ts
 ```
+# Payment Allocation Bug Fix - Execution Plan
+
+## Change Vector
+
+### File 1: server/services/enhanced-payment-allocation-engine.ts
+```diff
+--- a/server/services/enhanced-payment-allocation-engine.ts
++++ b/server/services/enhanced-payment-allocation-engine.ts
+@@ -626,7 +626,6 @@
+           action: 'ENHANCED_ALLOCATION_COMPLETED',
+           details: {
+-            allocationPaymentId: allocationPayment.id,
+             originalPaymentId: paymentId,
+             invoiceId,
+             allocatedAmount: amount,
+```
+
+## Validation Command
+```bash
+npm test -- test/synapse_validation.test.ts
+```
+
+## PLAN COMPLETE & VALIDATED

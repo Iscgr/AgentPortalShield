@@ -626,7 +626,6 @@ export class EnhancedPaymentAllocationEngine {
           timestamp: new Date().toISOString(),
           action: 'ENHANCED_ALLOCATION_COMPLETED',
           details: {
-            allocationPaymentId: allocationPayment.id,
             originalPaymentId: paymentId,
             invoiceId,
             allocatedAmount: amount,
