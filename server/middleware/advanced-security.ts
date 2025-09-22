@@ -474,7 +474,7 @@ export const apiKeyAuth = advancedSecurity.apiKeyValidation();
 
 // Security headers middleware
 export const securityHeaders = helmet({
-  contentSecurityPolicy: {
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
@@ -486,6 +486,6 @@ export const securityHeaders = helmet({
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
     },
-  },
+  } : false, // Disable CSP in development to allow Vite
   crossOriginEmbedderPolicy: false, // Disable for compatibility
 });
