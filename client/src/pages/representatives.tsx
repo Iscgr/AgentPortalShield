@@ -1588,7 +1588,6 @@ export default function Representatives() {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="w-full"
                         onClick={() => handleCopyPortalLink(selectedRep.publicId)}
                       >
                         <Copy className="w-4 h-4 ml-2" />
@@ -1598,7 +1597,17 @@ export default function Representatives() {
                   </CardContent>
                 </Card>
 
-                <FinancialIntegrityCard representativeId={selectedRep.id} />
+                <FinancialIntegrityCard
+                representativeId={selectedRep.id}
+                representativeName={selectedRep.name}
+                representativeCode={selectedRep.code}
+                totalSales={parseFloat(selectedRep.totalSales || '0')}
+                totalDebt={parseFloat(selectedRep.totalDebt || '0')}
+                invoiceCount={selectedRep.invoices?.length || 0}
+                paymentCount={selectedRep.payments?.length || 0}
+                lastInvoiceDate={selectedRep.invoices?.[0]?.issueDate}
+                lastPaymentDate={selectedRep.payments?.[0]?.paymentDate}
+              />
               </div>
 
               {/* Invoices Section */}

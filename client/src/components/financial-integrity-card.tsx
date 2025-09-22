@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,19 +10,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface FinancialIntegrityCardProps {
   representativeId: number;
+  representativeName: string;
+  representativeCode: string;
+  totalSales: number;
+  totalDebt: number;
+  invoiceCount: number;
+  paymentCount: number;
+  lastInvoiceDate?: string;
+  lastPaymentDate?: string;
 }
 
 interface FinancialData {
   representativeId: number;
   representativeName: string;
   representativeCode: string;
-  
+
   // ✅ آمار مالی صحیح طبق تعاریف استاندارد
   totalSales: number;           // فروش کل (استاندارد)
   totalPaid: number;           // پرداخت تخصیص یافته
   totalUnpaid: number;         // مجموع پرداخت نشده
   actualDebt: number;          // بدهی استاندارد
-  
+
   paymentRatio: number;
   debtLevel: 'HEALTHY' | 'MODERATE' | 'HIGH' | 'CRITICAL';
   invoiceCount: number;
