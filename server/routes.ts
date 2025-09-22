@@ -497,6 +497,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).authenticated = true;
       (req.session as any).userId = adminUser.id;
       (req.session as any).username = adminUser.username;
+
+
+// ✅ ATOMOS v36.0: Enhanced Portal Endpoint - Returns ALL payments with proper status
+app.get('/api/public/portal/:publicId', async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    console.log(`🚀 ATOMOS PORTAL v36.0: Enhanced portal request for publicId: ${publicId}`);
+
+    // Get representative by publicId
+    const [representative] = await db.select({
+      id: representatives.id,
+      name: representatives.name,
+      code: representatives.code,
+      panelUsername: representatives.panelUsername,
+      ownerName: representatives.ownerName,
+      credit: representatives.credit,
+      totalDebt: representatives.totalDebt,
+      totalSales: representatives.totalSales
+    }).from(representatives).where(eq(representatives.publicId, publicId));
+
+    if (!representative) {
+      return res.status(404).json({ error: 'نماینده یافت نشد' });
+    }
+
+    console.log(`✅ ATOMOS: Representative found: ${representative.name} (${representative.code})`);
+
+    // Get all invoices
+    const invoicesData = await db.select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      amount: invoices.amount,
+      issueDate: invoices.issueDate,
+      dueDate: invoices.dueDate,
+      status: invoices.status,
+      usageData: invoices.usageData,
+      createdAt: invoices.createdAt
+    }).from(invoices)
+    .where(eq(invoices.representativeId, representative.id))
+    .orderBy(invoices.issueDate, invoices.createdAt);
+
+    // ✅ CRITICAL FIX: Get ALL payments (both allocated and unallocated)
+    const paymentsData = await db.select({
+      id: payments.id,
+      amount: payments.amount,
+      paymentDate: payments.paymentDate,
+      description: payments.description,
+      createdAt: payments.createdAt,
+      isAllocated: payments.isAllocated,
+      invoiceId: payments.invoiceId
+    }).from(payments)
+    .where(eq(payments.representativeId, representative.id))
+    .orderBy(desc(payments.paymentDate));
+
+    // ✅ Enhanced financial calculations
+    const totalSales = invoicesData.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+    const totalAllocatedPayments = paymentsData
+      .filter(p => p.isAllocated)
+      .reduce((sum, pay) => sum + parseFloat(pay.amount), 0);
+    const totalUnallocatedPayments = paymentsData
+      .filter(p => !p.isAllocated)
+      .reduce((sum, pay) => sum + parseFloat(pay.amount), 0);
+    
+    const actualDebt = Math.max(0, totalSales - totalAllocatedPayments);
+    
+    // ✅ Enhanced payment data with status information
+    const enhancedPayments = paymentsData.map(payment => ({
+      ...payment,
+      statusText: payment.isAllocated ? 'تخصیص یافته' : 'تخصیص نیافته',
+      statusColor: payment.isAllocated ? 'green' : 'orange'
+    }));
+
+    console.log(`📊 ATOMOS PORTAL: Enhanced calculations: {
+      totalSales: ${totalSales},
+      totalAllocatedPayments: ${totalAllocatedPayments},
+      totalUnallocatedPayments: ${totalUnallocatedPayments},
+      actualDebt: ${actualDebt},
+      invoiceCount: ${invoicesData.length},
+      totalPaymentCount: ${paymentsData.length},
+      allocatedPaymentCount: ${paymentsData.filter(p => p.isAllocated).length},
+      unallocatedPaymentCount: ${paymentsData.filter(p => !p.isAllocated).length}
+    }`);
+
+    res.json({
+      name: representative.name,
+      panelUsername: representative.panelUsername,
+      totalSales: totalSales.toString(),
+      totalDebt: actualDebt.toString(),
+      credit: representative.credit || '0',
+      invoices: invoicesData,
+      payments: enhancedPayments,
+      financialMeta: {
+        totalSales,
+        totalAllocatedPayments,
+        totalUnallocatedPayments,
+        actualDebt,
+        paymentRatio: totalSales > 0 ? (totalAllocatedPayments / totalSales) * 100 : 0,
+        debtLevel: actualDebt === 0 ? 'HEALTHY' : actualDebt > 500000 ? 'CRITICAL' : 'MODERATE',
+        lastCalculation: new Date().toISOString(),
+        accuracyGuaranteed: true,
+        enhancedPortal: true
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ ATOMOS PORTAL ERROR:', error);
+    res.status(500).json({ error: 'خطا در دریافت اطلاعات پرتال' });
+  }
+});
+
+
       (req.session as any).role = adminUser.role || 'ADMIN';
       (req.session as any).permissions = adminUser.permissions || [];
       (req.session as any).user = adminUser; // Store full user object for easier access

@@ -339,10 +339,13 @@ export class UnifiedFinancialEngine {
       lastDate: sql<string>`MAX(created_at)`
     }).from(invoices).where(eq(invoices.representativeId, representativeId));
 
-    // ✅ محاسبه صحیح: پرداخت تخصیص یافته = مجموع پرداخت‌های تخصیص یافته
+    // ✅ ATOMOS v36.0: Enhanced payment calculations with detailed breakdown
     const paymentData = await db.select({
-      count: sql<number>`COUNT(*)`,
-      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`, // پرداخت تخصیص یافته
+      totalCount: sql<number>`COUNT(*)`,
+      allocatedCount: sql<number>`COUNT(CASE WHEN is_allocated = true THEN 1 END)`,
+      unallocatedCount: sql<number>`COUNT(CASE WHEN is_allocated = false THEN 1 END)`,
+      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`, // پرداخت تخصیص یافته
+      totalUnallocated: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`, // پرداخت تخصیص نیافته
       lastDate: sql<string>`MAX(payment_date)`
     }).from(payments).where(eq(payments.representativeId, representativeId));
 

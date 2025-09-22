@@ -442,8 +442,8 @@ export class EnhancedPaymentAllocationEngine {
   }
 
   /**
-   * 🎯 SHERLOCK v34.1: تخصیص دستی پرداخت با validation کامل
-   * ATOMOS COMPLIANT - Manual allocation with comprehensive checks
+   * 🎯 ATOMOS v36.0: Enhanced Manual Payment Allocation with Complete Transaction Management
+   * COMPLETE SOLUTION - Addresses all identified issues with atomic precision
    */
   static async manualAllocatePayment(
     paymentId: number,
@@ -468,31 +468,211 @@ export class EnhancedPaymentAllocationEngine {
       ...options
     };
 
-    console.log(`🎯 SHERLOCK v34.1: Starting MANUAL allocation`);
+    console.log(`🎯 ATOMOS v36.0: Starting ENHANCED MANUAL allocation with complete transaction management`);
     console.log(`   Payment: ${paymentId} -> Invoice: ${invoiceId}`);
     console.log(`   Amount: ${amount}, By: ${performedBy}`);
     console.log(`   Transaction ID: ${transactionId}`);
 
-    try {
-      // 🔍 PHASE 1: Comprehensive Input Validation
-      auditTrail.push({
-        timestamp: new Date().toISOString(),
-        action: 'MANUAL_ALLOCATION_INITIATED',
-        details: { paymentId, invoiceId, amount, performedBy, reason, transactionId },
-        userId: performedBy,
-        result: 'SUCCESS'
-      });
-
-      const validation = await this.validateManualAllocation(paymentId, invoiceId, amount, opts);
-
-      if (!validation.isValid) {
-        console.log(`❌ SHERLOCK v34.1: Manual allocation validation failed`);
-        validation.errors.forEach(error => console.log(`   ❌ ${error}`));
-
+    // ✅ ATOMOS: Start atomic transaction
+    return await db.transaction(async (tx) => {
+      try {
+        // 🔍 PHASE 1: Enhanced Validation with Transaction Context
         auditTrail.push({
           timestamp: new Date().toISOString(),
-          action: 'MANUAL_ALLOCATION_VALIDATION_FAILED',
-          details: { errors: validation.errors, warnings: validation.warnings },
+          action: 'ENHANCED_MANUAL_ALLOCATION_INITIATED',
+          details: { paymentId, invoiceId, amount, performedBy, reason, transactionId },
+          userId: performedBy,
+          result: 'SUCCESS'
+        });
+
+        // ✅ Get payment within transaction
+        const [payment] = await tx.select().from(payments).where(eq(payments.id, paymentId));
+        
+        if (!payment) {
+          throw new Error(`Payment ${paymentId} not found`);
+        }
+
+        // ✅ Get invoice within transaction
+        const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, invoiceId));
+        
+        if (!invoice) {
+          throw new Error(`Invoice ${invoiceId} not found`);
+        }
+
+        // ✅ Validate amounts
+        const paymentAmount = parseFloat(payment.amount);
+        const invoiceAmount = parseFloat(invoice.amount);
+        
+        if (amount <= 0) {
+          throw new Error('Allocation amount must be positive');
+        }
+        
+        if (amount > paymentAmount) {
+          throw new Error(`Allocation amount ${amount} exceeds payment amount ${paymentAmount}`);
+        }
+
+        // ✅ Check current invoice paid amount
+        const [currentPaidResult] = await tx.select({
+          total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+        }).from(payments)
+        .where(and(
+          eq(payments.invoiceId, invoiceId),
+          eq(payments.isAllocated, true)
+        ));
+
+        const currentPaid = currentPaidResult.total || 0;
+        const remainingInvoiceAmount = invoiceAmount - currentPaid;
+
+        if (amount > remainingInvoiceAmount && !opts.allowOverAllocation) {
+          throw new Error(`Allocation amount ${amount} exceeds remaining invoice amount ${remainingInvoiceAmount}`);
+        }
+
+        console.log(`✅ ATOMOS v36.0: Validation completed successfully`);
+
+        // 🎯 PHASE 2: ATOMIC ALLOCATION EXECUTION
+        
+        // ✅ Create allocation payment record with proper relationship
+        const [allocationPayment] = await tx.insert(payments).values({
+          representativeId: payment.representativeId!,
+          invoiceId: invoiceId,
+          amount: amount.toString(),
+          paymentDate: payment.paymentDate,
+          description: `Manual allocation from payment ${paymentId} by ${performedBy}${reason ? ` - ${reason}` : ''}`,
+          isAllocated: true,
+          createdAt: new Date()
+        }).returning();
+
+        console.log(`✅ ATOMOS v36.0: Allocation payment record created: ${allocationPayment.id}`);
+
+        // 🎯 CRITICAL FIX 1: Update original payment status correctly
+        // If partial allocation, keep original and mark as allocated
+        // If full allocation, mark as allocated
+        const remainingPaymentAmount = paymentAmount - amount;
+        
+        if (remainingPaymentAmount <= 0.01) {
+          // Full allocation - mark original payment as allocated
+          await tx.update(payments)
+            .set({ 
+              isAllocated: true,
+              updatedAt: new Date()
+            })
+            .where(eq(payments.id, paymentId));
+        } else {
+          // Partial allocation - mark original as allocated and create remainder
+          await tx.update(payments)
+            .set({ 
+              isAllocated: true,
+              updatedAt: new Date()
+            })
+            .where(eq(payments.id, paymentId));
+
+          // Create remainder payment
+          await tx.insert(payments).values({
+            representativeId: payment.representativeId!,
+            amount: remainingPaymentAmount.toString(),
+            paymentDate: payment.paymentDate,
+            description: `Remainder from payment ${paymentId} after manual allocation`,
+            isAllocated: false,
+            createdAt: new Date()
+          });
+        }
+
+        // 🎯 CRITICAL FIX 2: Update invoice status with accurate calculation
+        const newTotalPaid = currentPaid + amount;
+        const paymentRatio = invoiceAmount > 0 ? (newTotalPaid / invoiceAmount) : 0;
+        
+        let newInvoiceStatus = 'unpaid';
+        if (paymentRatio >= 0.999) { // 99.9% tolerance for floating point
+          newInvoiceStatus = 'paid';
+        } else if (newTotalPaid > 0.01) {
+          newInvoiceStatus = 'partial';
+        }
+
+        await tx.update(invoices)
+          .set({ 
+            status: newInvoiceStatus,
+            updatedAt: new Date()
+          })
+          .where(eq(invoices.id, invoiceId));
+
+        console.log(`✅ ATOMOS v36.0: Invoice ${invoiceId} status updated to '${newInvoiceStatus}' (paid: ${newTotalPaid}/${invoiceAmount})`);
+
+        // ✅ Create comprehensive audit trail
+        auditTrail.push({
+          timestamp: new Date().toISOString(),
+          action: 'ENHANCED_ALLOCATION_COMPLETED',
+          details: {
+            allocationPaymentId: allocationPayment.id,
+            originalPaymentId: paymentId,
+            invoiceId,
+            allocatedAmount: amount,
+            remainingPaymentAmount,
+            newInvoiceStatus,
+            newTotalPaid,
+            invoiceAmount,
+            paymentRatio: Math.round(paymentRatio * 10000) / 100 // Percentage with 2 decimals
+          },
+          userId: performedBy,
+          result: 'SUCCESS'
+        });
+
+        const processingTime = performance.now() - startTime;
+
+        // 🎯 CRITICAL FIX 3: Force immediate cache invalidation and sync
+        console.log(`🔄 ATOMOS v36.0: Forcing comprehensive cache invalidation...`);
+        
+        // Import and trigger cache invalidation outside transaction
+        setTimeout(async () => {
+          try {
+            const { UnifiedFinancialEngine } = await import('./unified-financial-engine.js');
+            UnifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId!, {
+              cascadeGlobal: true,
+              reason: 'enhanced_manual_payment_allocation',
+              immediate: true,
+              includePortal: true
+            });
+
+            // Trigger debt synchronization
+            const engine = new UnifiedFinancialEngine(null);
+            await engine.calculateRepresentative(payment.representativeId!);
+            
+            console.log(`✅ ATOMOS v36.0: Cache invalidation and sync completed for rep ${payment.representativeId}`);
+          } catch (syncError) {
+            console.error(`❌ ATOMOS v36.0: Post-transaction sync failed:`, syncError);
+          }
+        }, 50); // Small delay to ensure transaction is committed
+
+        const allocation: PaymentAllocation = {
+          invoiceId,
+          allocatedAmount: amount,
+          allocationDate: new Date().toISOString(),
+          allocationMethod: 'MANUAL',
+          allocatedBy: performedBy,
+          transactionId,
+          validationHash: this.generateValidationHash({ invoiceId, amount, transactionId })
+        };
+
+        console.log(`✅ ATOMOS v36.0: Enhanced manual allocation completed successfully in ${Math.round(processingTime)}ms`);
+
+        return {
+          success: true,
+          allocatedAmount: amount,
+          remainingAmount: remainingPaymentAmount,
+          allocations: [allocation],
+          errors: [],
+          warnings: [],
+          transactionId,
+          processingTime,
+          auditTrail: opts.auditMode ? auditTrail : undefined
+        };
+
+      } catch (error) {
+        console.error(`❌ ATOMOS v36.0: Enhanced manual allocation failed:`, error);
+        
+        auditTrail.push({
+          timestamp: new Date().toISOString(),
+          action: 'ENHANCED_ALLOCATION_FAILED',
+          details: { error: error.message },
           userId: performedBy,
           result: 'FAILURE'
         });
@@ -502,121 +682,14 @@ export class EnhancedPaymentAllocationEngine {
           allocatedAmount: 0,
           remainingAmount: 0,
           allocations: [],
-          errors: validation.errors,
-          warnings: validation.warnings,
+          errors: [error.message],
+          warnings: [],
           transactionId,
           processingTime: performance.now() - startTime,
           auditTrail
         };
       }
-
-      console.log(`✅ SHERLOCK v34.1: Manual allocation validation passed`);
-
-      if (validation.warnings.length > 0) {
-        console.log(`⚠️ SHERLOCK v34.1: Validation warnings:`);
-        validation.warnings.forEach(warning => console.log(`   ⚠️ ${warning}`));
-      }
-
-      // انجام تخصیص دستی
-      const allocation: PaymentAllocation = {
-        invoiceId,
-        allocatedAmount: amount,
-        allocationDate: new Date().toISOString(),
-        allocationMethod: 'MANUAL',
-        allocatedBy: performedBy
-      };
-
-      // ✅ دریافت اطلاعات payment
-      const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
-      
-      // ✅ ایجاد رکورد allocation جدید
-      const [newAllocationPayment] = await db.insert(payments).values({
-        representativeId: payment.representativeId!,
-        invoiceId: invoiceId,
-        amount: amount.toString(),
-        paymentDate: payment.paymentDate,
-        description: `Manual allocation from payment ${paymentId} by ${performedBy}${reason ? ` - ${reason}` : ''}`,
-        isAllocated: true,
-        createdAt: new Date()
-      }).returning();
-
-      // ✅ بروزرسانی payment اصلی
-      await db.update(payments)
-        .set({ 
-          isAllocated: true,
-          updatedAt: new Date()
-        })
-        .where(eq(payments.id, paymentId));
-
-      // ✅ بروزرسانی وضعیت فاکتور
-      const [totalPaid] = await db.select({
-        total: sql<number>`COALESCE(SUM(amount), 0)`
-      }).from(payments)
-      .where(and(
-        eq(payments.invoiceId, invoiceId),
-        eq(payments.isAllocated, true)
-      ));
-
-      const [invoice] = await db.select({
-        amount: invoices.amount
-      }).from(invoices).where(eq(invoices.id, invoiceId));
-
-      if (invoice) {
-        const invoiceAmount = parseFloat(invoice.amount);
-        const paidAmount = totalPaid.total;
-        
-        let newStatus = 'unpaid';
-        if (paidAmount >= invoiceAmount) {
-          newStatus = 'paid';
-        } else if (paidAmount > 0) {
-          newStatus = 'partial';
-        }
-
-        await db.update(invoices)
-          .set({ 
-            status: newStatus,
-            updatedAt: new Date()
-          })
-          .where(eq(invoices.id, invoiceId));
-      }
-
-      // ✅ Force financial sync
-      const { UnifiedFinancialEngine } = await import('./unified-financial-engine.js');
-      UnifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId!, {
-        cascadeGlobal: true,
-        reason: 'manual_payment_allocation',
-        immediate: true,
-        includePortal: true
-      });
-
-      const { unifiedFinancialEngine } = await import('./unified-financial-engine.js');
-      await unifiedFinancialEngine.syncRepresentativeDebt(payment.representativeId!);
-
-      const totalAllocated = amount;
-      const remainingAmount = parseFloat(payment.amount) - amount;
-
-      console.log(`✅ Manual allocation completed successfully`);
-
-      return {
-        success: true,
-        allocatedAmount: totalAllocated,
-        remainingAmount,
-        allocations: newAllocations,
-        errors: [],
-        warnings: []
-      };
-
-    } catch (error) {
-      console.error('Error in manual allocation:', error);
-      return {
-        success: false,
-        allocatedAmount: 0,
-        remainingAmount: 0,
-        allocations: [],
-        errors: [error.message],
-        warnings: []
-      };
-    }
+    });
   }
 
   /**

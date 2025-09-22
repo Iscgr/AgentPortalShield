@@ -275,6 +275,10 @@ interface Representative {
     debtLevel: string;
     lastSync: string;
   };
+  // Added for payment status display
+  lastPaymentDate?: string;
+  allocatedPayments?: number;
+  unallocatedPayments?: number;
 }
 
 
@@ -506,6 +510,12 @@ export default function Representatives() {
       const actualDebt = rep.financialData?.actualDebt ?? parseFloat(rep.totalDebt || '0');
       const totalSales = parseFloat(rep.totalSales || '0');
 
+      // ✅ Data for payment status display
+      const payments = (rep as any).payments || []; // Assuming payments are fetched with rep details
+      const allocatedPayments = payments.filter((p: Payment) => p.isAllocated).length;
+      const unallocatedPayments = payments.filter((p: Payment) => !p.isAllocated).length;
+      const lastPayment = payments.sort((a: Payment, b: Payment) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
+
       return {
         ...rep,
         displayDebt: formatCurrency(actualDebt),
@@ -513,7 +523,11 @@ export default function Representatives() {
         paymentRatio: rep.financialData?.paymentRatio || 0,
         debtLevel: rep.financialData?.debtLevel || 'UNKNOWN',
         isLoading: enhancedRepsLoading, // Indicate if the enhanced data is still loading
-        lastSync: rep.financialData?.lastSync || null
+        lastSync: rep.financialData?.lastSync || null,
+        // Added payment status data
+        lastPaymentDate: lastPayment ? lastPayment.paymentDate : undefined,
+        allocatedPayments: allocatedPayments,
+        unallocatedPayments: unallocatedPayments
       };
     });
   }, [representatives, enhancedRepsData, enhancedRepsLoading]);
@@ -1559,7 +1573,7 @@ export default function Representatives() {
                     <div className="pt-2 space-y-2">
                       <Button 
                         variant="outline" 
-                        size="sm" 
+                        size="sm"
                         className="w-full"
                         onClick={() => {
                           const baseUrl = process.env.NODE_ENV === 'production' 
