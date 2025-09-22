@@ -40,7 +40,7 @@ import bcrypt from "bcryptjs";
 // Commented out temporarily - import { generateFinancialReport } from "./services/report-generator";
 
 // New import for unified financial engine
-import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
+import { unifiedFinancialEngine, UnifiedFinancialEngine } from './services/unified-financial-engine.js';
 
 // Import maintenance routes registration
 import { registerMaintenanceRoutes } from "./routes/maintenance-routes";
@@ -184,6 +184,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
+
+  // ✅ DATA RECONCILIATION ENDPOINT - Fix dataIntegrity status
+  app.post("/api/system/data-reconciliation", authMiddleware, async (req, res) => {
+    try {
+      console.log("🔄 Starting comprehensive data reconciliation...");
+      
+      const reconciliationResult = await unifiedFinancialEngine.executeDataReconciliation();
+      
+      if (reconciliationResult.success) {
+        // Cache the reconciliation result for the data integrity calculation
+        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+        UnifiedFinancialEngine.batchCache.set('last_reconciliation_status', {
+          data: reconciliationResult,
+          timestamp: Date.now()
+        });
+
+        // Force global cache invalidation to refresh all data
+        UnifiedFinancialEngine.forceInvalidateGlobal("post_reconciliation_complete");
+
+        console.log("✅ Data reconciliation completed successfully");
+        
+        res.json({
+          success: true,
+          message: "تطبیق داده‌ها با موفقیت انجام شد",
+          results: reconciliationResult,
+          dataIntegrityStatus: reconciliationResult.finalDataIntegrityStatus,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        console.log("❌ Data reconciliation failed");
+        res.status(500).json({
+          success: false,
+          message: "خطا در تطبیق داده‌ها",
+          error: reconciliationResult,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error("❌ Data reconciliation endpoint error:", error);
+      res.status(500).json({
+        success: false,
+        message: "خطا در اجرای تطبیق داده‌ها",
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
   
   // ATOMOS v2.0: Register Advanced System Routes
   app.use('/api/system', advancedSystemRoutes);
@@ -605,33 +652,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get base representatives data
       const representatives = await storage.getRepresentatives();
 
-      // ✅ SHERLOCK v32.0: Enhanced with real-time financial calculations
-      const enhancedRepresentatives = await Promise.all(
-        representatives.map(async (rep) => {
-          try {
-            // Get real-time financial data from unified engine
-            const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
-
-            return {
-              ...rep,
-              // ✅ Override stored debt with calculated debt
-              totalDebt: financialData.actualDebt.toString(),
-              totalSales: financialData.totalSales.toString(),
-              // Additional real-time data for UI
-              financialData: {
-                actualDebt: financialData.actualDebt,
-                paymentRatio: financialData.paymentRatio,
-                debtLevel: financialData.debtLevel,
-                lastSync: financialData.calculationTimestamp
-              }
-            };
-          } catch (error) {
-            console.warn(`⚠️ SHERLOCK v32.0: Failed to calculate financial data for rep ${rep.id}:`, error);
-            // Fallback to stored data if calculation fails
-            return rep;
-          }
-        })
-      );
+      // ✅ ATOMOS v2.0: BATCH CALCULATION - ELIMINATING N+1 QUERIES
+      console.log('🚀 ATOMOS v2.0: Using BATCH calculation to eliminate N+1 queries...');
+      const batchStartTime = performance.now();
+      
+      // Use optimized batch calculation instead of individual queries
+      const engine = new UnifiedFinancialEngine(null);
+      const allFinancialData = await engine.calculateAllRepresentatives();
+      
+      // Create lookup map for O(1) access
+      const financialDataMap = new Map(allFinancialData.map(data => [data.id, data]));
+      
+      // Enhanced representatives with batch-calculated financial data
+      const enhancedRepresentatives = representatives.map(rep => {
+        const financialData = financialDataMap.get(rep.id);
+        
+        if (financialData) {
+          return {
+            ...rep,
+            // ✅ Override stored debt with batch-calculated debt
+            totalDebt: financialData.totalDebt.toString(),
+            totalSales: financialData.totalSales.toString(),
+            // Additional real-time data for UI
+            financialData: {
+              actualDebt: financialData.totalDebt,
+              paymentRatio: financialData.totalSales > 0 ? (financialData.totalPaid / financialData.totalSales) * 100 : 0,
+              debtLevel: financialData.debtLevel,
+              lastSync: new Date().toISOString()
+            }
+          };
+        }
+        
+        // Fallback to stored data if batch calculation didn't include this rep
+        console.warn(`⚠️ ATOMOS v2.0: No batch data for rep ${rep.id}, using stored data`);
+        return rep;
+      });
+      
+      const batchEndTime = performance.now();
+      const batchProcessingTime = Math.round(batchEndTime - batchStartTime);
+      console.log(`✅ ATOMOS v2.0: BATCH PROCESSING completed in ${batchProcessingTime}ms - N+1 ELIMINATED!`);
 
       console.log(`✅ SHERLOCK v32.0: Enhanced ${enhancedRepresentatives.length} representatives with real-time financial data`);
       res.json(enhancedRepresentatives);

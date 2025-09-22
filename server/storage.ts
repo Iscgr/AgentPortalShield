@@ -2191,27 +2191,62 @@ export class DatabaseStorage implements IStorage {
 
   // فاز ۳: Payment Synchronization and Allocation Methods
 
+  // ✅ OPTIMIZED: Enhanced getUnallocatedPayments with FIFO ordering and performance optimization
   async getUnallocatedPayments(representativeId?: number): Promise<Payment[]> {
     return await withDatabaseRetry(
       async () => {
-        const query = db
-          .select()
+        console.log(`🔍 OPTIMIZED: Fetching unallocated payments${representativeId ? ` for representative ${representativeId}` : ' (all)'}`);
+
+        // Build optimized query with proper conditions and ordering
+        let query = db
+          .select({
+            id: payments.id,
+            representativeId: payments.representativeId,
+            invoiceId: payments.invoiceId,
+            amount: payments.amount,
+            paymentDate: payments.paymentDate,
+            description: payments.description,
+            isAllocated: payments.isAllocated,
+            createdAt: payments.createdAt
+          })
           .from(payments)
           .where(eq(payments.isAllocated, false));
 
+        // Add representative filter if specified
         if (representativeId) {
-          return await db
-            .select()
-            .from(payments)
-            .where(
-              and(
-                eq(payments.isAllocated, false),
-                eq(payments.representativeId, representativeId)
-              )
-            );
+          query = query.where(
+            and(
+              eq(payments.isAllocated, false),
+              eq(payments.representativeId, representativeId)
+            )
+          );
         }
 
-        return await query;
+        // ✅ FIFO Ordering: Oldest payments first for proper allocation sequence
+        // Order by payment date first, then by creation time for consistent FIFO behavior
+        const results = await query.orderBy(payments.paymentDate, payments.createdAt);
+
+        // ✅ Performance logging for monitoring
+        console.log(`✅ OPTIMIZED: Retrieved ${results.length} unallocated payments${representativeId ? ` for representative ${representativeId}` : ''}`);
+
+        // ✅ Additional filtering for data quality - remove invalid entries
+        const validPayments = results.filter(payment => {
+          const amount = parseFloat(payment.amount);
+          const isValid = amount > 0 && payment.representativeId && !payment.isAllocated;
+          
+          if (!isValid) {
+            console.warn(`⚠️ OPTIMIZED: Filtered out invalid payment ${payment.id}: amount=${amount}, repId=${payment.representativeId}, allocated=${payment.isAllocated}`);
+          }
+          
+          return isValid;
+        });
+
+        // ✅ Performance metrics for optimization monitoring
+        if (results.length !== validPayments.length) {
+          console.log(`🔧 OPTIMIZED: Data quality filter removed ${results.length - validPayments.length} invalid payments`);
+        }
+
+        return validPayments as Payment[];
       },
       'getUnallocatedPayments'
     );
@@ -2276,7 +2311,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // ✅ SHERLOCK v34.1: Enhanced Auto-Allocation with ATOMOS Protocol Integration
+  // ✅ ACID TRANSACTIONAL: Enhanced Auto-Allocation with ATOMIC transactions and debt sync
   async autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<{
     success: boolean;
     allocated: number;
@@ -2285,97 +2320,270 @@ export class DatabaseStorage implements IStorage {
   }> {
     return await withDatabaseRetry(
       async () => {
-        console.log(`🚀 SHERLOCK v34.1: ENHANCED auto-allocation for payment ${paymentId}, representative ${representativeId}`);
+        console.log(`🚀 ACID TRANSACTION: Starting auto-allocation for payment ${paymentId}, representative ${representativeId}`);
 
-        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-
-        try {
-          // Use the enhanced allocation engine
-          const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(
-            paymentId,
-            {
-              method: 'FIFO',
-              allowPartialAllocation: true,
-              allowOverAllocation: false,
-              priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
-              strictValidation: true,
-              auditMode: true
+        // ✅ ACID Transaction - All operations in one atomic transaction
+        return await db.transaction(async (tx) => {
+          const transactionId = `AUTO_ALLOC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          
+          try {
+            // 🔍 PHASE 1: Validation - Payment exists and ownership WITH ROW LOCK
+            const [payment] = await tx.select().from(payments)
+              .where(eq(payments.id, paymentId))
+              .for('update'); // ✅ ACID FIX: Row-level locking to prevent double-allocation
+            
+            if (!payment) {
+              throw new Error(`Payment ${paymentId} not found`);
             }
-          );
 
-          if (result.success) {
-            console.log(`✅ SHERLOCK v34.1: Auto-allocation successful - Allocated: ${result.allocatedAmount}`);
+            if (payment.representativeId !== representativeId) {
+              throw new Error(`Payment ${paymentId} doesn't belong to representative ${representativeId}`);
+            }
 
-            // Create activity log
-            await this.createActivityLog({
+            if (payment.isAllocated) {
+              throw new Error(`Payment ${paymentId} is already allocated`);
+            }
+
+            const paymentAmount = parseFloat(payment.amount);
+            if (paymentAmount <= 0) {
+              throw new Error(`Invalid payment amount: ${paymentAmount}`);
+            }
+
+            // 🔍 PHASE 2: Get unpaid invoices ordered by FIFO (oldest first) WITH ROW LOCKS
+            const unpaidInvoices = await tx.select({
+              id: invoices.id,
+              amount: invoices.amount,
+              issueDate: invoices.issueDate,
+              status: invoices.status
+            })
+            .from(invoices)
+            .where(
+              and(
+                eq(invoices.representativeId, representativeId),
+                sql`${invoices.status} IN ('unpaid', 'partial', 'overdue')`
+              )
+            )
+            .orderBy(invoices.issueDate, invoices.id) // FIFO order
+            .for('update'); // ✅ ACID FIX: Lock invoices to prevent concurrent allocation conflicts
+
+            if (!unpaidInvoices.length) {
+              throw new Error(`No unpaid invoices found for representative ${representativeId}`);
+            }
+
+            // 🔍 PHASE 3: Calculate current paid amounts for each invoice
+            const invoiceCurrentPaid = await Promise.all(
+              unpaidInvoices.map(async (invoice) => {
+                const paidResults = await tx.select({
+                  total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+                }).from(payments).where(
+                  and(
+                    eq(payments.invoiceId, invoice.id),
+                    eq(payments.isAllocated, true)
+                  )
+                );
+                
+                const currentPaid = paidResults[0]?.total || 0;
+                const invoiceAmount = parseFloat(invoice.amount);
+                const remainingAmount = invoiceAmount - currentPaid;
+                
+                return {
+                  ...invoice,
+                  currentPaid,
+                  remainingAmount: Math.max(0, remainingAmount)
+                };
+              })
+            );
+
+            // Filter only invoices that still need payment
+            const invoicesNeedingPayment = invoiceCurrentPaid.filter(inv => inv.remainingAmount > 0);
+
+            if (!invoicesNeedingPayment.length) {
+              throw new Error(`All invoices are already fully paid for representative ${representativeId}`);
+            }
+
+            // 🔄 PHASE 4: FIFO Allocation Logic
+            let remainingPayment = paymentAmount;
+            const allocations: Array<{ invoiceId: number; amount: string }> = [];
+
+            for (const invoice of invoicesNeedingPayment) {
+              if (remainingPayment <= 0) break;
+
+              const allocateAmount = Math.min(remainingPayment, invoice.remainingAmount);
+              
+              if (allocateAmount > 0) {
+                allocations.push({
+                  invoiceId: invoice.id,
+                  amount: allocateAmount.toString()
+                });
+                remainingPayment -= allocateAmount;
+              }
+            }
+
+            if (!allocations.length) {
+              throw new Error(`Unable to allocate any amount from payment ${paymentId}`);
+            }
+
+            // 🔄 PHASE 5: Execute Allocations
+            const totalAllocated = allocations.reduce((sum, alloc) => sum + parseFloat(alloc.amount), 0);
+
+            // Update payment status
+            await tx.update(payments)
+              .set({ 
+                isAllocated: true,
+                // If partial allocation, split the payment (create new payment for remainder)
+              })
+              .where(eq(payments.id, paymentId));
+
+            // If partial allocation, create remainder payment
+            if (remainingPayment > 0) {
+              await tx.insert(payments).values({
+                representativeId: representativeId,
+                amount: remainingPayment.toString(),
+                paymentDate: payment.paymentDate,
+                description: `Remainder from payment ${paymentId} auto-allocation`,
+                isAllocated: false
+              });
+            }
+
+            // Create allocation records and update invoices
+            for (const allocation of allocations) {
+              // ✅ ALLOCATION LEDGER: Create detailed allocation payment record
+              const [allocationRecord] = await tx.insert(payments).values({
+                representativeId: representativeId,
+                invoiceId: allocation.invoiceId,
+                amount: allocation.amount,
+                paymentDate: payment.paymentDate,
+                description: `Auto-allocated from payment ${paymentId} (FIFO)`,
+                isAllocated: true
+              }).returning();
+
+              // Update invoice status based on new payment
+              const invoice = invoicesNeedingPayment.find(inv => inv.id === allocation.invoiceId)!;
+              const newPaidAmount = invoice.currentPaid + parseFloat(allocation.amount);
+              const invoiceAmount = parseFloat(invoice.amount);
+              
+              let newStatus = 'unpaid';
+              if (newPaidAmount >= invoiceAmount) {
+                newStatus = 'paid';
+              } else if (newPaidAmount > 0) {
+                newStatus = 'partial';
+              }
+
+              await tx.update(invoices)
+                .set({ status: newStatus })
+                .where(eq(invoices.id, allocation.invoiceId));
+
+              // 📊 PHASE 6: Create Financial Transaction Record (ENHANCED ALLOCATION LEDGER)
+              await tx.insert(financialTransactions).values({
+                transactionId: `${transactionId}_${allocation.invoiceId}`,
+                type: 'PAYMENT_AUTO_ALLOCATE',
+                status: 'COMPLETED',
+                representativeId: representativeId,
+                relatedEntityType: 'payment',
+                relatedEntityId: paymentId,
+                amount: allocation.amount,
+                description: `Auto-allocation of payment ${paymentId} to invoice ${allocation.invoiceId}`,
+                metadata: {
+                  sourcePaymentId: paymentId,
+                  targetInvoiceId: allocation.invoiceId,
+                  allocationRecordId: allocationRecord.id, // ✅ ALLOCATION LEDGER: Link to allocation record
+                  allocationMethod: 'FIFO',
+                  allocatedAmount: allocation.amount,
+                  remainingPayment: remainingPayment,
+                  transactionId,
+                  fifoOrder: allocations.indexOf(allocation) + 1, // ✅ FIFO TRACKING
+                  invoiceOriginalAmount: invoice.amount,
+                  invoicePreviouslyPaid: invoice.currentPaid,
+                  invoiceRemainingAfter: invoice.remainingAmount - parseFloat(allocation.amount)
+                },
+                performedBy: 'SYSTEM',
+                transactionDate: new Date().toISOString().split('T')[0]
+              });
+            }
+
+            // 📊 PHASE 7: Create Activity Log
+            await tx.insert(activityLogs).values({
               type: 'payment_auto_allocated',
-              description: `تخصیص خودکار پرداخت ${paymentId} به مبلغ ${result.allocatedAmount} با روش FIFO`,
+              description: `تخصیص خودکار پرداخت ${paymentId} به مبلغ ${totalAllocated} با روش FIFO`,
               relatedId: paymentId,
               metadata: {
                 representativeId,
-                allocatedAmount: result.allocatedAmount,
-                allocationsCount: result.allocations.length,
-                transactionId: result.transactionId,
-                processingTime: result.processingTime
+                allocatedAmount: totalAllocated,
+                allocationsCount: allocations.length,
+                transactionId,
+                remainingAmount: remainingPayment,
+                method: 'FIFO'
               }
             });
 
-            // ✅ Update representative debt after successful allocation
-            await this.updateRepresentativeFinancials(representativeId);
+            console.log(`✅ ACID TRANSACTION: Auto-allocation completed - Allocated: ${totalAllocated}, Remaining: ${remainingPayment}`);
 
-            return {
+            // Return success result
+            const result = {
               success: true,
-              allocated: result.allocations.length,
-              totalAmount: result.allocatedAmount.toString(),
-              details: result.allocations.map(alloc => ({
+              allocated: allocations.length,
+              totalAmount: totalAllocated.toString(),
+              details: allocations.map(alloc => ({
                 paymentId: paymentId,
                 invoiceId: alloc.invoiceId,
-                amount: alloc.allocatedAmount.toString()
+                amount: alloc.amount
               }))
             };
-          } else {
-            console.log(`❌ SHERLOCK v34.1: Auto-allocation failed:`, result.errors);
 
-            // Log failure for auditing
-            await this.createActivityLog({
+            return result;
+
+          } catch (error) {
+            console.error(`❌ ACID TRANSACTION: Auto-allocation failed:`, error);
+            
+            // Create failure log
+            await tx.insert(activityLogs).values({
               type: 'payment_auto_allocation_failed',
-              description: `تخصیص خودکار پرداخت ${paymentId} شکست خورد`,
+              description: `تخصیص خودکار پرداخت ${paymentId} شکست خورد: ${error.message}`,
               relatedId: paymentId,
               metadata: {
                 representativeId,
-                errors: result.errors,
-                processingTime: result.processingTime
+                error: error.message,
+                transactionId
               }
             });
 
-            return {
-              success: false,
-              allocated: 0,
-              totalAmount: "0",
-              details: []
-            };
+            throw error; // This will cause transaction rollback
           }
-        } catch (error) {
-          console.error(`❌ SHERLOCK v34.1: Auto-allocation engine error:`, error);
-
-          // Log critical engine errors
-          await this.createActivityLog({
-            type: 'payment_auto_allocation_error',
-            description: `خطای بحرانی در موتور تخصیص خودکار پرداخت ${paymentId}`,
-            relatedId: paymentId,
-            metadata: {
-              representativeId,
-              error: error instanceof Error ? error.message : String(error)
-            }
-          });
-          throw error;
-        }
+        }); // End of transaction
       },
       'autoAllocatePaymentToInvoices'
-    );
+    )
+    .then(async (result) => {
+      // ✅ DEBT SYNC: Call after successful transaction commit
+      try {
+        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+        // ✅ DEBT SYNC FIX: Use correct method - forceInvalidateRepresentative + calculateRepresentative
+        UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, { 
+          cascadeGlobal: true, 
+          reason: 'payment_auto_allocation', 
+          immediate: true 
+        });
+        await new UnifiedFinancialEngine(null).calculateRepresentative(representativeId);
+        console.log(`✅ DEBT SYNC: Representative ${representativeId} debt synchronized after auto-allocation`);
+      } catch (syncError) {
+        console.error(`⚠️ DEBT SYNC: Failed to sync debt for representative ${representativeId}:`, syncError);
+        // Don't fail the entire operation if debt sync fails
+      }
+      
+      return result;
+    })
+    .catch((error) => {
+      console.error(`❌ ACID TRANSACTION: Auto-allocation failed completely:`, error);
+      return {
+        success: false,
+        allocated: 0,
+        totalAmount: "0",
+        details: []
+      };
+    });
   }
 
-  // ✅ SHERLOCK v34.1: Manual Payment Allocation
+  // ✅ ACID TRANSACTIONAL: Manual Payment Allocation with ATOMIC transactions and debt sync
   async manualAllocatePaymentToInvoice(
     paymentId: number,
     invoiceId: number,
@@ -2390,31 +2598,154 @@ export class DatabaseStorage implements IStorage {
   }> {
     return await withDatabaseRetry(
       async () => {
-        console.log(`🎯 SHERLOCK v34.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
+        console.log(`🎯 ACID TRANSACTION: Starting manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
 
-        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+        // ✅ ACID Transaction - All operations in one atomic transaction
+        return await db.transaction(async (tx) => {
+          const transactionId = `MANUAL_ALLOC_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          
+          try {
+            // 🔍 PHASE 1: Comprehensive Validation
+            
+            // Validate payment exists and ownership WITH ROW LOCK
+            const [payment] = await tx.select().from(payments)
+              .where(eq(payments.id, paymentId))
+              .for('update'); // ✅ ACID FIX: Row-level locking to prevent double-allocation
+            if (!payment) {
+              throw new Error(`Payment ${paymentId} not found`);
+            }
 
-        const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
-          paymentId,
-          invoiceId,
-          amount,
-          performedBy,
-          reason,
-          {
-            strictValidation: true,
-            auditMode: true,
-            allowOverAllocation: false
-          }
-        );
+            // Validate invoice exists and ownership WITH ROW LOCK
+            const [invoice] = await tx.select().from(invoices)
+              .where(eq(invoices.id, invoiceId))
+              .for('update'); // ✅ ACID FIX: Lock invoice to prevent concurrent modifications
+            if (!invoice) {
+              throw new Error(`Invoice ${invoiceId} not found`);
+            }
 
-        if (result.success) {
-          console.log(`✅ SHERLOCK v34.1: Manual allocation successful`);
+            // Verify same representative
+            if (payment.representativeId !== invoice.representativeId) {
+              throw new Error(`Payment ${paymentId} and Invoice ${invoiceId} belong to different representatives`);
+            }
 
-          // Get payment info for activity log
-          const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+            const representativeId = payment.representativeId!;
 
-          if (payment) {
-            await this.createActivityLog({
+            // Validate amounts
+            const paymentAmount = parseFloat(payment.amount);
+            const invoiceAmount = parseFloat(invoice.amount);
+            
+            if (amount <= 0) {
+              throw new Error(`Invalid allocation amount: ${amount}`);
+            }
+
+            if (amount > paymentAmount) {
+              throw new Error(`Allocation amount ${amount} exceeds payment amount ${paymentAmount}`);
+            }
+
+            // Calculate current paid amount for the invoice
+            const currentPaidResults = await tx.select({
+              total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+            }).from(payments).where(
+              and(
+                eq(payments.invoiceId, invoiceId),
+                eq(payments.isAllocated, true)
+              )
+            );
+
+            const currentPaid = currentPaidResults[0]?.total || 0;
+            const remainingInvoiceAmount = invoiceAmount - currentPaid;
+
+            if (remainingInvoiceAmount <= 0) {
+              throw new Error(`Invoice ${invoiceId} is already fully paid`);
+            }
+
+            // Prevent over-allocation
+            if (amount > remainingInvoiceAmount) {
+              throw new Error(`Allocation amount ${amount} exceeds remaining invoice amount ${remainingInvoiceAmount}`);
+            }
+
+            // Check if payment is already allocated
+            if (payment.isAllocated) {
+              throw new Error(`Payment ${paymentId} is already allocated`);
+            }
+
+            // 🔄 PHASE 2: Execute Allocation
+            
+            // Calculate if this is a partial or full allocation of the payment
+            const remainingPayment = paymentAmount - amount;
+            
+            // Update original payment to allocated
+            await tx.update(payments)
+              .set({ isAllocated: true })
+              .where(eq(payments.id, paymentId));
+
+            // ✅ ALLOCATION LEDGER: Create detailed allocation payment record
+            const [allocationPayment] = await tx.insert(payments).values({
+              representativeId: representativeId,
+              invoiceId: invoiceId,
+              amount: amount.toString(),
+              paymentDate: payment.paymentDate,
+              description: `Manual allocation from payment ${paymentId} by ${performedBy}${reason ? ` - ${reason}` : ''}`,
+              isAllocated: true
+            }).returning();
+
+            // If partial payment allocation, create remainder payment
+            if (remainingPayment > 0) {
+              await tx.insert(payments).values({
+                representativeId: representativeId,
+                amount: remainingPayment.toString(),
+                paymentDate: payment.paymentDate,
+                description: `Remainder from payment ${paymentId} manual allocation`,
+                isAllocated: false
+              });
+            }
+
+            // 🔄 PHASE 3: Update Invoice Status
+            const newPaidAmount = currentPaid + amount;
+            let newInvoiceStatus = 'unpaid';
+            
+            if (newPaidAmount >= invoiceAmount) {
+              newInvoiceStatus = 'paid';
+            } else if (newPaidAmount > 0) {
+              newInvoiceStatus = 'partial';
+            }
+
+            await tx.update(invoices)
+              .set({ status: newInvoiceStatus })
+              .where(eq(invoices.id, invoiceId));
+
+            // 📊 PHASE 4: Create Financial Transaction Record (ENHANCED ALLOCATION LEDGER)
+            await tx.insert(financialTransactions).values({
+              transactionId: transactionId,
+              type: 'PAYMENT_MANUAL_ALLOCATE',
+              status: 'COMPLETED',
+              representativeId: representativeId,
+              relatedEntityType: 'payment',
+              relatedEntityId: paymentId,
+              amount: amount.toString(),
+              description: `Manual allocation of payment ${paymentId} to invoice ${invoiceId} by ${performedBy}`,
+              metadata: {
+                sourcePaymentId: paymentId,
+                targetInvoiceId: invoiceId,
+                allocationRecordId: allocationPayment.id, // ✅ ALLOCATION LEDGER: Link to allocation record
+                allocationMethod: 'MANUAL',
+                allocatedAmount: amount,
+                performedBy,
+                reason,
+                transactionId,
+                originalPaymentAmount: paymentAmount,
+                remainingPayment,
+                invoiceOriginalAmount: invoiceAmount,
+                invoicePreviouslyPaid: currentPaid,
+                invoiceNewTotal: newPaidAmount,
+                invoiceNewStatus: newInvoiceStatus
+              },
+              performedBy: performedBy,
+              transactionDate: new Date().toISOString().split('T')[0]
+            });
+
+            // 📊 PHASE 5: Create Activity Log
+            await tx.insert(activityLogs).values({
               type: 'payment_manual_allocation',
               description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} به مبلغ ${amount} توسط ${performedBy}`,
               relatedId: paymentId,
@@ -2423,47 +2754,81 @@ export class DatabaseStorage implements IStorage {
                 amount,
                 performedBy,
                 reason,
-                representativeId: payment.representativeId,
-                transactionId: result.transactionId
+                representativeId,
+                transactionId,
+                newInvoiceStatus,
+                newPaidAmount,
+                remainingInvoiceAmount: invoiceAmount - newPaidAmount
               }
             });
 
-            // Update representative financials
-            await this.updateRepresentativeFinancials(payment.representativeId!);
+            console.log(`✅ ACID TRANSACTION: Manual allocation completed - Amount: ${amount}, Invoice Status: ${newInvoiceStatus}`);
+
+            return {
+              success: true,
+              allocatedAmount: amount,
+              message: `تخصیص دستی با موفقیت انجام شد - مبلغ: ${amount}`,
+              transactionId: transactionId
+            };
+
+          } catch (error) {
+            console.error(`❌ ACID TRANSACTION: Manual allocation failed:`, error);
+            
+            // Create failure log
+            await tx.insert(activityLogs).values({
+              type: 'payment_manual_allocation_failed',
+              description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} شکست خورد: ${error.message}`,
+              relatedId: paymentId,
+              metadata: {
+                invoiceId,
+                amount,
+                performedBy,
+                reason,
+                error: error.message,
+                transactionId
+              }
+            });
+
+            throw error; // This will cause transaction rollback
           }
-
-          return {
-            success: true,
-            allocatedAmount: result.allocatedAmount,
-            message: `تخصیص دستی با موفقیت انجام شد - مبلغ: ${result.allocatedAmount}`,
-            transactionId: result.transactionId
-          };
-        } else {
-          console.log(`❌ SHERLOCK v34.1: Manual allocation failed:`, result.errors);
-
-          // Log failure for auditing
-          await this.createActivityLog({
-            type: 'payment_manual_allocation_failed',
-            description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} شکست خورد`,
-            relatedId: paymentId,
-            metadata: {
-              invoiceId,
-              amount,
-              performedBy,
-              reason,
-              errors: result.errors
-            }
-          });
-
-          return {
-            success: false,
-            allocatedAmount: 0,
-            message: `خطا در تخصیص: ${result.errors.join(', ')}`
-          };
-        }
+        }); // End of transaction
       },
       'manualAllocatePaymentToInvoice'
-    );
+    )
+    .then(async (result) => {
+      // ✅ DEBT SYNC: Call after successful transaction commit
+      try {
+        // Get representative ID from the payment (we need to fetch it again after transaction)
+        const [payment] = await db.select({ representativeId: payments.representativeId })
+          .from(payments).where(eq(payments.id, paymentId)).limit(1);
+        
+        if (payment?.representativeId) {
+          const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+          // ✅ DEBT SYNC FIX: Use correct method - forceInvalidateRepresentative + calculateRepresentative
+          UnifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, { 
+            cascadeGlobal: true, 
+            reason: 'payment_manual_allocation', 
+            immediate: true 
+          });
+          await new UnifiedFinancialEngine(null).calculateRepresentative(payment.representativeId);
+          console.log(`✅ DEBT SYNC: Representative ${payment.representativeId} debt synchronized after manual allocation`);
+        }
+      } catch (syncError) {
+        console.error(`⚠️ DEBT SYNC: Failed to sync debt after manual allocation:`, syncError);
+        // Don't fail the entire operation if debt sync fails
+      }
+      
+      return result;
+    })
+    .catch((error) => {
+      console.error(`❌ ACID TRANSACTION: Manual allocation failed completely:`, error);
+      return {
+        success: false,
+        allocatedAmount: 0,
+        message: `خطا در تخصیص: ${error.message}`,
+        transactionId: undefined
+      };
+    });
   }
 
   /**

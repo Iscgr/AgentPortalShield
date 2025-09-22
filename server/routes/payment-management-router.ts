@@ -106,7 +106,7 @@ paymentManagementRouter.post('/auto-allocate/:representativeId', async (req, res
             allocatedAmount: 0
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         totalErrors++;
         results.push({
           paymentId: payment.id,
@@ -123,7 +123,7 @@ paymentManagementRouter.post('/auto-allocate/:representativeId', async (req, res
     await storage.createActivityLog({
       type: 'payment_auto_allocation_batch',
       description: `تخصیص خودکار دسته‌ای برای نماینده ${representativeId} - ${results.length} پرداخت پردازش شد`,
-      relatedId: representativeId,
+      relatedId: String(representativeId),
       metadata: {
         representativeId,
         totalProcessed: results.length,
@@ -162,14 +162,44 @@ paymentManagementRouter.post('/auto-allocate/:representativeId', async (req, res
   }
 });
 
-// Manual allocation endpoint
+// Manual allocation endpoint - ENHANCED with debt sync and comprehensive logging
 paymentManagementRouter.post('/manual-allocate', async (req, res) => {
   try {
     const { paymentId, invoiceId, amount, reason } = req.body;
     const performedBy = (req.session as any)?.username || 'ADMIN';
+    const startTime = Date.now();
 
-    console.log(`🎯 SHERLOCK v34.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
+    console.log(`🎯 SHERLOCK v35.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
 
+    // Validate required fields
+    if (!paymentId || !invoiceId || !amount) {
+      return res.status(400).json({
+        success: false,
+        error: "پارامترهای الزامی ناقص است",
+        details: {
+          missing: {
+            paymentId: !paymentId,
+            invoiceId: !invoiceId,
+            amount: !amount
+          }
+        }
+      });
+    }
+
+    // Get invoice details to obtain representativeId
+    const invoice = await storage.getInvoiceById(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        error: "فاکتور مورد نظر یافت نشد",
+        details: { invoiceId }
+      });
+    }
+
+    const representativeId = invoice.representativeId;
+    console.log(`🔍 SHERLOCK v35.1: Representative ID identified: ${representativeId}`);
+
+    // Execute manual allocation
     const result = await storage.manualAllocatePaymentToInvoice(
       paymentId,
       invoiceId,
@@ -179,24 +209,170 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
     );
 
     if (result.success) {
-      res.json({
-        success: true,
-        message: result.message,
-        data: {
-          allocatedAmount: result.allocatedAmount,
-          transactionId: result.transactionId
-        }
-      });
+      const processingTime = Date.now() - startTime;
+      
+      // ✅ POST-SUCCESS DEBT SYNC - as required by architect plan
+      try {
+        console.log(`🔄 SHERLOCK v35.1: Initiating post-success debt sync for representative ${representativeId}`);
+        
+        const { UnifiedFinancialEngine } = await import('../services/unified-financial-engine.js');
+        
+        // Force cache invalidation first
+        UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
+          cascadeGlobal: true,
+          reason: 'manual_allocation_sync',
+          immediate: true,
+          includePortal: true
+        });
+        
+        // Recalculate representative debt
+        const engine = new UnifiedFinancialEngine(storage);
+        const updatedFinancialData = await engine.calculateRepresentative(representativeId);
+        
+        console.log(`✅ SHERLOCK v35.1: Debt sync completed for representative ${representativeId}`);
+        
+        // ✅ COMPREHENSIVE ACTIVITY LOGGING
+        await storage.createActivityLog({
+          type: 'payment_manual_allocation',
+          description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} - مبلغ: ${amount} تومان`,
+          relatedId: String(representativeId),
+          metadata: {
+            paymentId: parseInt(paymentId),
+            invoiceId: parseInt(invoiceId),
+            representativeId,
+            allocatedAmount: parseFloat(amount),
+            performedBy,
+            reason: reason || 'تخصیص دستی',
+            processingTime,
+            transactionId: result.transactionId,
+            preAllocationDebt: updatedFinancialData.actualDebt + parseFloat(amount), // Estimated
+            postAllocationDebt: updatedFinancialData.actualDebt,
+            debtReduction: parseFloat(amount),
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+        // ✅ STRUCTURED PAYLOAD RESPONSE suitable for frontend
+        res.json({
+          success: true,
+          message: result.message,
+          data: {
+            allocation: {
+              paymentId: parseInt(paymentId),
+              invoiceId: parseInt(invoiceId),
+              allocatedAmount: result.allocatedAmount,
+              transactionId: result.transactionId,
+              performedBy,
+              timestamp: new Date().toISOString()
+            },
+            representative: {
+              id: representativeId,
+              name: updatedFinancialData.representativeName,
+              updatedDebt: updatedFinancialData.actualDebt,
+              paymentRatio: updatedFinancialData.paymentRatio,
+              debtLevel: updatedFinancialData.debtLevel
+            },
+            processing: {
+              processingTime,
+              debtSyncCompleted: true,
+              activityLogCreated: true
+            }
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+            operation: 'manual_allocation_with_sync',
+            version: 'SHERLOCK_v35.1'
+          }
+        });
+        
+      } catch (syncError: any) {
+        console.error(`⚠️ SHERLOCK v35.1: Debt sync failed but allocation successful:`, syncError);
+        
+        // Still log the allocation even if sync fails
+        await storage.createActivityLog({
+          type: 'payment_manual_allocation',
+          description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} - مبلغ: ${amount} تومان (همگام‌سازی بدهی ناموفق)`,
+          relatedId: String(representativeId),
+          metadata: {
+            paymentId: parseInt(paymentId),
+            invoiceId: parseInt(invoiceId),
+            representativeId,
+            allocatedAmount: parseFloat(amount),
+            performedBy,
+            reason: reason || 'تخصیص دستی',
+            processingTime: Date.now() - startTime,
+            transactionId: result.transactionId,
+            syncError: syncError.message,
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+        // Return success but with sync warning
+        res.json({
+          success: true,
+          message: result.message + ' (هشدار: همگام‌سازی بدهی ناموفق)',
+          data: {
+            allocation: {
+              paymentId: parseInt(paymentId),
+              invoiceId: parseInt(invoiceId),
+              allocatedAmount: result.allocatedAmount,
+              transactionId: result.transactionId,
+              performedBy,
+              timestamp: new Date().toISOString()
+            },
+            representative: {
+              id: representativeId,
+              syncWarning: 'همگام‌سازی بدهی ناموفق - لطفاً دستی بروزرسانی کنید'
+            },
+            processing: {
+              processingTime: Date.now() - startTime,
+              debtSyncCompleted: false,
+              activityLogCreated: true
+            }
+          },
+          meta: {
+            timestamp: new Date().toISOString(),
+            operation: 'manual_allocation_partial_sync',
+            version: 'SHERLOCK_v35.1'
+          }
+        });
+      }
     } else {
+      // Allocation failed
+      console.log(`❌ SHERLOCK v35.1: Manual allocation failed: ${result.message}`);
+      
       res.status(400).json({
         success: false,
-        error: result.message
+        error: result.message,
+        details: {
+          paymentId: parseInt(paymentId),
+          invoiceId: parseInt(invoiceId),
+          requestedAmount: parseFloat(amount),
+          representativeId,
+          reason: reason || 'نامشخص'
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          operation: 'manual_allocation_failed',
+          version: 'SHERLOCK_v35.1'
+        }
       });
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Manual allocation error:', error);
-    res.status(500).json({ error: "خطا در تخصیص دستی" });
+    res.status(500).json({ 
+      success: false,
+      error: "خطا در تخصیص دستی",
+      details: {
+        message: error.message,
+        timestamp: new Date().toISOString()
+      },
+      meta: {
+        operation: 'manual_allocation_system_error',
+        version: 'SHERLOCK_v35.1'
+      }
+    });
   }
 });
 
@@ -330,6 +506,172 @@ paymentManagementRouter.get('/smart-recommendations/:representativeId', async (r
   } catch (error) {
     console.error('❌ Smart recommendations error:', error);
     res.status(500).json({ error: "خطا در تولید پیشنهادات هوشمند" });
+  }
+});
+
+// ✅ SHERLOCK v35.1: LIGHTWEIGHT RECALCULATE ENDPOINT - as required by architect plan
+paymentManagementRouter.post('/recalculate/:representativeId', async (req, res) => {
+  try {
+    const representativeId = parseInt(req.params.representativeId);
+    const { forceRefresh = true, cascadeGlobal = false } = req.body;
+    const startTime = Date.now();
+
+    console.log(`🔄 SHERLOCK v35.1: Lightweight recalculate request for representative ${representativeId}`);
+
+    // Validate representative ID
+    if (isNaN(representativeId) || representativeId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "شناسه نماینده نامعتبر است",
+        details: {
+          providedId: req.params.representativeId,
+          parsedId: representativeId
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          operation: 'recalculate_validation_failed',
+          version: 'SHERLOCK_v35.1'
+        }
+      });
+    }
+
+    // Check if representative exists
+    const representative = await storage.getRepresentativeById(representativeId);
+    if (!representative) {
+      return res.status(404).json({
+        success: false,
+        error: "نماینده مورد نظر یافت نشد",
+        details: {
+          representativeId
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          operation: 'recalculate_not_found',
+          version: 'SHERLOCK_v35.1'
+        }
+      });
+    }
+
+    try {
+      const { UnifiedFinancialEngine } = await import('../services/unified-financial-engine.js');
+
+      // Force cache invalidation with options
+      UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
+        cascadeGlobal,
+        reason: 'manual_recalculate_request',
+        immediate: true,
+        includePortal: true
+      });
+
+      // Recalculate representative financial data
+      const engine = new UnifiedFinancialEngine(storage);
+      const freshFinancialData = await engine.calculateRepresentative(representativeId);
+      
+      const processingTime = Date.now() - startTime;
+
+      // Log the recalculation activity
+      await storage.createActivityLog({
+        type: 'financial_recalculation',
+        description: `بازمحاسبه دستی اطلاعات مالی برای نماینده ${representativeId}`,
+        relatedId: String(representativeId),
+        metadata: {
+          representativeId,
+          representativeName: freshFinancialData.representativeName,
+          processingTime,
+          forceRefresh,
+          cascadeGlobal,
+          calculatedDebt: freshFinancialData.actualDebt,
+          paymentRatio: freshFinancialData.paymentRatio,
+          debtLevel: freshFinancialData.debtLevel,
+          timestamp: new Date().toISOString(),
+          accuracy: freshFinancialData.accuracyGuaranteed
+        }
+      });
+
+      // Return structured response
+      res.json({
+        success: true,
+        message: `بازمحاسبه موفقیت‌آمیز برای نماینده ${representative.name}`,
+        data: {
+          representative: {
+            id: representativeId,
+            name: freshFinancialData.representativeName,
+            code: freshFinancialData.representativeCode
+          },
+          financialData: {
+            totalSales: freshFinancialData.totalSales,
+            totalPaid: freshFinancialData.totalPaid,
+            actualDebt: freshFinancialData.actualDebt,
+            paymentRatio: freshFinancialData.paymentRatio,
+            debtLevel: freshFinancialData.debtLevel,
+            lastUpdate: freshFinancialData.calculationTimestamp
+          },
+          processing: {
+            processingTime,
+            cacheInvalidated: true,
+            cascadeGlobal,
+            accuracyGuaranteed: freshFinancialData.accuracyGuaranteed
+          }
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          operation: 'lightweight_recalculate_success',
+          version: 'SHERLOCK_v35.1',
+          requestId: `recalc_${representativeId}_${Date.now()}`
+        }
+      });
+
+      console.log(`✅ SHERLOCK v35.1: Lightweight recalculate completed for representative ${representativeId} in ${processingTime}ms`);
+
+    } catch (calculationError: any) {
+      console.error(`❌ SHERLOCK v35.1: Recalculation failed for representative ${representativeId}:`, calculationError);
+
+      // Log the failure
+      await storage.createActivityLog({
+        type: 'financial_recalculation_failed',
+        description: `بازمحاسبه ناموفق برای نماینده ${representativeId}: ${calculationError.message}`,
+        relatedId: String(representativeId),
+        metadata: {
+          representativeId,
+          error: calculationError.message,
+          processingTime: Date.now() - startTime,
+          forceRefresh,
+          cascadeGlobal,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "خطا در بازمحاسبه اطلاعات مالی",
+        details: {
+          representativeId,
+          errorMessage: calculationError.message,
+          processingTime: Date.now() - startTime
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+          operation: 'recalculate_calculation_failed',
+          version: 'SHERLOCK_v35.1'
+        }
+      });
+    }
+
+  } catch (error: any) {
+    console.error('❌ Recalculate endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطای سیستمی در بازمحاسبه",
+      details: {
+        message: error.message,
+        representativeId: req.params.representativeId
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+        operation: 'recalculate_system_error',
+        version: 'SHERLOCK_v35.1'
+      }
+    });
   }
 });
 
