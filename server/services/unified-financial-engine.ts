@@ -157,6 +157,13 @@ export class UnifiedFinancialEngine {
       });
     }
 
+    // ✅ Additional invalidation for payment-specific caches
+    this.queryCache.delete(`payments_${representativeId}`);
+    this.queryCache.delete(`invoices_${representativeId}`);
+    this.cache.delete(`allocation_summary_${representativeId}`);
+    
+    console.log(`🔄 PAYMENT ALLOCATION: Invalidated payment-specific caches for representative ${representativeId}`);
+
     console.log(`✅ SHERLOCK v34.0: Invalidated ${cacheKeys.length} cache entries (including portal) for representative ${representativeId}`);
   }
 

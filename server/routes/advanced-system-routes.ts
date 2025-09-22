@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { advancedSecurity, enhancedAuth } from '../middleware/advanced-security';
 import { db } from '../db';
@@ -26,7 +25,7 @@ router.use((req, res, next) => {
 router.get('/ai-analytics', enhancedAuth, async (req, res) => {
   try {
     const depth = req.query.depth || 'ADVANCED';
-    
+
     // Mock AI analytics data - در نسخه واقعی از AI engine استفاده می‌شود
     const analytics = {
       overallScore: 87,
@@ -138,7 +137,7 @@ router.get('/performance-metrics', enhancedAuth, async (req, res) => {
 router.post('/export/generate', enhancedAuth, async (req, res) => {
   try {
     const config = req.body;
-    
+
     // Validate export configuration
     if (!config.type || !config.format || !config.columns?.length) {
       return res.status(400).json({ 
@@ -191,13 +190,13 @@ router.get('/security/stats', enhancedAuth, async (req, res) => {
 router.post('/security/block-ip', enhancedAuth, async (req, res) => {
   try {
     const { ip } = req.body;
-    
+
     if (!ip) {
       return res.status(400).json({ error: 'IP آدرس الزامی است' });
     }
 
     advancedSecurity.blockIP(ip);
-    
+
     await db.insert(activityLogs).values({
       type: 'SECURITY_ACTION',
       description: `IP blocked: ${ip}`,
@@ -219,13 +218,13 @@ router.post('/security/block-ip', enhancedAuth, async (req, res) => {
 router.post('/security/unblock-ip', enhancedAuth, async (req, res) => {
   try {
     const { ip } = req.body;
-    
+
     if (!ip) {
       return res.status(400).json({ error: 'IP آدرس الزامی است' });
     }
 
     advancedSecurity.unblockIP(ip);
-    
+
     await db.insert(activityLogs).values({
       type: 'SECURITY_ACTION',
       description: `IP unblocked: ${ip}`,
@@ -249,7 +248,7 @@ router.get('/health', async (req, res) => {
   try {
     // Test database connection
     await db.execute(sql`SELECT 1 as test`);
-    
+
     // Get basic system stats
     const [repCount] = await db.select({ count: sql<number>`COUNT(*)` }).from(representatives);
     const [invCount] = await db.select({ count: sql<number>`COUNT(*)` }).from(invoices);

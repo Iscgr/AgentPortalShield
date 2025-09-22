@@ -1,4 +1,3 @@
-
 /**
  * SHERLOCK v34.1: Payment Management Router
  * ATOMOS COMPLIANT - Enhanced payment allocation management
@@ -18,9 +17,9 @@ paymentManagementRouter.use(requireAuth);
 paymentManagementRouter.get('/', async (req, res) => {
   try {
     console.log('🔍 SHERLOCK v34.1: Fetching payments with enhanced allocation data');
-    
+
     const payments = await storage.getPayments();
-    
+
     res.json({
       success: true,
       data: payments,
@@ -39,9 +38,9 @@ paymentManagementRouter.get('/unallocated/:representativeId', async (req, res) =
   try {
     const representativeId = parseInt(req.params.representativeId);
     console.log(`🔍 SHERLOCK v34.1: Fetching unallocated payments for representative ${representativeId}`);
-    
+
     const unallocatedPayments = await storage.getUnallocatedPayments(representativeId);
-    
+
     res.json({
       success: true,
       data: unallocatedPayments,
@@ -59,10 +58,10 @@ paymentManagementRouter.post('/auto-allocate/:representativeId', async (req, res
   try {
     const representativeId = parseInt(req.params.representativeId);
     console.log(`🚀 SHERLOCK v34.1: Auto-allocation request for representative ${representativeId}`);
-    
+
     // Get unallocated payments for this representative
     const unallocatedPayments = await storage.getUnallocatedPayments(representativeId);
-    
+
     if (!unallocatedPayments.length) {
       return res.json({
         success: true,
@@ -86,9 +85,9 @@ paymentManagementRouter.post('/auto-allocate/:representativeId', async (req, res
     for (const payment of unallocatedPayments) {
       try {
         console.log(`🔄 Processing payment ${payment.id} with amount ${payment.amount}`);
-        
+
         const allocationResult = await storage.autoAllocatePaymentToInvoices(payment.id, representativeId);
-        
+
         if (allocationResult.success) {
           totalAllocated += parseFloat(allocationResult.totalAmount);
           results.push({
@@ -134,6 +133,17 @@ paymentManagementRouter.post('/auto-allocate/:representativeId', async (req, res
       }
     });
 
+    // ✅ Force representative debt sync after batch allocation
+    if (totalAllocated > 0) {
+      try {
+        const { unifiedFinancialEngine } = await import('../services/unified-financial-engine.js');
+        await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
+        console.log(`✅ SHERLOCK v34.1: Representative ${representativeId} debt synced after batch allocation`);
+      } catch (syncError) {
+        console.error(`⚠️ SHERLOCK v34.1: Debt sync failed but allocation successful:`, syncError);
+      }
+    }
+
     res.json({
       success: true,
       message: `تخصیص خودکار کامل شد - ${results.filter(r => r.success).length} موفق از ${results.length} پرداخت`,
@@ -157,9 +167,9 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
   try {
     const { paymentId, invoiceId, amount, reason } = req.body;
     const performedBy = (req.session as any)?.username || 'ADMIN';
-    
+
     console.log(`🎯 SHERLOCK v34.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
-    
+
     const result = await storage.manualAllocatePaymentToInvoice(
       paymentId,
       invoiceId,
@@ -167,7 +177,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
       performedBy,
       reason
     );
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -183,7 +193,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
         error: result.message
       });
     }
-    
+
   } catch (error) {
     console.error('❌ Manual allocation error:', error);
     res.status(500).json({ error: "خطا در تخصیص دستی" });
@@ -194,9 +204,9 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
 paymentManagementRouter.get('/allocation-summary/:representativeId', async (req, res) => {
   try {
     const representativeId = parseInt(req.params.representativeId);
-    
+
     const summary = await storage.getPaymentAllocationSummary(representativeId);
-    
+
     res.json({
       success: true,
       data: summary
@@ -212,11 +222,11 @@ paymentManagementRouter.post('/batch-allocate/:representativeId', async (req, re
   try {
     const representativeId = parseInt(req.params.representativeId);
     const { maxPayments, priorityMethod, strictMode } = req.body;
-    
+
     console.log(`🚀 SHERLOCK v35.0: Batch allocation request for representative ${representativeId}`);
-    
+
     const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
-    
+
     const result = await EnhancedPaymentAllocationEngine.batchAllocatePayments(
       representativeId,
       {
@@ -225,7 +235,7 @@ paymentManagementRouter.post('/batch-allocate/:representativeId', async (req, re
         strictMode: strictMode !== false
       }
     );
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -243,7 +253,7 @@ paymentManagementRouter.post('/batch-allocate/:representativeId', async (req, re
         details: result.errors
       });
     }
-    
+
   } catch (error) {
     console.error('❌ Batch allocation error:', error);
     res.status(500).json({ error: "خطا در تخصیص دسته‌ای" });
@@ -254,18 +264,18 @@ paymentManagementRouter.post('/batch-allocate/:representativeId', async (req, re
 paymentManagementRouter.get('/allocation-report/:representativeId', async (req, res) => {
   try {
     const representativeId = parseInt(req.params.representativeId);
-    
+
     console.log(`📊 SHERLOCK v35.0: Generating allocation report for representative ${representativeId}`);
-    
+
     const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
-    
+
     const report = await EnhancedPaymentAllocationEngine.generateAllocationReport(representativeId);
-    
+
     res.json({
       success: true,
       data: report
     });
-    
+
   } catch (error) {
     console.error('❌ Allocation report error:', error);
     res.status(500).json({ error: "خطا در تولید گزارش تخصیص" });
@@ -276,16 +286,16 @@ paymentManagementRouter.get('/allocation-report/:representativeId', async (req, 
 paymentManagementRouter.get('/smart-recommendations/:representativeId', async (req, res) => {
   try {
     const representativeId = parseInt(req.params.representativeId);
-    
+
     console.log(`🧠 SHERLOCK v35.0: Generating smart recommendations for representative ${representativeId}`);
-    
+
     // Get current allocation status
     const unallocatedPayments = await storage.getUnallocatedPayments(representativeId);
     const summary = await storage.getPaymentAllocationSummary(representativeId);
-    
+
     const recommendations = [];
     const priorities = [];
-    
+
     if (unallocatedPayments.length > 0) {
       recommendations.push({
         type: 'AUTO_ALLOCATE',
@@ -295,14 +305,14 @@ paymentManagementRouter.get('/smart-recommendations/:representativeId', async (r
         estimatedBenefit: `تخصیص ${unallocatedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)} تومان`
       });
     }
-    
+
     if (parseFloat(summary.totalUnallocatedAmount) > 1000000) {
       priorities.push({
         type: 'URGENT',
         message: 'مبلغ بالای پرداخت‌های تخصیص نیافته نیاز به توجه فوری دارد'
       });
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -316,7 +326,7 @@ paymentManagementRouter.get('/smart-recommendations/:representativeId', async (r
         ]
       }
     });
-    
+
   } catch (error) {
     console.error('❌ Smart recommendations error:', error);
     res.status(500).json({ error: "خطا در تولید پیشنهادات هوشمند" });

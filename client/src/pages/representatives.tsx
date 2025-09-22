@@ -96,9 +96,21 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
   // Force refresh when payment operations complete
   React.useEffect(() => {
     const handlePaymentUpdate = () => {
+      console.log(`🔄 Payment update event received for representative ${representativeId}`);
+      
+      // Invalidate all related queries
       queryClient.invalidateQueries({ 
         queryKey: [`unified-financial-representative-${representativeId}`] 
       });
+      queryClient.invalidateQueries({ 
+        queryKey: ["representatives"] 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["enhanced-representatives-data"] 
+      });
+      
+      // Force refetch immediately
+      refetch();
     };
 
     // Listen for custom payment update events
@@ -107,7 +119,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     return () => {
       window.removeEventListener(`payment-updated-${representativeId}`, handlePaymentUpdate);
     };
-  }, [representativeId, queryClient]);
+  }, [representativeId, queryClient, refetch]);
 
   // Show fallback immediately if available
   if (isLoading && fallbackDebt) {
