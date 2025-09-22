@@ -287,25 +287,53 @@ export class EnhancedPaymentAllocationEngine {
       console.log(`🔄 SHERLOCK v34.1: Starting database updates...`);
 
       try {
-        // ✅ بروزرسانی payment record با درایولر ORM
-        await db.update(payments)
-          .set({ 
-            isAllocated: true,
-            updatedAt: new Date()
-          })
-          .where(eq(payments.id, paymentId));
+        // ✅ CRITICAL FIX: Update original payment with proper allocation
+        if (allocations.length > 0) {
+          // If full allocation, update original payment to allocated with first invoice
+          if (remainingAmount <= 0.01) {
+            await db.update(payments)
+              .set({ 
+                isAllocated: true,
+                invoiceId: allocations[0].invoiceId,
+                updatedAt: new Date()
+              })
+              .where(eq(payments.id, paymentId));
 
-        // ✅ ایجاد رکوردهای allocation برای هر فاکتور
-        for (const allocation of allocations) {
-          await db.insert(payments).values({
-            representativeId: payment.representativeId!,
-            invoiceId: allocation.invoiceId,
-            amount: allocation.allocatedAmount.toString(),
-            paymentDate: payment.paymentDate,
-            description: `Auto-allocation from payment ${paymentId} via ${rules.method}`,
-            isAllocated: true,
-            createdAt: new Date()
-          });
+            // Create additional allocation records for remaining invoices
+            for (let i = 1; i < allocations.length; i++) {
+              const allocation = allocations[i];
+              await db.insert(payments).values({
+                representativeId: payment.representativeId!,
+                invoiceId: allocation.invoiceId,
+                amount: allocation.allocatedAmount.toString(),
+                paymentDate: payment.paymentDate,
+                description: `Auto-allocation split from payment ${paymentId}`,
+                isAllocated: true,
+                createdAt: new Date()
+              });
+            }
+          } else {
+            // Partial allocation: create allocated portion and update original
+            for (const allocation of allocations) {
+              await db.insert(payments).values({
+                representativeId: payment.representativeId!,
+                invoiceId: allocation.invoiceId,
+                amount: allocation.allocatedAmount.toString(),
+                paymentDate: payment.paymentDate,
+                description: `Auto-allocation from payment ${paymentId}`,
+                isAllocated: true,
+                createdAt: new Date()
+              });
+            }
+            
+            // Update original payment amount to remaining
+            await db.update(payments)
+              .set({ 
+                amount: remainingAmount.toString(),
+                updatedAt: new Date()
+              })
+              .where(eq(payments.id, paymentId));
+          }
         }
 
         // ✅ ENHANCED: بروزرسانی وضعیت فاکتورها با validation کامل
@@ -531,50 +559,40 @@ export class EnhancedPaymentAllocationEngine {
 
         // 🎯 PHASE 2: ATOMIC ALLOCATION EXECUTION
         
-        // ✅ Create allocation payment record with proper relationship
-        const [allocationPayment] = await tx.insert(payments).values({
-          representativeId: payment.representativeId!,
-          invoiceId: invoiceId,
-          amount: amount.toString(),
-          paymentDate: payment.paymentDate,
-          description: `Manual allocation from payment ${paymentId} by ${performedBy}${reason ? ` - ${reason}` : ''}`,
-          isAllocated: true,
-          createdAt: new Date()
-        }).returning();
-
-        console.log(`✅ ATOMOS v36.0: Allocation payment record created: ${allocationPayment.id}`);
-
-        // 🎯 CRITICAL FIX 1: Update original payment status correctly
-        // If partial allocation, keep original and mark as allocated
-        // If full allocation, mark as allocated
         const remainingPaymentAmount = paymentAmount - amount;
         
         if (remainingPaymentAmount <= 0.01) {
-          // Full allocation - mark original payment as allocated
+          // Full allocation - update original payment to be allocated to this invoice
           await tx.update(payments)
             .set({ 
               isAllocated: true,
-              updatedAt: new Date()
-            })
-            .where(eq(payments.id, paymentId));
-        } else {
-          // Partial allocation - mark original as allocated and create remainder
-          await tx.update(payments)
-            .set({ 
-              isAllocated: true,
+              invoiceId: invoiceId,
               updatedAt: new Date()
             })
             .where(eq(payments.id, paymentId));
 
-          // Create remainder payment
-          await tx.insert(payments).values({
+          console.log(`✅ ATOMOS v36.0: Original payment ${paymentId} fully allocated to invoice ${invoiceId}`);
+        } else {
+          // Partial allocation - create allocated portion and update original
+          const [allocationPayment] = await tx.insert(payments).values({
             representativeId: payment.representativeId!,
-            amount: remainingPaymentAmount.toString(),
+            invoiceId: invoiceId,
+            amount: amount.toString(),
             paymentDate: payment.paymentDate,
-            description: `Remainder from payment ${paymentId} after manual allocation`,
-            isAllocated: false,
+            description: `Manual allocation from payment ${paymentId} by ${performedBy}${reason ? ` - ${reason}` : ''}`,
+            isAllocated: true,
             createdAt: new Date()
-          });
+          }).returning();
+
+          // Update original payment amount to remaining (keep it unallocated)
+          await tx.update(payments)
+            .set({ 
+              amount: remainingPaymentAmount.toString(),
+              updatedAt: new Date()
+            })
+            .where(eq(payments.id, paymentId));
+
+          console.log(`✅ ATOMOS v36.0: Created allocation payment ${allocationPayment.id}, original payment ${paymentId} reduced to ${remainingPaymentAmount}`);
         }
 
         // 🎯 CRITICAL FIX 2: Update invoice status with accurate calculation
@@ -782,6 +800,52 @@ export class EnhancedPaymentAllocationEngine {
         warnings: []
       };
     }
+  }
+
+  /**
+   * Helper method to get eligible invoices for allocation
+   */
+  private static async getEligibleInvoices(
+    representativeId: number,
+    rules: AllocationRule
+  ): Promise<any[]> {
+    console.log(`🔍 Getting eligible invoices for representative ${representativeId}`);
+    
+    // Get unpaid/partial invoices ordered by FIFO (oldest first)
+    const eligibleInvoices = await db.select({
+      id: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      amount: invoices.amount,
+      issueDate: invoices.issueDate,
+      status: invoices.status
+    }).from(invoices)
+    .where(and(
+      eq(invoices.representativeId, representativeId),
+      or(
+        eq(invoices.status, 'unpaid'),
+        eq(invoices.status, 'partial'),
+        eq(invoices.status, 'overdue')
+      )
+    ))
+    .orderBy(invoices.issueDate, invoices.createdAt); // FIFO ordering
+
+    console.log(`📋 Found ${eligibleInvoices.length} eligible invoices`);
+    return eligibleInvoices;
+  }
+
+  /**
+   * Helper method to get currently allocated amount for an invoice
+   */
+  private static async getCurrentlyAllocatedAmount(invoiceId: number): Promise<number> {
+    const [result] = await db.select({
+      total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+    }).from(payments)
+    .where(and(
+      eq(payments.invoiceId, invoiceId),
+      eq(payments.isAllocated, true)
+    ));
+
+    return result.total || 0;
   }
 
   /**

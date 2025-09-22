@@ -2318,6 +2318,50 @@ export class DatabaseStorage implements IStorage {
     totalAmount: string;
     details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
   }> {
+    // Use Enhanced Payment Allocation Engine for proper allocation
+    const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+    
+    try {
+      const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, {
+        method: 'FIFO',
+        allowPartialAllocation: true,
+        allowOverAllocation: false,
+        priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
+        strictValidation: true,
+        auditMode: true
+      });
+
+      if (result.success) {
+        const details = result.allocations.map(alloc => ({
+          paymentId: paymentId,
+          invoiceId: alloc.invoiceId,
+          amount: alloc.allocatedAmount.toString()
+        }));
+
+        return {
+          success: true,
+          allocated: result.allocatedAmount,
+          totalAmount: result.allocatedAmount.toString(),
+          details
+        };
+      } else {
+        console.error('Auto-allocation failed:', result.errors);
+        return {
+          success: false,
+          allocated: 0,
+          totalAmount: '0',
+          details: []
+        };
+      }
+    } catch (error) {
+      console.error('Error in autoAllocatePaymentToInvoices:', error);
+      return {
+        success: false,
+        allocated: 0,
+        totalAmount: '0',
+        details: []
+      };
+    }
     return await withDatabaseRetry(
       async () => {
         console.log(`🚀 ACID TRANSACTION: Starting auto-allocation for payment ${paymentId}, representative ${representativeId}`);
@@ -2620,6 +2664,41 @@ export class DatabaseStorage implements IStorage {
     message: string;
     transactionId?: string;
   }> {
+    // Use Enhanced Payment Allocation Engine for proper allocation
+    const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+    
+    try {
+      const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
+        paymentId,
+        invoiceId,
+        amount,
+        performedBy,
+        reason
+      );
+
+      if (result.success) {
+        return {
+          success: true,
+          allocatedAmount: result.allocatedAmount,
+          message: `تخصیص دستی ${amount} تومان با موفقیت انجام شد`,
+          transactionId: result.transactionId
+        };
+      } else {
+        return {
+          success: false,
+          allocatedAmount: 0,
+          message: result.errors.join(', '),
+          transactionId: result.transactionId
+        };
+      }
+    } catch (error) {
+      console.error('Error in manualAllocatePaymentToInvoice:', error);
+      return {
+        success: false,
+        allocatedAmount: 0,
+        message: `خطا در تخصیص دستی: ${error.message}`,
+      };
+    }
     return await withDatabaseRetry(
       async () => {
         console.log(`🎯 ACID TRANSACTION: Starting manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
