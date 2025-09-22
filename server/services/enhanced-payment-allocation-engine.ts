@@ -6,7 +6,7 @@
 
 import { db } from '../db.js';
 import { payments, invoices, representatives } from '../../shared/schema.js';
-import { eq, sql, and, desc, asc, inArray } from 'drizzle-orm';
+import { eq, sql, and, desc, asc, inArray, or } from 'drizzle-orm';
 import { performance } from 'perf_hooks';
 
 export interface AllocationRule {
@@ -287,75 +287,46 @@ export class EnhancedPaymentAllocationEngine {
       console.log(`🔄 SHERLOCK v34.1: Starting database updates...`);
 
       try {
-        // ✅ CRITICAL FIX: Update original payment with proper allocation
+        // ✅ TITAN-O FIXED: Simplified and correct auto-allocation logic
         if (allocations.length > 0) {
-          // Logic for full vs partial allocation needs to be handled carefully
-          // to correctly mark the original payment and create new ones if necessary.
+          if (remainingAmount <= 0.01) {
+            // Full allocation - update original payment to allocated with first invoice
+            await db.update(payments)
+              .set({ 
+                isAllocated: true,
+                invoiceId: allocations[0].invoiceId
+              })
+              .where(eq(payments.id, paymentId));
 
-          // If the payment is fully allocated, mark it as allocated and link to the first invoice.
-          // If partially allocated, update its amount and link to the first invoice,
-          // and create a new payment for the remaining unallocated amount.
-          // The current logic for splitting payments needs careful review based on ATOMOS protocol.
-
-          // Refactored logic for updating payments based on allocation results
-          let currentPaymentAmount = parseFloat(payment.amount);
-
-          for (let i = 0; i < allocations.length; i++) {
-            const allocation = allocations[i];
-            const allocationAmount = allocation.allocatedAmount;
-            const invoiceId = allocation.invoiceId;
-
-            // Determine if this is the last allocation for the original payment
-            const isLastAllocation = i === allocations.length - 1;
-
-            if (isLastAllocation && remainingAmount <= 0.01) {
-              // Full allocation: Update the original payment
-              await db.update(payments)
-                .set({
-                  isAllocated: true,
-                  invoiceId: invoiceId,
-                  amount: allocationAmount.toString() // Update amount to the allocated portion
-                })
-                .where(eq(payments.id, paymentId));
-              console.log(`✅ SHERLOCK v35.1: Updated original payment ${paymentId} to be fully allocated to invoice ${invoiceId}.`);
-            } else {
-              // Partial allocation or split:
-              // If it's the first allocation, update the original payment's amount
-              // and link it to the invoice.
-              if (i === 0) {
-                await db.update(payments)
-                  .set({
-                    isAllocated: true,
-                    invoiceId: invoiceId,
-                    amount: allocationAmount.toString()
-                  })
-                  .where(eq(payments.id, paymentId));
-                console.log(`✅ SHERLOCK v35.1: Updated original payment ${paymentId} with partial allocation to invoice ${invoiceId}.`);
-              } else {
-                // For subsequent allocations, create new payment records
-                await db.insert(payments).values({
-                  representativeId: payment.representativeId!,
-                  invoiceId: invoiceId,
-                  amount: allocationAmount.toString(),
-                  paymentDate: payment.paymentDate,
-                  description: `Auto-allocation split from payment ${paymentId}`,
-                  isAllocated: true
-                });
-                console.log(`✅ SHERLOCK v35.1: Created new payment for split allocation to invoice ${invoiceId}.`);
-              }
+            // Create additional allocation records for remaining invoices
+            for (let i = 1; i < allocations.length; i++) {
+              const allocation = allocations[i];
+              await db.insert(payments).values({
+                representativeId: payment.representativeId!,
+                invoiceId: allocation.invoiceId,
+                amount: allocation.allocatedAmount.toString(),
+                paymentDate: payment.paymentDate,
+                description: `Auto-allocation split from payment ${paymentId}`,
+                isAllocated: true
+              });
             }
-          }
+          } else {
+            // Partial allocation: create allocated portion and update original
+            for (const allocation of allocations) {
+              await db.insert(payments).values({
+                representativeId: payment.representativeId!,
+                invoiceId: allocation.invoiceId,
+                amount: allocation.allocatedAmount.toString(),
+                paymentDate: payment.paymentDate,
+                description: `Auto-allocation from payment ${paymentId}`,
+                isAllocated: true
+              });
+            }
 
-          // Create remaining unallocated payment if any
-          if (remainingAmount > 0.01) {
-            await db.insert(payments).values({
-              representativeId: payment.representativeId!,
-              amount: remainingAmount.toString(),
-              paymentDate: payment.paymentDate,
-              description: `Remaining from auto-allocation ${paymentId}`,
-              isAllocated: false
-            });
-            console.log(`✅ SHERLOCK v35.1: Created remaining unallocated payment for ${remainingAmount}.`);
+            // Update original payment with remaining amount (stays unallocated)
+            await db.update(payments)
+              .set({ amount: remainingAmount.toString() })
+              .where(eq(payments.id, paymentId));
           }
         } else {
           // If no allocations were made, ensure the payment remains unallocated.
@@ -586,31 +557,38 @@ export class EnhancedPaymentAllocationEngine {
 
         // 🎯 PHASE 2: ATOMIC ALLOCATION EXECUTION
 
-        // ✅ ATOMOS FIXED: Proper payment allocation
+        // ✅ TITAN-O FIXED: Correct allocation logic
         const remainingPaymentAmount = paymentAmount - amount;
 
-        // Update original payment to allocated with the specified amount
-        await tx.update(payments)
-          .set({
-            isAllocated: true,
-            invoiceId: invoiceId,
-            amount: amount.toString()
-          })
-          .where(eq(payments.id, paymentId));
+        if (remainingPaymentAmount <= 0.01) {
+          // Full allocation - update original payment to be allocated to this invoice
+          await tx.update(payments)
+            .set({ 
+              isAllocated: true,
+              invoiceId: invoiceId
+            })
+            .where(eq(payments.id, paymentId));
 
-        console.log(`✅ ATOMOS v36.0: Payment ${paymentId} allocated ${amount} to invoice ${invoiceId}, isAllocated=true`);
-
-        // Create remaining unallocated payment if needed
-        if (remainingPaymentAmount > 0.01) {
+          console.log(`✅ TITAN-O: Original payment ${paymentId} fully allocated to invoice ${invoiceId}`);
+        } else {
+          // Partial allocation - create allocated portion and keep original as unallocated
           await tx.insert(payments).values({
             representativeId: payment.representativeId!,
-            amount: remainingPaymentAmount.toString(),
+            invoiceId: invoiceId,
+            amount: amount.toString(),
             paymentDate: payment.paymentDate,
-            description: `Remaining from manual allocation ${paymentId}`,
-            isAllocated: false
+            description: `Manual allocation from payment ${paymentId}`,
+            isAllocated: true
           });
 
-          console.log(`✅ ATOMOS v36.0: Created remaining payment ${remainingPaymentAmount} as unallocated`);
+          // Update original payment to reduce amount (remaining unallocated)
+          await tx.update(payments)
+            .set({ 
+              amount: remainingPaymentAmount.toString()
+            })
+            .where(eq(payments.id, paymentId));
+
+          console.log(`✅ TITAN-O: Created allocated payment ${amount} to invoice ${invoiceId}, remaining ${remainingPaymentAmount} unallocated`);
         }
 
         // 🎯 CRITICAL FIX 2: Update invoice status with accurate calculation
