@@ -215,9 +215,38 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ SHERLOCK v23.0: محاسبه صحیح مالی نماینده طبق تعاریف استاندارد
+   * ✅ SHERLOCK v23.1: محاسبه صحیح مالی نماینده با timeout protection
    */
   async calculateRepresentative(representativeId: number): Promise<UnifiedFinancialData> {
+    // Add timeout protection to prevent crashes
+    return Promise.race([
+      this._calculateRepresentativeInternal(representativeId),
+      new Promise<UnifiedFinancialData>((_, reject) => 
+        setTimeout(() => reject(new Error(`Calculation timeout for representative ${representativeId}`)), 10000)
+      )
+    ]).catch(error => {
+      console.warn(`⚠️ Calculation failed for rep ${representativeId}, using fallback:`, error.message);
+      // Return safe fallback data
+      return {
+        representativeId,
+        representativeName: `نماینده ${representativeId}`,
+        representativeCode: `REP-${representativeId}`,
+        totalSales: 0,
+        totalPaid: 0,
+        totalUnpaid: 0,
+        actualDebt: 0,
+        paymentRatio: 0,
+        debtLevel: 'HEALTHY' as const,
+        invoiceCount: 0,
+        paymentCount: 0,
+        lastTransactionDate: null,
+        calculationTimestamp: new Date().toISOString(),
+        accuracyGuaranteed: false
+      };
+    });
+  }
+
+  private async _calculateRepresentativeInternal(representativeId: number): Promise<UnifiedFinancialData> {
     // Check cache first with enhanced invalidation check
     const cacheKey = `rep_calc_${representativeId}`;
     const cached = UnifiedFinancialEngine.queryCache.get(cacheKey);

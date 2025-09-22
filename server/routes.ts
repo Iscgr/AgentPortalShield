@@ -1038,10 +1038,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/allocation/metrics", authMiddleware, async (req, res) => {
     try {
       console.log('📊 SHERLOCK v35.0: Fetching allocation metrics');
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const metrics = await AllocationMonitoringService.calculateGlobalMetrics();
-      
+
       res.json({
         success: true,
         data: metrics,
@@ -1057,10 +1057,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const days = parseInt(req.query.days as string) || 30;
       console.log(`📈 SHERLOCK v35.0: Fetching allocation trends for ${days} days`);
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const trends = await AllocationMonitoringService.analyzeTrends(days);
-      
+
       res.json({
         success: true,
         data: trends,
@@ -1076,10 +1076,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/allocation/alerts", authMiddleware, async (req, res) => {
     try {
       console.log('🚨 SHERLOCK v35.0: Generating allocation alerts');
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const alerts = await AllocationMonitoringService.generateAlerts();
-      
+
       res.json({
         success: true,
         data: alerts,
@@ -1096,10 +1096,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/allocation/monitoring-report", authMiddleware, async (req, res) => {
     try {
       console.log('📋 SHERLOCK v35.0: Generating comprehensive monitoring report');
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const report = await AllocationMonitoringService.generateMonitoringReport();
-      
+
       res.json({
         success: true,
         data: report,
@@ -1339,16 +1339,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason: 'payment_created',
           immediate: true
         });
-        
+
         // 3. Update invoice statuses if payment was allocated
         if (newPayment.invoiceId) {
           await storage.updateInvoiceStatusAfterPayment(newPayment.invoiceId);
           console.log(`✅ Invoice ${newPayment.invoiceId} status updated`);
         }
-        
+
         // 4. Force refresh portal cache for immediate portal updates
         await storage.forceRefreshPortalCache(representativeCode);
-        
+
         console.log(`✅ SHERLOCK v34.0: Complete financial sync completed for representative ${representativeId}`);
       } catch (syncError) {
         console.error(`❌ SHERLOCK v34.0: Financial sync error:`, syncError);
@@ -1665,7 +1665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         enhancedInvoices = enhancedInvoices.filter(invoice => invoice.status === statusFilter);
       }
 
-      // Apply telegram status filter
+      // Apply telegram filter
       if (telegramFilter && telegramFilter !== 'all') {
         if (telegramFilter === 'sent') {
           enhancedInvoices = enhancedInvoices.filter(invoice => invoice.sentToTelegram);
