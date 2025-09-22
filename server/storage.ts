@@ -1091,7 +1091,7 @@ export class DatabaseStorage implements IStorage {
       // Calculate standardized total revenue = Sum of ALLOCATED payments only
       const [totalRevenueResult] = await db
         .select({
-          totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
+          totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`
         })
         .from(payments);
 
@@ -1099,9 +1099,9 @@ export class DatabaseStorage implements IStorage {
       const remainingDebtQuery = await db
         .select({
           representativeId: representatives.id,
-          totalInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
-          allocatedPayments: sql<string>`COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0)`,
-          remainingDebt: sql<string>`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0))`
+          totalInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN invoices.amount ELSE 0 END), 0)`,
+          allocatedPayments: sql<string>`COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN payments.amount ELSE 0 END), 0)`,
+          remainingDebt: sql<string>`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN invoices.amount ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN payments.amount ELSE 0 END), 0))`
         })
         .from(representatives)
         .leftJoin(invoices, eq(representatives.id, invoices.representativeId))
@@ -1275,16 +1275,16 @@ export class DatabaseStorage implements IStorage {
           id: representatives.id,
           name: representatives.name,
           code: representatives.code,
-          totalInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
-          totalPayments: sql<string>`COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0)`,
-          remainingDebt: sql<string>`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0))`
+          totalInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN invoices.amount ELSE 0 END), 0)`,
+          totalPayments: sql<string>`COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN payments.amount ELSE 0 END), 0)`,
+          remainingDebt: sql<string>`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN invoices.amount ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN payments.amount ELSE 0 END), 0))`
         })
         .from(representatives)
         .leftJoin(invoices, eq(representatives.id, invoices.representativeId))
         .leftJoin(payments, eq(representatives.id, payments.representativeId))
         .groupBy(representatives.id, representatives.name, representatives.code)
-        .having(sql`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0)) > 0`)
-        .orderBy(sql`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0)) DESC`);
+        .having(sql`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN invoices.amount ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN payments.amount ELSE 0 END), 0)) > 0`)
+        .orderBy(sql`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue', 'partial') THEN invoices.amount ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN payments.amount ELSE 0 END), 0)) DESC`);
 
       return debtorReps;
     }, 'getDebtorRepresentatives');

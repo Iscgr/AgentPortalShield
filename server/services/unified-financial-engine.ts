@@ -280,14 +280,14 @@ export class UnifiedFinancialEngine {
     // ✅ محاسبه صحیح: فروش کل = مجموع کل فاکتورهای صادر شده
     const invoiceData = await db.select({
       count: sql<number>`COUNT(*)`,
-      totalSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`, // فروش کل
+      totalSales: sql<number>`COALESCE(SUM(amount), 0)`, // فروش کل
       lastDate: sql<string>`MAX(created_at)`
     }).from(invoices).where(eq(invoices.representativeId, representativeId));
 
     // ✅ محاسبه صحیح: پرداخت تخصیص یافته = مجموع پرداخت‌های تخصیص یافته
     const paymentData = await db.select({
       count: sql<number>`COUNT(*)`,
-      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`, // پرداخت تخصیص یافته
+      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`, // پرداخت تخصیص یافته
       lastDate: sql<string>`MAX(payment_date)`
     }).from(payments).where(eq(payments.representativeId, representativeId));
 
@@ -412,18 +412,18 @@ export class UnifiedFinancialEngine {
     const results = await Promise.all([
       // فروش کل سیستم = مجموع کل فاکتورهای صادر شده
       db.select({
-        totalSystemSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+        totalSystemSales: sql<number>`COALESCE(SUM(amount), 0)`
       }).from(invoices),
 
       // پرداخت کل سیستم = مجموع پرداخت‌های تخصیص یافته
       db.select({
-        totalSystemPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
+        totalSystemPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`
       }).from(payments),
 
       // ✅ SHERLOCK v28.0: محاسبه دقیق مطالبات معوق
       db.select({
-        totalOverdueAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'overdue' THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
-        totalUnpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+        totalOverdueAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'overdue' THEN amount ELSE 0 END), 0)`,
+        totalUnpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN amount ELSE 0 END), 0)`,
         overdueInvoicesCount: sql<number>`COUNT(CASE WHEN status = 'overdue' THEN 1 END)`,
         unpaidInvoicesCount: sql<number>`COUNT(CASE WHEN status IN ('unpaid', 'overdue') THEN 1 END)`
       }).from(invoices)
@@ -655,7 +655,7 @@ export class UnifiedFinancialEngine {
     const invoiceDataQuery = db.select({
       representativeId: invoices.representativeId,
       count: sql<number>`COUNT(*)`,
-      totalSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
+      totalSales: sql<number>`COALESCE(SUM(amount), 0)`,
       lastDate: sql<string>`MAX(created_at)`
     }).from(invoices)
     .where(sql`${invoices.representativeId} = ANY(${repIds})`)
@@ -665,7 +665,7 @@ export class UnifiedFinancialEngine {
     const paymentDataQuery = db.select({
       representativeId: payments.representativeId,
       count: sql<number>`COUNT(*)`,
-      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`,
       lastDate: sql<string>`MAX(payment_date)`
     }).from(payments)
     .where(sql`${payments.representativeId} = ANY(${repIds})`)

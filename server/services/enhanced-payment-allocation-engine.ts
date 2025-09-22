@@ -931,8 +931,8 @@ export class EnhancedPaymentAllocationEngine {
     console.log(`📊 SHERLOCK v35.0: Getting enhanced allocation summary for representative ${representativeId}`);
 
     const [allocatedPayments] = await db.select({
-      totalAllocated: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
-      totalUnallocated: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+      totalAllocated: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`,
+      totalUnallocated: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN amount ELSE 0 END), 0)`,
       lastAllocationDate: sql<string>`MAX(CASE WHEN is_allocated = true THEN updated_at END)`
     }).from(payments).where(eq(payments.representativeId, representativeId));
 

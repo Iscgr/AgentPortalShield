@@ -2123,7 +2123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate total unpaid invoices for this representative
       const unpaidResult = await db.select({
-        totalDebt: sql<string>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+        totalDebt: sql<string>`COALESCE(SUM(amount), 0)`
       }).from(invoices).where(
         and(
           eq(invoices.representativeId, representativeId),
@@ -2133,7 +2133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate total sales (all invoices)
       const salesResult = await db.select({
-        totalSales: sql<string>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+        totalSales: sql<string>`COALESCE(SUM(amount), 0)`
       }).from(invoices).where(eq(invoices.representativeId, representativeId));
 
       const actualTotalDebt = unpaidResult[0]?.totalDebt || "0";
@@ -3261,16 +3261,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get detailed invoice and payment info
       const invoicesData = await db.select({
         count: count(),
-        totalAmount: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
-        unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue', 'partial') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
-        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'paid' THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
+        totalAmount: sql<number>`COALESCE(SUM(amount), 0)`,
+        unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue', 'partial') THEN amount ELSE 0 END), 0)`,
+        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0)`
       }).from(invoices).where(eq(invoices.representativeId, representativeId));
 
       const paymentsData = await db.select({
         count: count(),
-        totalAmount: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
-        allocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
-        unallocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
+        totalAmount: sql<number>`COALESCE(SUM(amount), 0)`,
+        allocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`,
+        unallocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN amount ELSE 0 END), 0)`
       }).from(payments).where(eq(payments.representativeId, representativeId));
 
       const invoice = invoicesData[0];
