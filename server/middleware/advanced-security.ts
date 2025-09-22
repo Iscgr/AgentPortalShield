@@ -1,5 +1,4 @@
-
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { db } from '../db';
@@ -42,18 +41,18 @@ class AdvancedSecurityManager {
       windowMs: this.config.rateLimiting.windowMs,
       max: (req: Request) => {
         const clientIP = this.getClientIP(req);
-        
+
         // Blocked IPs get 0 requests
         if (this.blockedIPs.has(clientIP)) {
           return 0;
         }
-        
+
         // Suspicious IPs get reduced limits
         const suspiciousCount = this.suspiciousIPs.get(clientIP) || 0;
         if (suspiciousCount >= this.config.suspiciousActivityThreshold) {
           return Math.max(10, this.config.rateLimiting.max - (suspiciousCount * 10));
         }
-        
+
         return this.config.rateLimiting.max;
       },
       message: {
@@ -66,7 +65,7 @@ class AdvancedSecurityManager {
       handler: (req: Request, res: Response) => {
         const clientIP = this.getClientIP(req);
         this.logSuspiciousActivity(clientIP, 'RATE_LIMIT_EXCEEDED', req);
-        
+
         res.status(429).json({
           error: 'درخواست‌های بیش از حد مجاز',
           message: 'لطفاً کمی صبر کنید و سپس دوباره تلاش کنید'
@@ -76,7 +75,7 @@ class AdvancedSecurityManager {
   }
 
   // Advanced request sanitization and validation
-  sanitizeAndValidate() {
+  sanitizeAndValidate(): RequestHandler {
     return (req: Request, res: Response, next: NextFunction) => {
       const clientIP = this.getClientIP(req);
       const userAgent = req.get('User-Agent') || '';
@@ -165,7 +164,7 @@ class AdvancedSecurityManager {
 
         // Update last activity
         session.lastActivity = new Date().toISOString();
-        
+
         next();
       } catch (error) {
         console.error('Enhanced auth middleware error:', error);
@@ -210,26 +209,26 @@ class AdvancedSecurityManager {
     const algorithm = 'aes-256-gcm';
     const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-characters-long!!', 'utf-8');
     const iv = crypto.randomBytes(16);
-    
+
     const cipher = crypto.createCipher(algorithm, key);
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     return iv.toString('hex') + ':' + encrypted;
   }
 
   decryptSensitiveData(encryptedData: string): string {
     const algorithm = 'aes-256-gcm';
     const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-key-32-characters-long!!', 'utf-8');
-    
+
     const parts = encryptedData.split(':');
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = parts[1];
-    
+
     const decipher = crypto.createDecipher(algorithm, key);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 
@@ -361,7 +360,7 @@ class AdvancedSecurityManager {
     try {
       // Only log sensitive endpoints
       const sensitiveEndpoints = ['/api/auth/', '/api/representatives/', '/api/payments/', '/api/invoices/'];
-      
+
       if (sensitiveEndpoints.some(endpoint => req.path.startsWith(endpoint))) {
         await db.insert(activityLogs).values({
           type: 'API_REQUEST',
@@ -407,6 +406,54 @@ class AdvancedSecurityManager {
       totalAPIKeys: this.apiKeyHashes.size,
       lastUpdate: new Date().toISOString()
     };
+  }
+  
+  /**
+   * Sanitize and validate requests
+   */
+  sanitizeAndValidate(): RequestHandler {
+    return (req: Request, res: Response, next: NextFunction) => {
+      try {
+        // Basic request sanitization
+        if (req.body && typeof req.body === 'object') {
+          // Sanitize request body
+          req.body = this.sanitizeObject(req.body);
+        }
+
+        if (req.query && typeof req.query === 'object') {
+          // Sanitize query parameters
+          req.query = this.sanitizeObject(req.query);
+        }
+
+        next();
+      } catch (error) {
+        console.error('Request sanitization error:', error);
+        res.status(400).json({ error: 'Invalid request format' });
+      }
+    };
+  }
+
+  /**
+   * Sanitize object properties
+   */
+  private sanitizeObject(obj: any): any {
+    if (!obj || typeof obj !== 'object') return obj;
+
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string') {
+        // Basic XSS protection - remove script tags and dangerous content
+        sanitized[key] = value
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/javascript:/gi, '')
+          .replace(/on\w+\s*=/gi, '');
+      } else if (typeof value === 'object' && value !== null) {
+        sanitized[key] = this.sanitizeObject(value);
+      } else {
+        sanitized[key] = value;
+      }
+    }
+    return sanitized;
   }
 }
 

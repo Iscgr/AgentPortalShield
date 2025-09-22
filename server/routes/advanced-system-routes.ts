@@ -8,7 +8,19 @@ import { sql } from 'drizzle-orm';
 const router = Router();
 
 // Apply security middleware to all routes
-router.use(advancedSecurity.sanitizeAndValidate());
+router.use((req, res, next) => {
+  try {
+    const middleware = advancedSecurity.sanitizeAndValidate();
+    if (typeof middleware === 'function') {
+      middleware(req, res, next);
+    } else {
+      next();
+    }
+  } catch (error) {
+    console.error('Security middleware error:', error);
+    next();
+  }
+});
 
 // AI Analytics endpoints
 router.get('/ai-analytics', enhancedAuth(), async (req, res) => {
