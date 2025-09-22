@@ -1,17 +1,13 @@
-
 "use client"
-
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { useMobileDetection } from "@/hooks/use-mobile-detection"
-
 interface MobileFormWrapperProps {
   children: React.ReactNode
   className?: string
   title?: string
   onBack?: () => void
 }
-
 export function MobileFormWrapper({ 
   children, 
   className, 
@@ -19,11 +15,9 @@ export function MobileFormWrapper({
   onBack 
 }: MobileFormWrapperProps) {
   const { isMobile } = useMobileDetection()
-
   if (!isMobile) {
     return <div className={className}>{children}</div>
   }
-
   return (
     <div className={cn(
       "fixed inset-0 z-50 bg-background",
@@ -55,7 +49,6 @@ export function MobileFormWrapper({
     </div>
   )
 }
-
 // Enhanced mobile input component
 export const MobileInput = React.forwardRef<
   HTMLInputElement,

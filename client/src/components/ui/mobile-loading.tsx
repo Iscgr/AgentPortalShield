@@ -1,35 +1,28 @@
-
 "use client"
-
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { useMobileDetection } from "@/hooks/use-mobile-detection"
-
 interface MobileLoadingProps {
   size?: "sm" | "md" | "lg"
   text?: string
   className?: string
 }
-
 export function MobileLoading({ 
   size = "md", 
   text = "در حال بارگذاری...",
   className 
 }: MobileLoadingProps) {
   const { isMobile } = useMobileDetection()
-
   const spinnerSizes = {
     sm: "w-4 h-4",
     md: "w-6 h-6", 
     lg: "w-8 h-8"
   }
-
   const textSizes = {
     sm: "text-sm",
     md: "text-base",
     lg: "text-lg"
   }
-
   return (
     <div className={cn(
       "flex flex-col items-center justify-center space-y-3",
@@ -55,20 +48,17 @@ export function MobileLoading({
     </div>
   )
 }
-
 // Full screen mobile loader for page transitions
 export function MobilePageLoader({ text }: { text?: string }) {
   const { isMobile } = useMobileDetection()
   
   if (!isMobile) return null
-
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
       <MobileLoading size="lg" text={text} />
     </div>
   )
 }
-
 // Skeleton loader optimized for mobile
 export function MobileSkeleton({ 
   className,
