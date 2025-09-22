@@ -89,7 +89,7 @@ export const payments = pgTable('payments', {
   id: serial('id').primaryKey(),
   representativeId: integer('representative_id').references(() => representatives.id),
   invoiceId: integer('invoice_id').references(() => invoices.id),
-  amount: text('amount').notNull(),
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
   paymentDate: text('payment_date').notNull(),
   description: text('description'),
   isAllocated: boolean('is_allocated').default(false),
