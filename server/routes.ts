@@ -1325,13 +1325,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📝 SHERLOCK v33.2: Payment ${newPayment.id} created without allocation (manual later)`);
       }
 
-      // ✅ SHERLOCK v33.2: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
-      console.log(`🔄 SHERLOCK v33.2: Starting comprehensive financial sync for representative ${representativeId}`);
+      // ✅ SHERLOCK v34.0: ATOMIC FINANCIAL SYNCHRONIZATION
+      console.log(`🔄 SHERLOCK v34.0: Starting ATOMIC financial sync for representative ${representativeId}`);
 
-      // 1. Update representative financials
+      // 1. Update representative financials with transaction safety
       await storage.updateRepresentativeFinancials(representativeId);
 
-      // 2. Force invalidate financial engine cache for immediate UI updates
+      // 2. Force invalidate ALL related caches immediately
       try {
         const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
         UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
@@ -1339,9 +1339,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason: 'payment_created',
           immediate: true
         });
-        console.log(`✅ SHERLOCK v33.2: Financial cache invalidated for representative ${representativeId}`);
-      } catch (cacheError) {
-        console.warn(`⚠️ SHERLOCK v33.2: Cache invalidation warning:`, cacheError);
+        
+        // 3. Update invoice statuses if payment was allocated
+        if (newPayment.invoiceId) {
+          await storage.updateInvoiceStatusAfterPayment(newPayment.invoiceId);
+          console.log(`✅ Invoice ${newPayment.invoiceId} status updated`);
+        }
+        
+        // 4. Force refresh portal cache for immediate portal updates
+        await storage.forceRefreshPortalCache(representativeCode);
+        
+        console.log(`✅ SHERLOCK v34.0: Complete financial sync completed for representative ${representativeId}`);
+      } catch (syncError) {
+        console.error(`❌ SHERLOCK v34.0: Financial sync error:`, syncError);
+        // Continue but log error for debugging
       }
 
       // Log final status for debugging

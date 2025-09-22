@@ -257,6 +257,19 @@ export interface IStorage {
   updateAiConfiguration(configName: string, config: Partial<AiConfiguration>): Promise<AiConfiguration>;
   deleteAiConfiguration(configName: string): Promise<void>;
   getActiveAiConfiguration(): Promise<AiConfiguration[]>;
+
+  // Payment Allocation Methods (SHERLOCK v34.0)
+  getUnallocatedPayments(representativeId?: number): Promise<Payment[]>;
+  allocatePaymentToInvoice(paymentId: number, invoiceId: number): Promise<Payment>;
+  autoAllocatePayments(representativeId: number): Promise<{
+    allocated: number;
+    totalAmount: string;
+    details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
+  }>;
+  // Force refresh portal cache
+  forceRefreshPortalCache(representativeCode: string): Promise<void>;
+  // Update invoice status after payment
+  updateInvoiceStatusAfterPayment(invoiceId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1556,7 +1569,7 @@ export class DatabaseStorage implements IStorage {
           deletedCounts.payments = result.rowCount || 0;
           await this.createActivityLog({
             type: 'system',
-            description: `بازنشانی پرداخت‌ها: ${deletedCounts.payments} رکورد حذف شد`,
+            description: `بازنشانی پرداخت‌ها: ${deletedCounts.payments}رکورد حذف شد`,
             relatedId: null,
             metadata: { resetType: 'payments', count: deletedCounts.payments }
           });
@@ -1567,7 +1580,7 @@ export class DatabaseStorage implements IStorage {
           deletedCounts.invoices = result.rowCount || 0;
           await this.createActivityLog({
             type: 'system',
-            description: `بازنشانی فاکتورها: ${deletedCounts.invoices} رکورد حذف شد`,
+            description: `بازنشانی فاکتورها: ${deletedCounts.invoices}رکورد حذف شد`,
             relatedId: null,
             metadata: { resetType: 'invoices', count: deletedCounts.invoices }
           });

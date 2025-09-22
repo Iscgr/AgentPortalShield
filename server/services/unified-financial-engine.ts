@@ -98,21 +98,23 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ SHERLOCK v28.0: Enhanced immediate cache invalidation with cascade support
+   * ✅ SHERLOCK v34.0: Enhanced immediate cache invalidation with portal support
    */
   static forceInvalidateRepresentative(representativeId: number, options: {
     cascadeGlobal?: boolean;
     reason?: string;
     immediate?: boolean;
+    includePortal?: boolean;
   } = {}): void {
-    const { cascadeGlobal = true, reason = "manual", immediate = true } = options;
+    const { cascadeGlobal = true, reason = "manual", immediate = true, includePortal = true } = options;
 
-    console.log(`🔄 SHERLOCK v28.0: Starting cache invalidation for rep ${representativeId}, reason: ${reason}`);
+    console.log(`🔄 SHERLOCK v34.0: Starting COMPREHENSIVE cache invalidation for rep ${representativeId}, reason: ${reason}`);
 
     const cacheKeys = [
       `rep_calc_${representativeId}`,
       `rep_financial_${representativeId}`,
-      `rep_sync_${representativeId}`
+      `rep_sync_${representativeId}`,
+      `unified-financial-representative-${representativeId}` // Added for UI query cache
     ];
 
     if (cascadeGlobal) {
@@ -121,7 +123,15 @@ export class UnifiedFinancialEngine {
         `global_summary`,
         `all_representatives`,
         `batch_calc_active`,
-        `system_totals`
+        `system_totals`,
+        `enhanced-representatives-data` // Added for frontend cache
+      );
+    }
+
+    if (includePortal) {
+      cacheKeys.push(
+        `portal_data_${representativeId}`,
+        `portal_cache_${representativeId}`
       );
     }
 
@@ -138,7 +148,16 @@ export class UnifiedFinancialEngine {
       this.scheduleBackgroundRefresh(representativeId, reason);
     }
 
-    console.log(`✅ SHERLOCK v28.0: Invalidated ${cacheKeys.length} cache entries for representative ${representativeId}`);
+    // Emit event for frontend real-time updates
+    if (typeof global !== 'undefined' && global.eventEmitter) {
+      global.eventEmitter.emit(`payment-updated-${representativeId}`, {
+        representativeId,
+        timestamp: Date.now(),
+        reason
+      });
+    }
+
+    console.log(`✅ SHERLOCK v34.0: Invalidated ${cacheKeys.length} cache entries (including portal) for representative ${representativeId}`);
   }
 
   /**
