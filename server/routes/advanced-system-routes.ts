@@ -23,7 +23,7 @@ router.use((req, res, next) => {
 });
 
 // AI Analytics endpoints
-router.get('/ai-analytics', enhancedAuth(), async (req, res) => {
+router.get('/ai-analytics', enhancedAuth, async (req, res) => {
   try {
     const depth = req.query.depth || 'ADVANCED';
     
@@ -76,7 +76,7 @@ router.get('/ai-analytics', enhancedAuth(), async (req, res) => {
 });
 
 // Real-time metrics endpoint
-router.get('/real-time-metrics', enhancedAuth(), async (req, res) => {
+router.get('/real-time-metrics', enhancedAuth, async (req, res) => {
   try {
     const metrics = {
       aiCpuUsage: Math.floor(Math.random() * 30) + 10,
@@ -93,7 +93,7 @@ router.get('/real-time-metrics', enhancedAuth(), async (req, res) => {
 });
 
 // Performance monitoring endpoint
-router.get('/performance-metrics', enhancedAuth(), async (req, res) => {
+router.get('/performance-metrics', enhancedAuth, async (req, res) => {
   try {
     // در نسخه واقعی، اطلاعات واقعی سیستم دریافت می‌شود
     const metrics = {
@@ -135,7 +135,7 @@ router.get('/performance-metrics', enhancedAuth(), async (req, res) => {
 });
 
 // Export generation endpoint
-router.post('/export/generate', enhancedAuth(), async (req, res) => {
+router.post('/export/generate', enhancedAuth, async (req, res) => {
   try {
     const config = req.body;
     
@@ -155,7 +155,7 @@ router.post('/export/generate', enhancedAuth(), async (req, res) => {
     await db.insert(activityLogs).values({
       type: 'EXPORT_GENERATED',
       description: `Export generated: ${config.type} as ${config.format}`,
-      details: {
+      metadata: {
         type: config.type,
         format: config.format,
         columns: config.columns,
@@ -178,7 +178,7 @@ router.post('/export/generate', enhancedAuth(), async (req, res) => {
 });
 
 // Security management endpoints
-router.get('/security/stats', enhancedAuth(), async (req, res) => {
+router.get('/security/stats', enhancedAuth, async (req, res) => {
   try {
     const stats = advancedSecurity.getSecurityStats();
     res.json(stats);
@@ -188,7 +188,7 @@ router.get('/security/stats', enhancedAuth(), async (req, res) => {
   }
 });
 
-router.post('/security/block-ip', enhancedAuth(), async (req, res) => {
+router.post('/security/block-ip', enhancedAuth, async (req, res) => {
   try {
     const { ip } = req.body;
     
@@ -201,7 +201,7 @@ router.post('/security/block-ip', enhancedAuth(), async (req, res) => {
     await db.insert(activityLogs).values({
       type: 'SECURITY_ACTION',
       description: `IP blocked: ${ip}`,
-      details: {
+      metadata: {
         action: 'BLOCK_IP',
         ip,
         adminId: (req.session as any)?.userId
@@ -216,7 +216,7 @@ router.post('/security/block-ip', enhancedAuth(), async (req, res) => {
   }
 });
 
-router.post('/security/unblock-ip', enhancedAuth(), async (req, res) => {
+router.post('/security/unblock-ip', enhancedAuth, async (req, res) => {
   try {
     const { ip } = req.body;
     
@@ -229,7 +229,7 @@ router.post('/security/unblock-ip', enhancedAuth(), async (req, res) => {
     await db.insert(activityLogs).values({
       type: 'SECURITY_ACTION',
       description: `IP unblocked: ${ip}`,
-      details: {
+      metadata: {
         action: 'UNBLOCK_IP',
         ip,
         adminId: (req.session as any)?.userId
@@ -286,7 +286,7 @@ router.get('/health', async (req, res) => {
 });
 
 // System configuration endpoint
-router.get('/configuration', enhancedAuth(), async (req, res) => {
+router.get('/configuration', enhancedAuth, async (req, res) => {
   try {
     const config = {
       features: {

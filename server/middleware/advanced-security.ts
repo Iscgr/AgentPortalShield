@@ -64,7 +64,8 @@ class AdvancedSecurityManager {
       legacyHeaders: false,
       handler: (req: Request, res: Response) => {
         const clientIP = this.getClientIP(req);
-        this.logSuspiciousActivity(clientIP, 'RATE_LIMIT_EXCEEDED', req);
+        this.markSuspiciousIP(clientIP);
+        this.logSecurityEvent(clientIP, 'RATE_LIMIT_EXCEEDED', req);
 
         res.status(429).json({
           error: 'درخواست‌های بیش از حد مجاز',
@@ -341,7 +342,7 @@ class AdvancedSecurityManager {
       await db.insert(activityLogs).values({
         type: 'SECURITY_EVENT',
         description: `Security event: ${eventType} from IP ${ip}`,
-        details: {
+        metadata: {
           eventType,
           ip,
           userAgent: req.get('User-Agent'),
@@ -365,7 +366,7 @@ class AdvancedSecurityManager {
         await db.insert(activityLogs).values({
           type: 'API_REQUEST',
           description: `API request: ${req.method} ${req.path}`,
-          details: {
+          metadata: {
             method: req.method,
             path: req.path,
             ip: this.getClientIP(req),
@@ -408,30 +409,6 @@ class AdvancedSecurityManager {
     };
   }
   
-  /**
-   * Sanitize and validate requests
-   */
-  sanitizeAndValidate(): RequestHandler {
-    return (req: Request, res: Response, next: NextFunction) => {
-      try {
-        // Basic request sanitization
-        if (req.body && typeof req.body === 'object') {
-          // Sanitize request body
-          req.body = this.sanitizeObject(req.body);
-        }
-
-        if (req.query && typeof req.query === 'object') {
-          // Sanitize query parameters
-          req.query = this.sanitizeObject(req.query);
-        }
-
-        next();
-      } catch (error) {
-        console.error('Request sanitization error:', error);
-        res.status(400).json({ error: 'Invalid request format' });
-      }
-    };
-  }
 
   /**
    * Sanitize object properties
