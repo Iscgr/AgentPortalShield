@@ -95,6 +95,9 @@ export interface IStorage {
   getInvoicesWithBatchInfo(): Promise<(Invoice & { batch?: InvoiceBatch })[]>;
   // ✅ SHERLOCK v32.0: Get single invoice by ID with full details
   getInvoiceById(invoiceId: number): Promise<any | null>;
+  
+  // ✅ TITAN-O: Get invoice by invoice number
+  getInvoiceByNumber(invoiceNumber: string): Promise<any | null>;
 
   // Telegram Send History - for resending capability
   getTelegramSendHistory(invoiceId: number): Promise<TelegramSendHistory[]>;
@@ -3362,6 +3365,17 @@ export class DatabaseStorage implements IStorage {
         return invoice || null;
       },
       'getInvoiceById'
+    );
+  }
+
+  // ✅ TITAN-O: Get invoice by invoice number
+  async getInvoiceByNumber(invoiceNumber: string): Promise<any | null> {
+    return await withDatabaseRetry(
+      async () => {
+        const [invoice] = await db.select().from(invoices).where(eq(invoices.invoiceNumber, invoiceNumber));
+        return invoice || null;
+      },
+      'getInvoiceByNumber'
     );
   }
 

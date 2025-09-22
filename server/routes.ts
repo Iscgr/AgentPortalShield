@@ -1590,7 +1590,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
   app.post("/api/payments", authMiddleware, async (req, res) => {
     try {
-      const { representativeId, amount, paymentDate, description, selectedInvoiceId } = req.body;
+      const { representativeId, amount, paymentDate, description, selectedInvoiceId, selectedInvoiceNumber } = req.body;
 
       // Basic validation
       if (!representativeId || !amount || !paymentDate) {
@@ -1611,23 +1611,27 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
       console.log(`📅 تطبیق تاریخ: ورودی="${paymentDate}" -> عادی‌سازی شده="${normalizedPaymentDate}"`);
 
-      // ✅ TITAN-O FIXED: Corrected allocation logic for manual allocation
+      // TITAN-O: Enhanced allocation logic with invoice number support
       let isAllocated = false;
       let invoiceId = null;
       let finalPaymentStatus = null;
 
-      // Determine allocation status before creating payment
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
-        // ✅ CRITICAL FIX: For manual allocation, set isAllocated=true and invoiceId correctly
+        // Manual allocation
         isAllocated = true;
         invoiceId = parseInt(selectedInvoiceId);
-        console.log(`💰 TITAN-O FIXED: Manual allocation - Payment will be allocated to Invoice ${selectedInvoiceId}`);
-      } else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v35.1: UNIFIED Auto-allocation planneded for Representative ${representativeId}`);
-        // Auto-allocation will be performed using Enhanced Payment Allocation Engine
-        isAllocated = false; // Start as unallocated, will be updated after auto-allocation
+
+        console.log(`💰 TITAN-O: Manual allocation request`);
+        console.log(`   Selected Invoice ID: ${selectedInvoiceId}`);
+        console.log(`   Selected Invoice Number: ${selectedInvoiceNumber}`);
+
+        finalPaymentStatus = null; // Will be determined by allocation result
+      } else {
+        // Auto allocation or no allocation
+        isAllocated = false;
         invoiceId = null;
-        console.log(`🎯 SHERLOCK v35.1: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
+        finalPaymentStatus = 'unallocated';
+        console.log(`💰 TITAN-O: Payment will be created as unallocated`);
       }
 
       // Create the payment with correct allocation status
@@ -1635,14 +1639,14 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         representativeId,
         amount,
         paymentDate: normalizedPaymentDate, // Now as text to match database
-        description,
+        description: description || `پرداخت تخصیص یافته به فاکتور ${selectedInvoiceNumber || selectedInvoiceId}`,
         isAllocated: isAllocated,
         invoiceId: invoiceId
       });
 
       finalPaymentStatus = newPayment; // Initialize with the newly created payment
 
-      // ✅ TITAN-O FIXED: Manual allocation logic - only update invoice status since payment is already correctly linked
+      // TITAN-O FIXED: Manual allocation logic - only update invoice status since payment is already correctly linked
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
         console.log(`💰 TITAN-O FIXED: Manual allocation - Payment ${newPayment.id} created with Invoice ${selectedInvoiceId} link`);
 
@@ -2923,7 +2927,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     try {
       console.log('Testing Telegram connection...');
 
-      // Get Telegram settings from environment variables or database
+      // Get Telegram credentials from environment variables or database
       let botToken = process.env.TELEGRAM_BOT_TOKEN;
       let chatId = process.env.TELEGRAM_CHAT_ID;
 

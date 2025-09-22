@@ -74,6 +74,7 @@ import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 import { useBatchFinancialData } from "@/contexts/batch-financial-context";
 import InvoiceEditDialog from "@/components/invoice-edit-dialog";
 import DebtVerificationPanel from "@/components/debt-verification-panel";
+import axios from 'axios'; // Import axios
 
 // ✅ PERFORMANCE OPTIMIZATION: Batch-enabled Real-time debt display
 function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId: number, fallbackDebt?: string }) {
@@ -464,7 +465,7 @@ export default function Representatives() {
         }
       };
 
-      invalidateAll();
+      handleGlobalAllocationEvent(event);
     };
 
     // Listen for various allocation events from other components
@@ -2421,13 +2422,16 @@ function CreatePaymentDialog({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>(""); // Changed default to empty string
   const [isLoading, setIsLoading] = useState(false);
 
+  // Use the invoices from the representative object directly
+  const invoices = (representative as any).invoices || [];
+
   // ✅ SHERLOCK v34.0: UNIFIED FIFO Auto-Allocation System (Enhanced Engine)
   const handleAutoAllocation = async (paymentAmount: number) => {
     try {
       console.log('🔧 SHERLOCK v34.0 UNIFIED FIFO: Starting enhanced auto-allocation for oldest invoices first');
 
       // CRITICAL: Get unpaid invoices sorted by date (OLDEST FIRST - FIFO principle)
-      const unpaidInvoices = (representative as any).invoices?.filter(
+      const unpaidInvoices = invoices.filter(
         (inv: any) => inv.status === 'unpaid' || inv.status === 'partial' || inv.status === 'overdue'
       ).sort((a: any, b: any) => {
         // FIFO: Oldest invoices first (ascending order by issue date)
@@ -2613,9 +2617,19 @@ function CreatePaymentDialog({
           isAllocated: true
         };
 
+        // TITAN-O: Enhanced payment creation with invoice number support
+        let selectedInvoiceData = null;
+        if (paymentData.invoiceId) {
+          // Find the selected invoice to get its number
+          selectedInvoiceData = invoices.find(inv => inv.id === paymentData.invoiceId);
+        }
+
         await apiRequest("/api/payments", {
           method: "POST",
-          data: paymentData
+          data: {
+            ...paymentData,
+            selectedInvoiceNumber: selectedInvoiceData?.invoiceNumber || null
+          }
         });
       }
 
@@ -2760,8 +2774,8 @@ function CreatePaymentDialog({
                 <SelectItem value="auto" className="text-white hover:bg-white/10">
                   🤖 تخصیص خودکار (پیشنهادی)
                 </SelectItem>
-                {representative && (representative as any).invoices
-                  ?.filter((invoice: any) => invoice.status !== 'paid') // فقط فاکتورهای پرداخت نشده
+                {invoices
+                  .filter((invoice: any) => invoice.status !== 'paid') // فقط فاکتورهای پرداخت نشده
                   .map((invoice: Invoice) => (
                     <SelectItem key={invoice.id} value={invoice.id.toString()} className="text-white hover:bg-white/10">
                       📄 {invoice.invoiceNumber} - {formatCurrency(parseFloat(invoice.amount))} تومان - {invoice.status === 'partial' ? 'نیمه پرداخت' : 'پرداخت نشده'}

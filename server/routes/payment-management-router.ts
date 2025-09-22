@@ -166,17 +166,22 @@ paymentManagementRouter.post('/auto-allocate/:representativeId', async (req, res
   }
 });
 
-// Manual allocation endpoint - ENHANCED with debt sync and comprehensive logging
+// Manual allocation endpoint - TITAN-O FIXED with complete debugging
 paymentManagementRouter.post('/manual-allocate', async (req, res) => {
   try {
-    const { paymentId, invoiceId, amount, reason } = req.body;
+    const { paymentId, invoiceId, invoiceNumber, amount, reason } = req.body;
     const performedBy = (req.session as any)?.username || 'ADMIN';
     const startTime = Date.now();
 
-    console.log(`🎯 SHERLOCK v35.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
+    console.log(`🎯 TITAN-O DEBUGGING: Manual allocation request received`);
+    console.log(`   Payment ID: ${paymentId}`);
+    console.log(`   Invoice ID: ${invoiceId}`);
+    console.log(`   Invoice Number: ${invoiceNumber}`);
+    console.log(`   Amount: ${amount}`);
+    console.log(`   Request body:`, req.body);
 
-    // Validate required fields
-    if (!paymentId || !invoiceId || !amount) {
+    // TITAN-O: Enhanced validation with invoice number support
+    if (!paymentId || (!invoiceId && !invoiceNumber) || !amount) {
       return res.status(400).json({
         success: false,
         error: "پارامترهای الزامی ناقص است",
@@ -184,32 +189,65 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
           missing: {
             paymentId: !paymentId,
             invoiceId: !invoiceId,
+            invoiceNumber: !invoiceNumber,
             amount: !amount
           }
         }
       });
     }
 
-    // Get invoice details to obtain representativeId and invoice number
-    const invoice = await storage.getInvoiceById(invoiceId);
-    if (!invoice) {
+    // TITAN-O: Smart invoice resolution (ID or Number)
+    let targetInvoice = null;
+    let resolvedInvoiceId = null;
+
+    if (invoiceId) {
+      // Use direct invoice ID
+      targetInvoice = await storage.getInvoiceById(invoiceId);
+      resolvedInvoiceId = invoiceId;
+      console.log(`🔍 TITAN-O: Looking up by ID ${invoiceId}:`, targetInvoice ? 'FOUND' : 'NOT FOUND');
+    } else if (invoiceNumber) {
+      // Lookup by invoice number
+      console.log(`🔍 TITAN-O: Looking up by invoice number: ${invoiceNumber}`);
+      
+      // Query database for invoice by number
+      const invoiceResults = await db.select()
+        .from(invoices)
+        .where(eq(invoices.invoiceNumber, invoiceNumber))
+        .limit(1);
+      
+      if (invoiceResults.length > 0) {
+        targetInvoice = invoiceResults[0];
+        resolvedInvoiceId = targetInvoice.id;
+        console.log(`✅ TITAN-O: Found invoice by number ${invoiceNumber} -> ID ${resolvedInvoiceId}`);
+      } else {
+        console.log(`❌ TITAN-O: Invoice number ${invoiceNumber} not found`);
+      }
+    }
+
+    if (!targetInvoice) {
       return res.status(404).json({
         success: false,
-        error: "فاکتور مورد نظر یافت نشد",
-        details: { invoiceId }
+        error: `فاکتور مورد نظر یافت نشد`,
+        details: { 
+          searchedBy: invoiceId ? 'ID' : 'Number',
+          searchValue: invoiceId || invoiceNumber
+        }
       });
     }
 
     // Get actual invoice number for proper description
-    const invoiceNumber = invoice.invoiceNumber || `INV-${invoiceId}`;
+    const actualInvoiceNumber = targetInvoice.invoiceNumber || `INV-${resolvedInvoiceId}`;
+    const representativeId = targetInvoice.representativeId;
+    
+    console.log(`🔍 TITAN-O: Final resolution details:`);
+    console.log(`   Invoice ID: ${resolvedInvoiceId}`);
+    console.log(`   Invoice Number: ${actualInvoiceNumber}`);
+    console.log(`   Representative ID: ${representativeId}`);
 
-    const representativeId = invoice.representativeId;
-    console.log(`🔍 SHERLOCK v35.1: Representative ID identified: ${representativeId}`);
-
-    // Execute manual allocation
+    // Execute manual allocation with correct IDs
     const result = await storage.manualAllocatePaymentToInvoice(
       paymentId,
-      invoiceId,
+      resolvedInvoiceId,
       amount,
       performedBy,
       reason
