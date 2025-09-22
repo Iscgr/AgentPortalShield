@@ -2093,7 +2093,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
       }
 
       // SHERLOCK v12.2: Apply Display sorting - newest invoices first for UI
-      // NOTE: This ONLY affects display order, not payment allocation (which uses FIFO)
+      // NOTE: This ONLY affects payment allocation (which uses FIFO)
       enhancedInvoices.sort((a, b) => {
         const dateA = new Date(a.issueDate || a.createdAt).getTime();
         const dateB = new Date(b.issueDate || b.createdAt).getTime();
@@ -2395,7 +2395,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   // فاز ۲: Payment Synchronization API Routes
 
   // Get unallocated payments API
-  app.get("/api/payments/unallocated", authMiddleware, async (req, res) => {
+  app.get("/api/payments/unallocated", authMiddleware, async(req, res) => {
     try {
       const representativeId = req.query.representativeId ? parseInt(req.query.representativeId as string) : undefined;
       const unallocatedPayments = await storage.getUnallocatedPayments(representativeId);
