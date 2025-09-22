@@ -190,7 +190,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
       });
     }
 
-    // Get invoice details to obtain representativeId
+    // Get invoice details to obtain representativeId and invoice number
     const invoice = await storage.getInvoiceById(invoiceId);
     if (!invoice) {
       return res.status(404).json({
@@ -199,6 +199,9 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
         details: { invoiceId }
       });
     }
+
+    // Get actual invoice number for proper description
+    const invoiceNumber = invoice.invoiceNumber || `INV-${invoiceId}`;
 
     const representativeId = invoice.representativeId;
     console.log(`🔍 SHERLOCK v35.1: Representative ID identified: ${representativeId}`);
@@ -235,10 +238,10 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
 
         console.log(`✅ SHERLOCK v35.1: Debt sync completed for representative ${representativeId}`);
 
-        // ✅ COMPREHENSIVE ACTIVITY LOGGING
+        // ✅ COMPREHENSIVE ACTIVITY LOGGING with proper invoice number
         await storage.createActivityLog({
           type: 'payment_manual_allocation',
-          description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} - مبلغ: ${amount} تومان`,
+          description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceNumber} (ID: ${invoiceId}) - مبلغ: ${amount} تومان`,
           relatedId: String(representativeId),
           metadata: {
             paymentId: parseInt(paymentId),
@@ -295,7 +298,7 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
         // Still log the allocation even if sync fails
         await storage.createActivityLog({
           type: 'payment_manual_allocation',
-          description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} - مبلغ: ${amount} تومان (همگام‌سازی بدهی ناموفق)`,
+          description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceNumber} (ID: ${invoiceId}) - مبلغ: ${amount} تومان (همگام‌سازی بدهی ناموفق)`,
           relatedId: String(representativeId),
           metadata: {
             paymentId: parseInt(paymentId),
@@ -715,8 +718,20 @@ paymentManagementRouter.post('/create', requireAuth, async (req, res) => {
       throw new Error('Failed to create payment record');
     }
 
+    // Get invoice details for proper numbering
+    const targetInvoice = await storage.getInvoiceById(parseInt(invoiceId));
+    if (!targetInvoice) {
+      // Delete the payment record since allocation failed
+      await db.delete(payments).where(eq(payments.id, newPayment.id));
+      return res.status(400).json({
+        success: false,
+        error: "فاکتور مورد نظر یافت نشد",
+        details: { invoiceId }
+      });
+    }
+
     // MANDATORY manual allocation - NO generic payments allowed
-    console.log(`🎯 TITAN-O: Creating payment with MANDATORY allocation to invoice ${invoiceId}`);
+    console.log(`🎯 TITAN-O: Creating payment with MANDATORY allocation to invoice ${targetInvoice.invoiceNumber} (ID: ${invoiceId})`);
 
     const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
     
@@ -725,7 +740,7 @@ paymentManagementRouter.post('/create', requireAuth, async (req, res) => {
       parseInt(invoiceId),
       parseFloat(amount),
       performedBy,
-      `Mandatory allocation during payment creation: ${description || 'Payment registered'}`
+      `Mandatory allocation during payment creation to invoice ${targetInvoice.invoiceNumber}: ${description || 'Payment registered'}`
     );
 
     if (result.success) {

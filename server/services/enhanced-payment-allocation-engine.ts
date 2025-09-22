@@ -576,7 +576,7 @@ export class EnhancedPaymentAllocationEngine {
             .set({ 
               isAllocated: true,
               invoiceId: invoiceId,
-              description: `${payment.description || 'پرداخت'} - تخصیص کامل به فاکتور ${invoiceId}`
+              description: `${payment.description || 'پرداخت'} - تخصیص کامل به فاکتور ${invoice.invoiceNumber}`
             })
             .where(eq(payments.id, paymentId));
 
@@ -588,7 +588,7 @@ export class EnhancedPaymentAllocationEngine {
             invoiceId: invoiceId,
             amount: amount.toString(),
             paymentDate: payment.paymentDate,
-            description: `تخصیص دستی از پرداخت ${paymentId} به فاکتور ${invoiceId}`,
+            description: `تخصیص دستی از پرداخت ${paymentId} به فاکتور ${invoice.invoiceNumber}`,
             isAllocated: true
           });
           
@@ -598,7 +598,7 @@ export class EnhancedPaymentAllocationEngine {
               amount: remainingPaymentAmount.toString(),
               isAllocated: false,
               invoiceId: null,
-              description: `${payment.description || 'پرداخت'} - باقیمانده پس از تخصیص ${amount} تومان`
+              description: `${payment.description || 'پرداخت'} - باقیمانده پس از تخصیص ${amount} تومان به فاکتور ${invoice.invoiceNumber}`
             })
             .where(eq(payments.id, paymentId));
 
