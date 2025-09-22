@@ -533,6 +533,9 @@ export class UnifiedFinancialEngine {
 
       const systemAccuracy = 100; // Guaranteed by real-time calculations
 
+      // ✅ PERFORMANCE v2.1: Fix totalReps scope issue
+      const totalReps = repCounts[0]?.total || 0;
+      
       // ✅ Enhanced data integrity determination with reconciliation support
       let dataIntegrity: 'EXCELLENT' | 'GOOD' | 'NEEDS_ATTENTION';
       
@@ -546,7 +549,6 @@ export class UnifiedFinancialEngine {
         console.log(`📊 Using reconciliation-based data integrity: ${dataIntegrity}`);
       } else {
         // Improved ratio-based calculation with better thresholds
-        const totalReps = repCounts[0]?.total || 0;
         const criticalRatio = totalReps > 0 ? (critical / totalReps) * 100 : 0;
 
         // More reasonable thresholds for data integrity
