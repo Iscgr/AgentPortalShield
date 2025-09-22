@@ -5,12 +5,23 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { checkDatabaseHealth, closeDatabaseConnection, pool } from "./db";
 import { performanceMonitoringMiddleware } from "./middleware/performance";
+import { advancedSecurity } from "./middleware/advanced-security";
 
 
 const app = express();
 
-// Fix for Replit GCE deployment - trust proxy for authentication
-app.set('trust proxy', true);
+// Clear blocked IPs on startup (useful for development)
+if (process.env.NODE_ENV === 'development') {
+  advancedSecurity.clearAllBlocks();
+}
+
+// Fix for Replit GCE deployment - trust proxy for authentication  
+// Use specific proxy configuration instead of 'true' to avoid rate limiting issues
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // Trust first proxy only
+} else {
+  app.set('trust proxy', false); // Disable in development
+}
 
 // Enhanced CORS and security headers with special handling for portal routes
 app.use((req, res, next) => {

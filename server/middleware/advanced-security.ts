@@ -26,12 +26,12 @@ class AdvancedSecurityManager {
     this.config = {
       rateLimiting: {
         windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 100, // limit each IP to 100 requests per windowMs
+        max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More lenient for development
         skipSuccessfulRequests: false
       },
       auditLogging: true,
-      ipWhitelisting: [],
-      suspiciousActivityThreshold: 5
+      ipWhitelisting: ['127.0.0.1', '::1', 'localhost'], // Whitelist localhost for development
+      suspiciousActivityThreshold: process.env.NODE_ENV === 'development' ? 50 : 5
     };
   }
 
@@ -39,6 +39,22 @@ class AdvancedSecurityManager {
   createAdaptiveRateLimit() {
     return rateLimit({
       windowMs: this.config.rateLimiting.windowMs,
+      skip: (req: Request) => {
+        // Skip rate limiting for development assets and Vite HMR
+        if (process.env.NODE_ENV === 'development') {
+          const path = req.path;
+          if (path.includes('/@fs/') || path.includes('/@vite/') || 
+              path.includes('.js') || path.includes('.css') || 
+              path.includes('.svg') || path.includes('.png') || 
+              path.includes('node_modules')) {
+            return true;
+          }
+        }
+        
+        // Skip for whitelisted IPs
+        const clientIP = this.getClientIP(req);
+        return this.config.ipWhitelisting.includes(clientIP);
+      },
       max: (req: Request) => {
         const clientIP = this.getClientIP(req);
 
@@ -64,8 +80,12 @@ class AdvancedSecurityManager {
       legacyHeaders: false,
       handler: (req: Request, res: Response) => {
         const clientIP = this.getClientIP(req);
-        this.markSuspiciousIP(clientIP);
-        this.logSecurityEvent(clientIP, 'RATE_LIMIT_EXCEEDED', req);
+        
+        // Don't mark localhost as suspicious in development
+        if (process.env.NODE_ENV !== 'development' || !this.config.ipWhitelisting.includes(clientIP)) {
+          this.markSuspiciousIP(clientIP);
+          this.logSecurityEvent(clientIP, 'RATE_LIMIT_EXCEEDED', req);
+        }
 
         res.status(429).json({
           error: 'درخواست‌های بیش از حد مجاز',
@@ -392,6 +412,15 @@ class AdvancedSecurityManager {
     this.blockedIPs.delete(ip);
     this.suspiciousIPs.delete(ip);
     console.log(`✅ IP ${ip} unblocked`);
+  }
+
+  // Clear all blocks (useful for development)
+  clearAllBlocks(): void {
+    const blockedCount = this.blockedIPs.size;
+    const suspiciousCount = this.suspiciousIPs.size;
+    this.blockedIPs.clear();
+    this.suspiciousIPs.clear();
+    console.log(`🧹 Cleared ${blockedCount} blocked IPs and ${suspiciousCount} suspicious IPs`);
   }
 
   addAPIKey(apiKey: string): void {
