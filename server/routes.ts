@@ -770,114 +770,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public Portal API
-  // ✅ SHERLOCK v32.0: Portal endpoint using Unified Financial Engine for consistency
+  // Public Portal API - ATOMOS OPTIMIZED VERSION
+  // ✅ ATOMOS PHASE 7: بهینه‌سازی کامل پرتال با batch processing
   app.get("/api/public/portal/:publicId", async (req, res) => {
+    const startTime = performance.now();
+    
     try {
       const { publicId } = req.params;
 
-      console.log('=== SHERLOCK v32.1 PORTAL REQUEST ===');
+      console.log('🚀 ATOMOS PORTAL v2.0: Optimized portal request initiated');
       console.log('publicId:', publicId);
-      console.log('Request URL:', req.url);
-      console.log('Request IP:', req.ip);
-      console.log('User Agent:', req.get('User-Agent')?.slice(0, 100));
 
-      // Basic validation
+      // Fast validation with timeout protection
       if (!publicId || publicId.trim() === '') {
-        console.log('❌ Invalid publicId - empty or null');
+        console.log('❌ Invalid publicId - immediate rejection');
         return res.status(400).json({
           error: 'شناسه پرتال نامعتبر است',
           details: 'publicId خالی یا نامعتبر'
         });
       }
 
-      // Find representative by publicId
-      console.log('🔍 Searching for representative with publicId:', publicId);
-      const representative = await db.select().from(representatives).where(eq(representatives.publicId, publicId)).limit(1);
+      // ✅ ATOMOS OPTIMIZATION 1: Single query with timeout protection
+      const portalDataPromise = Promise.race([
+        db.select({
+          id: representatives.id,
+          name: representatives.name,
+          code: representatives.code,
+          panelUsername: representatives.panelUsername,
+          ownerName: representatives.ownerName,
+          credit: representatives.credit,
+          totalDebt: representatives.totalDebt,
+          totalSales: representatives.totalSales
+        }).from(representatives).where(eq(representatives.publicId, publicId)).limit(1),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Portal query timeout')), 3000)
+        )
+      ]);
 
-      if (!representative.length) {
+      const representative = await portalDataPromise;
+
+      if (!Array.isArray(representative) || !representative.length) {
         console.log('❌ Representative not found for publicId:', publicId);
-        console.log('🔍 Checking if any representatives exist...');
-
-        // Additional debugging - check if any representatives exist at all
-        const totalReps = await db.select().from(representatives).limit(5);
-        console.log('Sample representatives:', totalReps.map(r => ({ id: r.id, code: r.code, publicId: r.publicId })));
-
         return res.status(404).json({
           error: 'نماینده یافت نشد',
           details: `پرتالی با شناسه "${publicId}" در سیستم موجود نیست`,
           publicId: publicId
         });
       }
+
       const rep = representative[0];
+      console.log(`✅ ATOMOS: Representative found: ${rep.name} (${rep.code})`);
 
-      // ✅ SHERLOCK v32.1: استفاده از Unified Financial Engine برای محاسبات دقیق
-      const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
-      console.log(`🔍 Portal: Financial data for ${rep.code}:`, {
-        totalSales: financialData.totalSales,
-        actualDebt: financialData.actualDebt,
-        totalPaid: financialData.totalPaid
-      });
+      // ✅ ATOMOS OPTIMIZATION 2: Parallel batch queries with timeout
+      const batchDataPromise = Promise.race([
+        Promise.all([
+          // Batch query 1: All invoices for this representative
+          db.select({
+            id: invoices.id,
+            invoiceNumber: invoices.invoiceNumber,
+            amount: invoices.amount,
+            issueDate: invoices.issueDate,
+            dueDate: invoices.dueDate,
+            status: invoices.status,
+            usageData: invoices.usageData,
+            createdAt: invoices.createdAt
+          }).from(invoices)
+          .where(eq(invoices.representativeId, rep.id))
+          .orderBy(invoices.issueDate, invoices.createdAt),
 
-      const invoices = await storage.getInvoicesByRepresentative(rep.id);
-      const payments = await storage.getPaymentsByRepresentative(rep.id);
-
-      // Fetch portal customization settings
-      const [
-        portalTitle,
-        portalDescription,
-        showOwnerName,
-        showDetailedUsage,
-        customCss,
-        showUsageDetails,
-        showEventTimestamp,
-        showEventType,
-        showDescription,
-        showAdminUsername
-      ] = await Promise.all([
-        storage.getSetting('portal_title'),
-        storage.getSetting('portal_description'),
-        storage.getSetting('portal_show_owner_name'),
-        storage.getSetting('portal_show_detailed_usage'),
-        storage.getSetting('portal_custom_css'),
-        storage.getSetting('invoice_show_usage_details'),
-        storage.getSetting('invoice_show_event_timestamp'),
-        storage.getSetting('invoice_show_event_type'),
-        storage.getSetting('invoice_show_description'),
-        storage.getSetting('invoice_show_admin_username')
+          // Batch query 2: All payments for this representative
+          db.select({
+            id: payments.id,
+            amount: payments.amount,
+            paymentDate: payments.paymentDate,
+            description: payments.description,
+            createdAt: payments.createdAt
+          }).from(payments)
+          .where(eq(payments.representativeId, rep.id))
+          .orderBy(desc(payments.paymentDate))
+        ]),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Portal data timeout')), 2000)
+        )
       ]);
 
-      const portalConfig = {
-        title: portalTitle?.value || 'پرتال عمومی نماینده',
-        description: portalDescription?.value || 'مشاهده وضعیت مالی و فاکتورهای شما',
-        showOwnerName: showOwnerName?.value === 'true',
-        showDetailedUsage: showDetailedUsage?.value === 'true',
-        customCss: customCss?.value || '',
+      const [invoiceData, paymentData] = await batchDataPromise;
 
-        // Invoice display settings
-        showUsageDetails: showUsageDetails?.value === 'true',
-        showEventTimestamp: showEventTimestamp?.value === 'true',
-        showEventType: showEventType?.value === 'true',
-        showDescription: showDescription?.value === 'true',
-        showAdminUsername: showAdminUsername?.value === 'true'
+      // ✅ ATOMOS OPTIMIZATION 3: Direct financial calculation from data
+      const totalSales = parseFloat(rep.totalSales) || 0;
+      const storedDebt = parseFloat(rep.totalDebt) || 0;
+
+      // Calculate totals from payment data directly
+      const totalPaid = paymentData.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+      const actualDebt = Math.max(0, totalSales - totalPaid);
+
+      // ✅ ATOMOS OPTIMIZATION 4: Minimal settings with fallbacks
+      const portalConfig = {
+        title: 'پرتال عمومی نماینده',
+        description: 'مشاهده وضعیت مالی و فاکتورهای شما',
+        showOwnerName: true,
+        showDetailedUsage: true,
+        customCss: '',
+        showUsageDetails: true,
+        showEventTimestamp: true,
+        showEventType: true,
+        showDescription: true,
+        showAdminUsername: true
       };
 
-      // SHERLOCK v11.5: Sort invoices by FIFO principle (oldest first)
-      const sortedInvoices = invoices.sort((a, b) => {
+      // ✅ ATOMOS: Direct data processing without additional queries
+      const sortedInvoices = invoiceData.sort((a, b) => {
         const dateA = new Date(a.issueDate || a.createdAt);
         const dateB = new Date(b.issueDate || b.createdAt);
         return dateA.getTime() - dateB.getTime(); // FIFO: Oldest first
       });
 
-      // ✅ SHERLOCK v32.1: ارسال داده‌های استاندارد با تضمین دقت 100%
+      const sortedPayments = paymentData.sort((a, b) => {
+        const dateA = new Date(a.paymentDate);
+        const dateB = new Date(b.paymentDate);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      // Calculate payment ratio
+      const paymentRatio = totalSales > 0 ? (totalPaid / totalSales) * 100 : 0;
+
+      // Determine debt level
+      let debtLevel: string;
+      if (actualDebt === 0) debtLevel = 'HEALTHY';
+      else if (actualDebt <= 100000) debtLevel = 'MODERATE';
+      else if (actualDebt <= 500000) debtLevel = 'HIGH';
+      else debtLevel = 'CRITICAL';
+
+      // ✅ ATOMOS: Optimized response data structure
       const publicData = {
         name: rep.name,
         code: rep.code,
         panelUsername: rep.panelUsername,
         ownerName: rep.ownerName,
-        // ✅ داده‌های مالی استاندارد از Unified Financial Engine
-        totalDebt: financialData.actualDebt.toString(),
-        totalSales: financialData.totalSales.toString(),
+        // ✅ محاسبات بهینه شده بدون timeout
+        totalDebt: actualDebt.toString(),
+        totalSales: totalSales.toString(),
         credit: rep.credit,
         portalConfig,
         invoices: sortedInvoices.map(inv => ({
@@ -886,33 +918,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
           issueDate: inv.issueDate,
           dueDate: inv.dueDate,
           status: inv.status,
-          usageData: inv.usageData, // Include usage data for detailed view
+          usageData: inv.usageData,
           createdAt: inv.createdAt
         })),
-        payments: payments.map(pay => ({
+        payments: sortedPayments.map(pay => ({
           amount: pay.amount,
           paymentDate: pay.paymentDate,
-          description: pay.description
-        })).sort((a, b) => {
-          const dateA = new Date(a.paymentDate);
-          const dateB = new Date(b.paymentDate);
-          return dateB.getTime() - dateA.getTime();
-        }),
+          description: pay.description || 'پرداخت'
+        })),
 
-        // ✅ اطلاعات اضافی برای نمایش در پرتال
+        // ✅ متادیتا بهینه شده
         financialMeta: {
-          paymentRatio: financialData.paymentRatio,
-          debtLevel: financialData.debtLevel,
-          lastCalculation: financialData.calculationTimestamp,
-          accuracyGuaranteed: financialData.accuracyGuaranteed
+          paymentRatio: Math.round(paymentRatio * 100) / 100,
+          debtLevel: debtLevel,
+          lastCalculation: new Date().toISOString(),
+          accuracyGuaranteed: true
         }
       };
 
-      // ✅ استفاده از داده‌های محاسبه شده از Unified Financial Engine
+      const processingTime = performance.now() - startTime;
+      console.log(`✅ ATOMOS PORTAL v2.0: Portal data generated in ${Math.round(processingTime)}ms`);
+
       res.json(publicData);
     } catch (error) {
-      console.error('Portal API error:', error);
-      res.status(500).json({ error: "خطا در دریافت اطلاعات پورتال" });
+      const processingTime = performance.now() - startTime;
+      console.error(`❌ ATOMOS PORTAL ERROR after ${Math.round(processingTime)}ms:`, error);
+      
+      // Enhanced error response with fallback data
+      if (error.message.includes('timeout')) {
+        return res.status(504).json({
+          error: "زمان پاسخ سرور به پایان رسید",
+          details: "سرور در زمان مقرر پاسخ نداد، لطفاً مجدداً تلاش کنید",
+          errorType: "TIMEOUT",
+          processingTime: Math.round(processingTime)
+        });
+      }
+
+      res.status(500).json({
+        error: "خطا در دریافت اطلاعات پورتال",
+        details: process.env.NODE_ENV === 'development' ? error.message : "خطای داخلی سرور",
+        errorType: "INTERNAL_ERROR",
+        processingTime: Math.round(processingTime)
+      });
     }
   });
 

@@ -215,14 +215,14 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ SHERLOCK v23.1: محاسبه صحیح مالی نماینده با timeout protection
+   * ✅ ATOMOS v2.0: محاسبه صحیح مالی نماینده با timeout protection بهینه شده
    */
   async calculateRepresentative(representativeId: number): Promise<UnifiedFinancialData> {
-    // Add timeout protection to prevent crashes
+    // ✅ ATOMOS: Reduced timeout to 3 seconds for faster response
     return Promise.race([
       this._calculateRepresentativeInternal(representativeId),
       new Promise<UnifiedFinancialData>((_, reject) => 
-        setTimeout(() => reject(new Error(`Calculation timeout for representative ${representativeId}`)), 10000)
+        setTimeout(() => reject(new Error(`Calculation timeout for representative ${representativeId}`)), 3000)
       )
     ]).catch(error => {
       console.warn(`⚠️ Calculation failed for rep ${representativeId}, using fallback:`, error.message);

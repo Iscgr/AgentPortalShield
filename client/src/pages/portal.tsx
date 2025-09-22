@@ -316,24 +316,78 @@ export default function Portal() {
   }
 
   if (error || !data) {
-    console.error('=== SHERLOCK v32.1 PORTAL ERROR DETAILS ===');
+    console.error('=== ATOMOS PORTAL ERROR ANALYSIS ===');
     console.error('Error object:', error);
     console.error('Data object:', data);
     console.error('PublicId:', publicId);
     console.error('Current URL:', window.location.href);
 
-    // تشخیص نوع خطا - Enhanced for TanStack Query error format  
+    // ✅ ATOMOS: Enhanced error detection with timeout handling
     const responseError = (error as any)?.response || (error as any)?.cause?.response;
     const isQueryFnError = error?.message?.includes('Missing queryFn');
+    const isTimeoutError = responseError?.status === 504 || 
+                          error?.message?.includes('timeout') ||
+                          error?.message?.includes('Request timeout');
     const isNotFound = responseError?.status === 404 || 
                       error?.message?.includes('404') ||
                       (!data && !error && !isQueryFnError);
-    
-    const isServerError = responseError?.status >= 500;
+    const isServerError = responseError?.status >= 500 && !isTimeoutError;
     const isNetworkError = error?.message?.includes('Network') || 
                           error?.message?.includes('fetch') ||
                           error?.message?.includes('NetworkError');
     
+    // ✅ ATOMOS: Timeout error handling
+    if (isTimeoutError) {
+      return (
+        <div style={{ 
+          minHeight: '100vh', 
+          background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
+          color: 'white', 
+          padding: '40px',
+          fontFamily: 'Tahoma, sans-serif',
+          direction: 'rtl',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{ 
+            background: 'rgba(255, 255, 255, 0.1)', 
+            padding: '40px', 
+            borderRadius: '15px',
+            maxWidth: '600px',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>⏰</div>
+            <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+              زمان پاسخ سرور به پایان رسید!
+            </h1>
+            <p style={{ fontSize: '16px', marginBottom: '15px', lineHeight: '1.6' }}>
+              سرور در زمان مقرر پاسخ نداد. این معمولاً به دلیل حجم بالای داده‌ها است.
+            </p>
+            <p style={{ fontSize: '14px', opacity: 0.8, marginBottom: '20px' }}>
+              لطفاً چند لحظه صبر کنید و مجدداً تلاش کنید.
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              style={{
+                background: 'linear-gradient(135deg, #1e40af, #3730a3)',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                marginTop: '10px'
+              }}
+            >
+              🔄 تلاش مجدد
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     // خطای خاص queryFn
     if (isQueryFnError) {
       return (
