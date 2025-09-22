@@ -571,7 +571,7 @@ export class EnhancedPaymentAllocationEngine {
 
           console.log(`✅ TITAN-O: Original payment ${paymentId} fully allocated to invoice ${invoiceId}`);
         } else {
-          // Partial allocation - mark original payment as allocated, create remaining unallocated
+          // Partial allocation - update original payment with allocated amount and invoice link
           await tx.update(payments)
             .set({
               isAllocated: true,
@@ -586,7 +586,8 @@ export class EnhancedPaymentAllocationEngine {
             amount: remainingPaymentAmount.toString(),
             paymentDate: payment.paymentDate,
             description: `Remaining from manual allocation ${paymentId}`,
-            isAllocated: false
+            isAllocated: false,
+            invoiceId: null
           });
 
           console.log(`✅ TITAN-O: Original payment ${paymentId} allocated ${amount} to invoice ${invoiceId}, created remaining ${remainingPaymentAmount} unallocated`);
