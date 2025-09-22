@@ -557,11 +557,11 @@ export class EnhancedPaymentAllocationEngine {
 
         // 🎯 PHASE 2: ATOMIC ALLOCATION EXECUTION
 
-        // ✅ TITAN-O FIXED: Correct allocation logic
+        // ✅ TITAN-O FIXED: Corrected allocation logic following auto-allocation pattern
         const remainingPaymentAmount = paymentAmount - amount;
 
         if (remainingPaymentAmount <= 0.01) {
-          // Full allocation - update original payment to be allocated to this invoice
+          // Full allocation - mark original payment as allocated to this invoice
           await tx.update(payments)
             .set({ 
               isAllocated: true,
@@ -571,24 +571,25 @@ export class EnhancedPaymentAllocationEngine {
 
           console.log(`✅ TITAN-O: Original payment ${paymentId} fully allocated to invoice ${invoiceId}`);
         } else {
-          // Partial allocation - create allocated portion and keep original as unallocated
-          await tx.insert(payments).values({
-            representativeId: payment.representativeId!,
-            invoiceId: invoiceId,
-            amount: amount.toString(),
-            paymentDate: payment.paymentDate,
-            description: `Manual allocation from payment ${paymentId}`,
-            isAllocated: true
-          });
-
-          // Update original payment to reduce amount (remaining unallocated)
+          // Partial allocation - mark original payment as allocated, create remaining unallocated
           await tx.update(payments)
-            .set({ 
-              amount: remainingPaymentAmount.toString()
+            .set({
+              isAllocated: true,
+              invoiceId: invoiceId,
+              amount: amount.toString()
             })
             .where(eq(payments.id, paymentId));
+          
+          // Create remaining unallocated payment
+          await tx.insert(payments).values({
+            representativeId: payment.representativeId!,
+            amount: remainingPaymentAmount.toString(),
+            paymentDate: payment.paymentDate,
+            description: `Remaining from manual allocation ${paymentId}`,
+            isAllocated: false
+          });
 
-          console.log(`✅ TITAN-O: Created allocated payment ${amount} to invoice ${invoiceId}, remaining ${remainingPaymentAmount} unallocated`);
+          console.log(`✅ TITAN-O: Original payment ${paymentId} allocated ${amount} to invoice ${invoiceId}, created remaining ${remainingPaymentAmount} unallocated`);
         }
 
         // 🎯 CRITICAL FIX 2: Update invoice status with accurate calculation
