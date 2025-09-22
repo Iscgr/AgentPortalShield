@@ -341,7 +341,7 @@ export class UnifiedFinancialEngine {
 
     // ✅ ATOMOS v36.0: Enhanced payment calculations with detailed breakdown
     const paymentData = await db.select({
-      totalCount: sql<number>`COUNT(*)`,
+      count: sql<number>`COUNT(*)`,
       allocatedCount: sql<number>`COUNT(CASE WHEN is_allocated = true THEN 1 END)`,
       unallocatedCount: sql<number>`COUNT(CASE WHEN is_allocated = false THEN 1 END)`,
       totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`, // پرداخت تخصیص یافته
@@ -382,8 +382,8 @@ export class UnifiedFinancialEngine {
       paymentRatio: Math.round(paymentRatio * 100) / 100,
       debtLevel,
 
-      invoiceCount: invoice.count,
-      paymentCount: payment.count,
+      invoiceCount: Number(invoice.count) || 0,
+      paymentCount: Number(payment.count) || 0,
       lastTransactionDate: invoice.lastDate || payment.lastDate || null,
 
       calculationTimestamp: new Date().toISOString(),

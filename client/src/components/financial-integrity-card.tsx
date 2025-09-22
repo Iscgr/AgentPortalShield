@@ -174,16 +174,16 @@ export function FinancialIntegrityCard({ representativeId }: FinancialIntegrityC
           {/* Transaction Summary */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-bold text-lg text-blue-600">
-                {toPersianDigits(financialData.invoiceCount.toString())}
+              <div className="font-bold text-lg text-green-600">
+                {(financialData.invoiceCount || 0).toString()}
               </div>
               <div className="text-gray-500">فاکتور</div>
             </div>
             <div className="text-center">
-              <div className="font-bold text-lg text-green-600">
-                {toPersianDigits(financialData.paymentCount.toString())}
+              <div className="font-bold text-lg text-blue-600">
+                {(financialData.paymentCount || 0).toString()}
               </div>
-              <div className="text-gray-500">پرداخت</div>
+              <p className="text-xs text-muted-foreground">تعداد پرداخت</p>
             </div>
           </div>
 
