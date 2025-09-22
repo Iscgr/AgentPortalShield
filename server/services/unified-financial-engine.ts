@@ -80,11 +80,12 @@ export interface GlobalFinancialSummary {
 }
 
 export class UnifiedFinancialEngine {
-  // ✅ ATOMOS v2.0: Enhanced multi-level cache system with memory optimization
+  // ✅ PERFORMANCE v2.1: Optimized unified cache system for enterprise scale (347 representatives)
   private static cache = new Map<string, { data: any; timestamp: number }>();
-  private static readonly CACHE_TTL = 30 * 1000; // 30 seconds for regular data
-  private static readonly QUERY_CACHE_TTL = 10 * 1000; // 10 seconds for real-time feel
-  private static readonly BATCH_CACHE_TTL = 60 * 1000; // 60 seconds for batch/dashboard data
+  private static readonly CACHE_TTL = 90 * 1000; // 90 seconds for regular data (3x improvement)
+  private static readonly QUERY_CACHE_TTL = 60 * 1000; // 60 seconds for queries (6x improvement)
+  private static readonly BATCH_CACHE_TTL = 180 * 1000; // 3 minutes for batch/dashboard data (3x improvement)
+  private static readonly HOT_DATA_TTL = 45 * 1000; // 45 seconds for frequently accessed data
   private static queryCache = new Map<string, { data: any; timestamp: number }>();
   private static batchCache = new Map<string, { data: any; timestamp: number }>();
   
@@ -115,26 +116,36 @@ export class UnifiedFinancialEngine {
     immediate?: boolean;
     includePortal?: boolean;
   } = {}): void {
-    const { cascadeGlobal = true, reason = "manual", immediate = true, includePortal = true } = options;
+    const { cascadeGlobal = false, reason = "manual", immediate = true, includePortal = true } = options; // ✅ PERFORMANCE: Default to NO global cascade
 
-    console.log(`🔄 SHERLOCK v34.0: Starting COMPREHENSIVE cache invalidation for rep ${representativeId}, reason: ${reason}`);
+    console.log(`🎯 PERFORMANCE v2.1: Smart cache invalidation for rep ${representativeId}, reason: ${reason}, global: ${cascadeGlobal}`);
 
+    // ✅ PERFORMANCE: Always invalidate representative-specific caches
     const cacheKeys = [
       `rep_calc_${representativeId}`,
       `rep_financial_${representativeId}`,
       `rep_sync_${representativeId}`,
-      `unified-financial-representative-${representativeId}` // Added for UI query cache
+      `unified-financial-representative-${representativeId}`
     ];
 
+    // ✅ PERFORMANCE: Smart cascade logic - only when truly necessary
     if (cascadeGlobal) {
-      cacheKeys.push(
-        `debtor_list`,
-        `global_summary`,
-        `all_representatives`,
-        `batch_calc_active`,
-        `system_totals`,
-        `enhanced-representatives-data` // Added for frontend cache
-      );
+      // Only cascade for major financial changes (payment allocation, debt sync, etc.)
+      const isMajorChange = ['payment_allocation', 'debt_sync', 'reconciliation', 'bulk_update'].includes(reason);
+      
+      if (isMajorChange) {
+        console.log(`🌐 PERFORMANCE: Major change detected (${reason}), cascading to global caches`);
+        cacheKeys.push(
+          `debtor_list`,
+          `global_summary`,
+          `all_representatives`,
+          `batch_calc_active`,
+          `system_totals`,
+          `enhanced-representatives-data`
+        );
+      } else {
+        console.log(`🎯 PERFORMANCE: Minor change (${reason}), skipping global cascade`);
+      }
     }
 
     if (includePortal) {
@@ -152,10 +163,19 @@ export class UnifiedFinancialEngine {
       this.lastInvalidation.set(key, Date.now());
     });
 
-    // ✅ ATOMOS v2.0: DISABLE background refresh to prevent N+1 queries
-    // Background refresh disabled during optimization to prevent individual queries
-    if (false && immediate) { // Temporarily disabled
-      this.scheduleBackgroundRefresh(representativeId, reason);
+    // ✅ PERFORMANCE v2.1: Smart cache warming for frequently accessed data
+    if (immediate && reason !== 'bulk_update') { // Skip warming during bulk operations
+      console.log(`🔥 PERFORMANCE: Warming cache for frequently accessed rep ${representativeId}`);
+      
+      // Asynchronously warm the cache for this representative (non-blocking)
+      setTimeout(async () => {
+        try {
+          await this.calculateRepresentativeFinancials(representativeId);
+          console.log(`🔥 PERFORMANCE: Cache warmed successfully for rep ${representativeId}`);
+        } catch (error) {
+          console.error(`❌ PERFORMANCE: Cache warming failed for rep ${representativeId}:`, error);
+        }
+      }, 100); // Small delay to avoid blocking current operation
     }
 
     // Emit event for frontend real-time updates
