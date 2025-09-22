@@ -6,7 +6,7 @@
 
 import { db } from '../db.js';
 import { payments, invoices, representatives } from '../../shared/schema.js';
-import { eq, sql, and, desc, asc } from 'drizzle-orm';
+import { eq, sql, and, desc, asc, inArray } from 'drizzle-orm';
 import { performance } from 'perf_hooks';
 
 export interface AllocationRule {
@@ -283,31 +283,76 @@ export class EnhancedPaymentAllocationEngine {
       console.log(`🔄 SHERLOCK v34.1: Starting database updates...`);
 
       try {
-        // بروزرسانی payment record
-        await this.updatePaymentAllocation(paymentId, {
-          allocatedAmount: totalAllocated,
-          remainingAmount,
-          allocations,
-          allocationMethod: 'AUTO_' + rules.method,
-          transactionId,
-          allocationHistory: [{
-            timestamp: new Date().toISOString(),
-            action: 'AUTO_ALLOCATE',
-            amount: totalAllocated,
-            method: rules.method,
-            performedBy: 'SYSTEM_FIFO',
-            reason: `Automatic ${rules.method} allocation`,
-            transactionId
-          }]
-        });
+        // ✅ بروزرسانی payment record با درایولر ORM
+        await db.update(payments)
+          .set({ 
+            isAllocated: true,
+            updatedAt: new Date()
+          })
+          .where(eq(payments.id, paymentId));
 
-        // بروزرسانی invoice statuses
-        await this.updateInvoiceStatuses(allocations, transactionId);
+        // ✅ ایجاد رکوردهای allocation برای هر فاکتور
+        for (const allocation of allocations) {
+          await db.insert(payments).values({
+            representativeId: payment.representativeId!,
+            invoiceId: allocation.invoiceId,
+            amount: allocation.allocatedAmount.toString(),
+            paymentDate: payment.paymentDate,
+            description: `Auto-allocation from payment ${paymentId} via ${rules.method}`,
+            isAllocated: true,
+            createdAt: new Date()
+          });
+        }
 
-        // Update representative debt (if needed)
+        // ✅ بروزرسانی وضعیت فاکتورها
+        for (const allocation of allocations) {
+          // محاسبه کل پرداخت‌های تخصیص یافته برای این فاکتور
+          const [totalPaid] = await db.select({
+            total: sql<number>`COALESCE(SUM(amount), 0)`
+          }).from(payments)
+          .where(and(
+            eq(payments.invoiceId, allocation.invoiceId),
+            eq(payments.isAllocated, true)
+          ));
+
+          const [invoice] = await db.select({
+            amount: invoices.amount
+          }).from(invoices).where(eq(invoices.id, allocation.invoiceId));
+
+          if (invoice) {
+            const invoiceAmount = parseFloat(invoice.amount);
+            const paidAmount = totalPaid.total;
+            
+            let newStatus = 'unpaid';
+            if (paidAmount >= invoiceAmount) {
+              newStatus = 'paid';
+            } else if (paidAmount > 0) {
+              newStatus = 'partial';
+            }
+
+            await db.update(invoices)
+              .set({ 
+                status: newStatus,
+                updatedAt: new Date()
+              })
+              .where(eq(invoices.id, allocation.invoiceId));
+          }
+        }
+
+        // ✅ Force debt recalculation for representative
         if (totalAllocated > 0) {
           console.log(`🔄 SHERLOCK v34.1: Updating representative debt...`);
-          await this.updateRepresentativeDebtAfterAllocation(payment.representativeId!, totalAllocated);
+          
+          const { UnifiedFinancialEngine } = await import('./unified-financial-engine.js');
+          UnifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId!, {
+            cascadeGlobal: true,
+            reason: 'payment_allocation',
+            immediate: true,
+            includePortal: true
+          });
+
+          const { unifiedFinancialEngine } = await import('./unified-financial-engine.js');
+          await unifiedFinancialEngine.syncRepresentativeDebt(payment.representativeId!);
         }
 
         auditTrail.push({
@@ -461,35 +506,74 @@ export class EnhancedPaymentAllocationEngine {
         allocatedBy: performedBy
       };
 
-      // بروزرسانی پرداخت
+      // ✅ دریافت اطلاعات payment
       const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
-      const currentAllocations = payment.allocations || [];
-      const newAllocations = [...currentAllocations, allocation];
+      
+      // ✅ ایجاد رکورد allocation جدید
+      const [newAllocationPayment] = await db.insert(payments).values({
+        representativeId: payment.representativeId!,
+        invoiceId: invoiceId,
+        amount: amount.toString(),
+        paymentDate: payment.paymentDate,
+        description: `Manual allocation from payment ${paymentId} by ${performedBy}${reason ? ` - ${reason}` : ''}`,
+        isAllocated: true,
+        createdAt: new Date()
+      }).returning();
 
-      const totalAllocated = newAllocations.reduce((sum, alloc) => sum + alloc.allocatedAmount, 0);
-      const remainingAmount = parseFloat(payment.amount) - totalAllocated;
+      // ✅ بروزرسانی payment اصلی
+      await db.update(payments)
+        .set({ 
+          isAllocated: true,
+          updatedAt: new Date()
+        })
+        .where(eq(payments.id, paymentId));
 
-      await this.updatePaymentAllocation(paymentId, {
-        allocatedAmount: totalAllocated,
-        remainingAmount,
-        allocations: newAllocations,
-        allocationMethod: 'MANUAL',
-        allocationHistory: [
-          ...(payment.allocationHistory || []),
-          {
-            timestamp: new Date().toISOString(),
-            action: 'ALLOCATE',
-            invoiceId,
-            amount,
-            method: 'MANUAL',
-            performedBy,
-            reason: 'Manual allocation by user'
-          }
-        ]
+      // ✅ بروزرسانی وضعیت فاکتور
+      const [totalPaid] = await db.select({
+        total: sql<number>`COALESCE(SUM(amount), 0)`
+      }).from(payments)
+      .where(and(
+        eq(payments.invoiceId, invoiceId),
+        eq(payments.isAllocated, true)
+      ));
+
+      const [invoice] = await db.select({
+        amount: invoices.amount
+      }).from(invoices).where(eq(invoices.id, invoiceId));
+
+      if (invoice) {
+        const invoiceAmount = parseFloat(invoice.amount);
+        const paidAmount = totalPaid.total;
+        
+        let newStatus = 'unpaid';
+        if (paidAmount >= invoiceAmount) {
+          newStatus = 'paid';
+        } else if (paidAmount > 0) {
+          newStatus = 'partial';
+        }
+
+        await db.update(invoices)
+          .set({ 
+            status: newStatus,
+            updatedAt: new Date()
+          })
+          .where(eq(invoices.id, invoiceId));
+      }
+
+      // ✅ Force financial sync
+      const { UnifiedFinancialEngine } = await import('./unified-financial-engine.js');
+      UnifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId!, {
+        cascadeGlobal: true,
+        reason: 'manual_payment_allocation',
+        immediate: true,
+        includePortal: true
       });
 
-      // بروزرسانی وضعیت فاکتور
-      await this.updateInvoiceStatuses([allocation]);
+      const { unifiedFinancialEngine } = await import('./unified-financial-engine.js');
+      await unifiedFinancialEngine.syncRepresentativeDebt(payment.representativeId!);
+
+      const totalAllocated = amount;
+      const remainingAmount = parseFloat(payment.amount) - amount;
 
       console.log(`✅ Manual allocation completed successfully`);
 

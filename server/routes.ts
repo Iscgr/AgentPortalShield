@@ -1156,7 +1156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payments: sortedPayments,
         config: portalConfig,
 
-        // ✅ PORTAL MIRROR: Include unified financial metadata
+        // ✅ ATOMOS: Include unified financial metadata
         financialMeta: unifiedFinancialData ? {
           totalSales: mirroredTotalSales,
           totalPaid: mirroredTotalPaid,
@@ -1565,41 +1565,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation for Representative ${representativeId}`);
 
           try {
-            // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص خودکار
-            const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-            const allocationResult = await enhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
+            // 🎯 SHERLOCK v34.0: UNIFIED Auto-allocation with Enhanced Engine
+            const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
               method: 'FIFO',
               allowPartialAllocation: true,
               allowOverAllocation: false,
-              priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+              priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
+              strictValidation: true,
+              auditMode: true
             });
 
-            if (allocationResult.success && allocationResult.allocatedAmount > 0) {
-              // دریافت وضعیت به‌روز شده پرداخت
-              const updatedPayments = await storage.getPaymentsByRepresentative(representativeId);
-              const thisPayment = updatedPayments.find(p => p.id === newPayment.id);
+            if (allocationResult.success) {
+              console.log(`✅ SHERLOCK v34.0: Auto-allocation successful - ${allocationResult.allocatedAmount} allocated`);
 
-              finalPaymentStatus = thisPayment || newPayment;
-              console.log(`✅ SHERLOCK v34.0: UNIFIED auto-allocation successful - Payment ${newPayment.id} allocated ${allocationResult.allocatedAmount} تومان`);
-              console.log(`📋 SHERLOCK v34.0: Allocation details:`, allocationResult.allocations);
+              // ✅ Force cache invalidation after successful allocation
+              UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
+                cascadeGlobal: true,
+                reason: 'payment_allocation_success',
+                immediate: true,
+                includePortal: true
+              });
+
+              // ✅ Enhanced activity log for successful allocation
+              await storage.createActivityLog({
+                type: 'payment_auto_allocation_success',
+                description: `تخصیص خودکار پرداخت ${paymentId} موفق - مبلغ: ${allocationResult.allocatedAmount} تومان`,
+                relatedId: representativeId,
+                metadata: {
+                  paymentId,
+                  allocatedAmount: allocationResult.allocatedAmount,
+                  allocationsCount: allocationResult.allocations.length,
+                  transactionId: allocationResult.transactionId,
+                  engine: 'Enhanced Payment Allocation Engine v34.1'
+                }
+              });
             } else {
-              console.log(`⚠️ SHERLOCK v34.0: Auto-allocation completed but no allocation possible:`, allocationResult.warnings);
-              finalPaymentStatus = newPayment;
-            }
-          } catch (autoAllocationError) {
-            console.error(`❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:`, autoAllocationError);
-            // Keep payment as unallocated if auto-allocation fails
-            finalPaymentStatus = newPayment;
+              console.log(`❌ SHERLOCK v34.0: Auto-allocation failed:`, allocationResult.errors);
 
-            // Log detailed error for debugging
+              await storage.createActivityLog({
+                type: 'payment_auto_allocation_failed',
+                description: `تخصیص خودکار پرداخت ${paymentId} ناموفق: ${allocationResult.errors.join(', ')}`,
+                relatedId: representativeId,
+                metadata: {
+                  paymentId,
+                  errors: allocationResult.errors,
+                  warnings: allocationResult.warnings,
+                  transactionId: allocationResult.transactionId,
+                  engine: 'Enhanced Payment Allocation Engine v34.1'
+                }
+              });
+            }
+          } catch (allocationError) {
+            console.error('❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:', allocationError);
+
             await storage.createActivityLog({
-              type: "payment_auto_allocation_failed",
-              description: `تخصیص خودکار پرداخت ${newPayment.id} ناموفق: ${autoAllocationError.message}`,
+              type: 'payment_auto_allocation_failed',
+              description: `تخصیص خودکار پرداخت ${paymentId} ناموفق: ${allocationError.message}`,
               relatedId: representativeId,
               metadata: {
-                paymentId: newPayment.id,
-                error: autoAllocationError.message,
-                engine: "Enhanced Payment Allocation Engine"
+                paymentId,
+                error: allocationError.message,
+                stack: allocationError.stack,
+                engine: 'Enhanced Payment Allocation Engine v34.1'
               }
             });
           }
@@ -1610,33 +1637,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // ✅ SHERLOCK v34.0: ATOMIC FINANCIAL SYNCHRONIZATION
-      console.log(`🔄 SHERLOCK v34.0: Starting ATOMIC financial sync for representative ${representativeId}`);
-
-      // 1. Update representative financials with transaction safety
-      await storage.updateRepresentativeFinancials(representativeId);
-
-      // 2. Force invalidate ALL related caches immediately
+      // ✅ SHERLOCK v34.0: Force financial sync after payment creation
       try {
-        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+        console.log('🔄 SHERLOCK v34.0: Starting ATOMIC financial sync for representative', representativeId);
+
+        // Get representative data for proper logging
+        const representative = await storage.getRepresentativeById(representativeId);
+        const representativeCode = representative?.code || `REP-${representativeId}`;
+
+        // Force cache invalidation for immediate sync
         UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
           cascadeGlobal: true,
           reason: 'payment_created',
-          immediate: true
+          immediate: true,
+          includePortal: true
         });
 
-        // 3. Update invoice statuses if payment was allocated
-        if (newPayment.invoiceId) {
-          await storage.updateInvoiceStatusAfterPayment(newPayment.invoiceId);
-          console.log(`✅ Invoice ${newPayment.invoiceId} status updated`);
-        }
+        // Force debt recalculation
+        await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
 
-        // 4. Force refresh portal cache for immediate portal updates
-        await storage.forceRefreshPortalCache(representativeCode);
-
-        console.log(`✅ SHERLOCK v34.0: Complete financial sync completed for representative ${representativeId}`);
+        console.log(`✅ SHERLOCK v34.0: Financial sync completed for representative ${representativeCode}`);
       } catch (syncError) {
-        console.error(`❌ SHERLOCK v34.0: Financial sync error:`, syncError);
-        // Continue but log error for debugging
+        console.error('❌ SHERLOCK v34.0: Financial sync error:', syncError);
+        // Continue execution - sync error shouldn't fail payment creation
       }
 
       // Log final status for debugging
@@ -2582,8 +2605,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SHERLOCK v17.8 REMOVED: Duplicate financial reconciliation endpoint
   // All financial reconciliation now uses the standardized Financial Integrity Engine
   // Available at: /api/financial-integrity/representative/:id/reconcile
-
-
 
   // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use unified statistics endpoints instead
 
@@ -3577,7 +3598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Real message sending to Telegram groups
   app.post("/api/telegram/send-to-group", authMiddleware, async (req, res) => {
     try {
-      const { message, groupId, messageType } = req.body;
+      const { message, groupId } = req.body;
 
       // Get bot credentials from settings
       const botTokenSetting = await storage.getSetting("telegram_bot_token");

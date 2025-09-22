@@ -170,7 +170,8 @@ export class UnifiedFinancialEngine {
       // Asynchronously warm the cache for this representative (non-blocking)
       setTimeout(async () => {
         try {
-          await this.calculateRepresentativeFinancials(representativeId);
+          const engine = new UnifiedFinancialEngine(null);
+          await engine.calculateRepresentative(representativeId);
           console.log(`🔥 PERFORMANCE: Cache warmed successfully for rep ${representativeId}`);
         } catch (error) {
           console.error(`❌ PERFORMANCE: Cache warming failed for rep ${representativeId}:`, error);
