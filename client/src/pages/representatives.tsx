@@ -85,7 +85,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     queryKey: [`unified-financial-representative-${representativeId}`],
     queryFn: async () => {
       console.log(`🚀 BATCH PERFORMANCE: Requesting debt data for representative ${representativeId}`);
-      
+
       // ✅ USE BATCH CONTEXT instead of individual API call
       const batchData = await requestRepresentativeData(representativeId);
       return batchData;
@@ -103,7 +103,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
   const invalidateTargetedCaches = async (reason: string = 'payment-update') => {
     console.log(`🎯 PERFORMANCE: Starting TARGETED cache invalidation for rep ${representativeId} - ${reason}`);
     setIsRefreshing(true);
-    
+
     try {
       // ✅ TARGETED INVALIDATION: Only this representative + essential global caches
       const invalidationPromises = [
@@ -111,7 +111,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
         queryClient.invalidateQueries({ 
           queryKey: [`unified-financial-representative-${representativeId}`] 
         }),
-        
+
         // 2. Representative list data (REQUIRED for UI updates)
         queryClient.invalidateQueries({ 
           queryKey: ["/api/representatives"] 
@@ -119,7 +119,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
         queryClient.invalidateQueries({ 
           queryKey: ["representatives"] 
         }),
-        
+
         // 3. Skip enhanced-representatives-data (REMOVED - no longer needed)
       ];
 
@@ -135,10 +135,10 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
 
       await Promise.all(invalidationPromises);
       console.log(`✅ PERFORMANCE: Targeted cache invalidation completed for representative ${representativeId}`);
-      
+
       // ✅ THROTTLED REFETCH: Only refetch this specific representative data
       await refetch();
-      
+
     } catch (error) {
       console.error(`❌ PERFORMANCE: Targeted cache invalidation error:`, error);
       // Still try to refetch even if some invalidations failed
@@ -172,7 +172,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     window.addEventListener(`payment-updated-${representativeId}`, throttledUpdate);
     window.addEventListener('allocation-completed', throttledUpdate);
     window.addEventListener('manual-allocation-completed', throttledUpdate);
-    
+
     // ✅ REMOVED GLOBAL EVENT STORM: No longer listen to every global event
 
     return () => {
@@ -364,7 +364,7 @@ export default function Representatives() {
     return sortOrder === "asc" ? "⬆️" : "⬇️";
   };
 
-  const { data: representatives = [], isLoading, error: repsError, refetch } = useQuery<Representative[]>({
+  const { data: representatives = [], isLoading, error: repsError, refetch: refetchRepresentatives } = useQuery<Representative[]>({
     queryKey: ["/api/representatives"],
     queryFn: async () => {
       console.log("🔍 SHERLOCK v32.4: Fetching representatives data with enhanced caching");
@@ -406,7 +406,7 @@ export default function Representatives() {
       console.log(`🔄 SHERLOCK v32.4: Global allocation event received:`, event.detail);
       setIsGlobalSyncing(true);
       setLastGlobalUpdate(Date.now());
-      
+
       // Comprehensive cache invalidation for all allocation operations
       const invalidateAll = async () => {
         try {
@@ -421,16 +421,16 @@ export default function Representatives() {
             queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] }),
             queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] })
           ]);
-          
+
           console.log(`✅ SHERLOCK v32.4: Global cache invalidation completed`);
-          
+
           // ✅ PERFORMANCE: Throttled representative updates to prevent Query Storm
           if (representatives && representatives.length > 0) {
             console.log(`🎯 PERFORMANCE: Emitting targeted updates for ${Math.min(representatives.length, 50)} representatives (throttled)`);
-            
+
             // ✅ BATCH THROTTLING: Only emit for first 50 representatives to prevent storm
             const representativesToUpdate = representatives.slice(0, 50);
-            
+
             representativesToUpdate.forEach((rep: Representative, index: number) => {
               // ✅ STAGGERED EMISSION: Add small delay to prevent simultaneous requests
               setTimeout(() => {
@@ -439,7 +439,7 @@ export default function Representatives() {
                 }));
               }, index * 50); // 50ms delay between each
             });
-            
+
             // ✅ BULK UPDATE EVENT: For remaining representatives, use bulk event
             if (representatives.length > 50) {
               console.log(`🎯 PERFORMANCE: Using bulk update for remaining ${representatives.length - 50} representatives`);
@@ -452,14 +452,14 @@ export default function Representatives() {
               }));
             }
           }
-          
+
         } catch (error) {
           console.error(`❌ SHERLOCK v32.4: Global cache invalidation error:`, error);
         } finally {
           setIsGlobalSyncing(false);
         }
       };
-      
+
       invalidateAll();
     };
 
@@ -642,7 +642,7 @@ export default function Representatives() {
     },
     onSuccess: async (result, { id }) => {
       console.log(`✅ SHERLOCK v32.4: Representative ${id} updated successfully`);
-      
+
       try {
         // ✅ COMPREHENSIVE CACHE INVALIDATION for representative updates
         await Promise.all([
@@ -653,7 +653,7 @@ export default function Representatives() {
           queryClient.invalidateQueries({ queryKey: ["representative-details", id] }),
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] })
         ]);
-        
+
         // Emit update events
         window.dispatchEvent(new CustomEvent('representative-updated', {
           detail: { representativeId: id, timestamp: Date.now() }
@@ -661,12 +661,12 @@ export default function Representatives() {
         window.dispatchEvent(new CustomEvent('global-data-updated', {
           detail: { type: 'representative-update', representativeId: id, timestamp: Date.now() }
         }));
-        
+
         toast({
           title: "موفقیت",
           description: "اطلاعات نماینده بروزرسانی شد"
         });
-        
+
       } catch (error) {
         console.error('Cache invalidation error after representative update:', error);
         toast({
@@ -675,7 +675,7 @@ export default function Representatives() {
           variant: "destructive"
         });
       }
-      
+
       setIsEditOpen(false);
     },
     onError: (error: any) => {
@@ -690,7 +690,7 @@ export default function Representatives() {
 
   // ✅ SHERLOCK v32.4: Enhanced debt synchronization with comprehensive cache invalidation
   const [syncingRepIds, setSyncingRepIds] = useState<Set<number>>(new Set());
-  
+
   const syncRepresentativeDebtMutation = useMutation({
     mutationFn: async (representativeId: number) => {
       setSyncingRepIds(prev => new Set([...prev, representativeId]));
@@ -701,7 +701,7 @@ export default function Representatives() {
     },
     onSuccess: async (data, representativeId) => {
       console.log(`✅ SHERLOCK v32.4: Debt sync successful for representative ${representativeId}`);
-      
+
       try {
         // ✅ COMPREHENSIVE CACHE INVALIDATION with standardized patterns
         const invalidationPromises = [
@@ -710,30 +710,30 @@ export default function Representatives() {
           queryClient.invalidateQueries({ queryKey: ["representatives"] }),
           queryClient.invalidateQueries({ queryKey: ["enhanced-representatives-data"] }),
           queryClient.invalidateQueries({ queryKey: ["enhanced-representatives-data", representatives?.map(rep => rep.id)] }),
-          
+
           // Financial queries - ALL patterns
           queryClient.invalidateQueries({ queryKey: ["unified-financial", "debtors"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/unified-financial"] }),
           queryClient.invalidateQueries({ queryKey: ["unified-financial"] }),
           queryClient.invalidateQueries({ queryKey: [`unified-financial-representative-${representativeId}`] }),
-          
+
           // Dashboard and statistics
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/unified-statistics/representatives"] }),
           queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] }),
           queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] }),
-          
+
           // Allocation and monitoring
           queryClient.invalidateQueries({ queryKey: ["allocation-monitoring-report"] }),
-          
+
           // Representative details
           queryClient.invalidateQueries({ queryKey: ["representative-details", representativeId] }),
           queryClient.invalidateQueries({ queryKey: [`representatives/${representatives?.find(r => r.id === representativeId)?.code}`] })
         ];
-        
+
         await Promise.all(invalidationPromises);
         console.log(`✅ SHERLOCK v32.4: All caches invalidated successfully`);
-        
+
         // ✅ EMIT COMPREHENSIVE EVENTS for real-time updates
         window.dispatchEvent(new CustomEvent(`payment-updated-${representativeId}`, {
           detail: { representativeId, syncType: 'debt-sync', timestamp: Date.now() }
@@ -744,12 +744,12 @@ export default function Representatives() {
         window.dispatchEvent(new CustomEvent('financial-data-updated', {
           detail: { representativeId, syncType: 'debt-sync', timestamp: Date.now() }
         }));
-        
+
         toast({
           title: "موفق",
           description: "بدهی نماینده همگام‌سازی شد و تمام اطلاعات بروزرسانی شدند"
         });
-        
+
       } catch (error) {
         console.error(`❌ SHERLOCK v32.4: Cache invalidation error after sync:`, error);
         toast({
@@ -852,7 +852,7 @@ export default function Representatives() {
     },
     onSuccess: async (result, invoiceId) => {
       console.log(`✅ SHERLOCK v32.4: Invoice ${invoiceId} deleted successfully`);
-      
+
       try {
         // ✅ COMPREHENSIVE CACHE INVALIDATION for invoice deletion
         await Promise.all([
@@ -867,7 +867,7 @@ export default function Representatives() {
           queryClient.invalidateQueries({ queryKey: ["unified-financial"] }),
           queryClient.invalidateQueries({ queryKey: ["allocation-monitoring-report"] })
         ]);
-        
+
         // Emit financial update events
         if (selectedRep) {
           window.dispatchEvent(new CustomEvent(`payment-updated-${selectedRep.id}`, {
@@ -877,12 +877,12 @@ export default function Representatives() {
         window.dispatchEvent(new CustomEvent('global-payment-updated', {
           detail: { type: 'invoice-deletion', invoiceId, timestamp: Date.now() }
         }));
-        
+
         toast({
           title: "حذف موفق",
           description: "فاکتور با موفقیت حذف شد و تمام اطلاعات مالی به‌روزرسانی شدند"
         });
-        
+
       } catch (error) {
         console.error('Cache invalidation error after invoice deletion:', error);
         toast({
@@ -891,7 +891,7 @@ export default function Representatives() {
           variant: "destructive"
         });
       }
-      
+
       setIsDeleteConfirmOpen(false);
       setInvoiceToDelete(null);
 
@@ -920,7 +920,7 @@ export default function Representatives() {
     },
     onSuccess: async (result, paymentId) => {
       console.log(`✅ SHERLOCK v32.4: Payment ${paymentId} deleted successfully`);
-      
+
       try {
         // ✅ COMPREHENSIVE CACHE INVALIDATION for payment deletion
         await Promise.all([
@@ -937,7 +937,7 @@ export default function Representatives() {
           queryClient.invalidateQueries({ queryKey: ["allocation-monitoring-report"] }),
           queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] })
         ]);
-        
+
         // Emit payment update events
         if (selectedRep) {
           window.dispatchEvent(new CustomEvent(`payment-updated-${selectedRep.id}`, {
@@ -950,13 +950,13 @@ export default function Representatives() {
         window.dispatchEvent(new CustomEvent('financial-data-updated', {
           detail: { type: 'payment-deletion', paymentId, timestamp: Date.now() }
         }));
-        
+
         toast({
           title: "حذف موفق",
           description: "پرداخت با موفقیت حذف شد و تمام اطلاعات مالی در پنل مدیریت و CRM بروزرسانی شدند",
           className: "bg-green-50 border-green-200 text-green-800"
         });
-        
+
       } catch (error) {
         console.error('Cache invalidation error after payment deletion:', error);
         toast({
@@ -965,7 +965,7 @@ export default function Representatives() {
           variant: "destructive"
         });
       }
-      
+
       setIsPaymentDeleteConfirmOpen(false);
       setPaymentToDelete(null);
 
@@ -1004,35 +1004,35 @@ export default function Representatives() {
       if (result.success) {
         // ✅ SHERLOCK v32.4: COMPREHENSIVE CACHE INVALIDATION with all query patterns
         console.log('🔄 SHERLOCK v32.4: Starting comprehensive cache invalidation...');
-        
+
         const invalidationPromises = [
           // Main representatives queries - ALL patterns
           queryClient.invalidateQueries({ queryKey: ["/api/representatives"] }),
           queryClient.invalidateQueries({ queryKey: ["representatives"] }),
           queryClient.invalidateQueries({ queryKey: ["enhanced-representatives-data"] }),
           queryClient.invalidateQueries({ queryKey: ["enhanced-representatives-data", representatives?.map(rep => rep.id)] }),
-          
+
           // Financial engines - ALL patterns
           queryClient.invalidateQueries({ queryKey: ["/api/unified-financial"] }),
           queryClient.invalidateQueries({ queryKey: ["unified-financial"] }),
           queryClient.invalidateQueries({ queryKey: ["unified-financial", "debtors"] }),
           queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] }),
           queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] }),
-          
+
           // Dashboard and statistics
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/unified-statistics/representatives"] }),
-          
+
           // Payments and allocations
           queryClient.invalidateQueries({ queryKey: ["/api/payments"] }),
           queryClient.invalidateQueries({ queryKey: ["payments"] }),
           queryClient.invalidateQueries({ queryKey: ["allocation-monitoring-report"] }),
-          
+
           // Invoices
           queryClient.invalidateQueries({ queryKey: ["/api/invoices"] }),
           queryClient.invalidateQueries({ queryKey: ["invoices"] })
         ];
-        
+
         await Promise.all(invalidationPromises);
         console.log('✅ SHERLOCK v32.4: Base cache invalidation completed');
 
@@ -1048,14 +1048,14 @@ export default function Representatives() {
               })
             ]);
           });
-          
+
           await Promise.all(individualRefreshPromises);
           console.log(`✅ SHERLOCK v32.4: Individual representative calculations refreshed for ${representatives.length} representatives`);
         }
 
         // Final refresh of main data
         await queryClient.refetchQueries({ queryKey: ["/api/representatives"] });
-        
+
         // ✅ Emit comprehensive sync events
         window.dispatchEvent(new CustomEvent('financial-sync-completed', {
           detail: { type: 'full-sync', timestamp: Date.now(), count: representatives?.length || 0 }
@@ -1063,7 +1063,7 @@ export default function Representatives() {
         window.dispatchEvent(new CustomEvent('global-payment-updated', {
           detail: { type: 'full-sync', timestamp: Date.now() }
         }));
-        
+
         // Emit individual events for all representatives
         representatives?.forEach((rep: Representative) => {
           window.dispatchEvent(new CustomEvent(`payment-updated-${rep.id}`, {
@@ -1072,12 +1072,12 @@ export default function Representatives() {
         });
 
         console.log('✅ SHERLOCK v32.4: All debt data refreshed successfully with comprehensive event emission');
-        
+
         toast({
           title: "موفقیت",
           description: `همگام‌سازی تمام ${representatives?.length || 0} نماینده با موفقیت انجام شد و تمام داده‌ها به‌روز شدند`
         });
-        
+
       } else {
         console.error('Sync failed:', result.error);
         toast({

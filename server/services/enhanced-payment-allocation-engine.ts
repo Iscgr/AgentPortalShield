@@ -210,61 +210,65 @@ export class EnhancedPaymentAllocationEngine {
         result: 'SUCCESS'
       });
 
-      // 🎯 PHASE 4: ATOMIC Allocation Processing
-      console.log(`🚀 SHERLOCK v34.1: Starting ATOMIC allocation processing...`);
+      // 🎯 PHASE 4: ENHANCED ATOMIC Allocation Processing
+      console.log(`🚀 SHERLOCK v35.1: Starting ENHANCED ATOMIC allocation processing with proper validation...`);
 
-      for (let i = 0; i < eligibleInvoices.length && remainingAmount > 0; i++) {
+      for (let i = 0; i < eligibleInvoices.length && remainingAmount > 0.01; i++) {
         const invoice = eligibleInvoices[i];
 
-        console.log(`📊 SHERLOCK v34.1: Processing invoice ${invoice.id} (${i + 1}/${eligibleInvoices.length})`);
+        console.log(`📊 SHERLOCK v35.1: Processing invoice ${invoice.id} (${i + 1}/${eligibleInvoices.length})`);
 
         const invoiceAmount = parseFloat(invoice.amount);
         const currentlyAllocated = await this.getCurrentlyAllocatedAmount(invoice.id);
-        const invoiceBalance = invoiceAmount - currentlyAllocated;
+        const invoiceBalance = Math.max(0, invoiceAmount - currentlyAllocated);
 
         console.log(`💰 Invoice ${invoice.id}: Amount=${invoiceAmount}, Allocated=${currentlyAllocated}, Balance=${invoiceBalance}`);
 
-        if (invoiceBalance <= 0.01) { // Small tolerance for floating point
-          warnings.push(`Invoice ${invoice.id} is already fully allocated`);
-          console.log(`⚠️ SHERLOCK v34.1: Invoice ${invoice.id} fully allocated, skipping`);
+        // ✅ Enhanced validation with proper tolerance
+        if (invoiceBalance < 0.01) {
+          warnings.push(`Invoice ${invoice.id} is already fully allocated (balance: ${invoiceBalance})`);
+          console.log(`⚠️ SHERLOCK v35.1: Invoice ${invoice.id} fully allocated, skipping`);
           continue;
         }
 
-        // محاسبه مبلغ قابل تخصیص با دقت
+        // ✅ Precise allocation amount calculation
         const allocationAmount = Math.min(remainingAmount, invoiceBalance);
+        const roundedAllocation = Math.round(allocationAmount * 100) / 100;
 
-        if (allocationAmount < 0.01) { // Minimum allocation threshold
-          console.log(`⚠️ SHERLOCK v34.1: Allocation amount too small (${allocationAmount}), skipping`);
+        if (roundedAllocation < 0.01) {
+          console.log(`⚠️ SHERLOCK v35.1: Allocation amount too small (${roundedAllocation}), skipping`);
           continue;
         }
 
-        // ✅ Create allocation record
+        // ✅ Create validated allocation record
         const allocation: PaymentAllocation = {
           invoiceId: invoice.id,
-          allocatedAmount: Math.round(allocationAmount * 100) / 100, // Round to 2 decimals
+          allocatedAmount: roundedAllocation,
           allocationDate: new Date().toISOString(),
           allocationMethod: 'AUTO',
-          allocatedBy: 'SYSTEM_FIFO',
+          allocatedBy: 'SYSTEM_FIFO_v35',
           transactionId,
-          validationHash: this.generateValidationHash({ invoiceId: invoice.id, amount: allocationAmount })
+          validationHash: this.generateValidationHash({ invoiceId: invoice.id, amount: roundedAllocation })
         };
 
         allocations.push(allocation);
-        remainingAmount -= allocationAmount;
-        remainingAmount = Math.round(remainingAmount * 100) / 100; // Round to prevent floating point errors
+        remainingAmount = Math.round((remainingAmount - roundedAllocation) * 100) / 100;
 
-        console.log(`✅ SHERLOCK v34.1: Allocated ${allocationAmount} to invoice ${invoice.id}`);
+        console.log(`✅ SHERLOCK v35.1: Allocated ${roundedAllocation} to invoice ${invoice.id}`);
         console.log(`💰 Remaining amount: ${remainingAmount}`);
 
+        // ✅ Enhanced audit trail with validation
         auditTrail.push({
           timestamp: new Date().toISOString(),
-          action: 'ALLOCATION_CREATED',
+          action: 'ALLOCATION_CREATED_V35',
           details: {
             invoiceId: invoice.id,
-            allocatedAmount: allocationAmount,
+            invoiceNumber: invoice.invoiceNumber,
+            allocatedAmount: roundedAllocation,
             remainingAmount,
             invoiceBalance,
-            validationHash: allocation.validationHash
+            validationHash: allocation.validationHash,
+            precision: 'ENHANCED'
           },
           userId: 'SYSTEM',
           result: 'SUCCESS'
@@ -304,29 +308,39 @@ export class EnhancedPaymentAllocationEngine {
           });
         }
 
-        // ✅ بروزرسانی وضعیت فاکتورها
+        // ✅ ENHANCED: بروزرسانی وضعیت فاکتورها با validation کامل
         for (const allocation of allocations) {
-          // محاسبه کل پرداخت‌های تخصیص یافته برای این فاکتور
-          const [totalPaid] = await db.select({
-            total: sql<number>`COALESCE(SUM(amount), 0)`
-          }).from(payments)
-          .where(and(
-            eq(payments.invoiceId, allocation.invoiceId),
-            eq(payments.isAllocated, true)
-          ));
+          try {
+            // محاسبه دقیق کل پرداخت‌های تخصیص یافته برای این فاکتور
+            const [totalPaidResult] = await db.select({
+              total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+            }).from(payments)
+            .where(and(
+              eq(payments.invoiceId, allocation.invoiceId),
+              eq(payments.isAllocated, true)
+            ));
 
-          const [invoice] = await db.select({
-            amount: invoices.amount
-          }).from(invoices).where(eq(invoices.id, allocation.invoiceId));
+            const [invoice] = await db.select({
+              amount: invoices.amount,
+              invoiceNumber: invoices.invoiceNumber
+            }).from(invoices).where(eq(invoices.id, allocation.invoiceId));
 
-          if (invoice) {
+            if (!invoice) {
+              console.error(`❌ SHERLOCK v35.1: Invoice ${allocation.invoiceId} not found during status update`);
+              continue;
+            }
+
             const invoiceAmount = parseFloat(invoice.amount);
-            const paidAmount = totalPaid.total;
+            const paidAmount = totalPaidResult.total;
+            const paymentRatio = invoiceAmount > 0 ? (paidAmount / invoiceAmount) : 0;
             
+            console.log(`🧮 Invoice ${allocation.invoiceId} (${invoice.invoiceNumber}): Amount=${invoiceAmount}, Paid=${paidAmount}, Ratio=${paymentRatio.toFixed(3)}`);
+            
+            // ✅ Enhanced status calculation with proper tolerance
             let newStatus = 'unpaid';
-            if (paidAmount >= invoiceAmount) {
+            if (paymentRatio >= 0.999) { // 99.9% paid tolerance
               newStatus = 'paid';
-            } else if (paidAmount > 0) {
+            } else if (paidAmount > 0.01) {
               newStatus = 'partial';
             }
 
@@ -336,6 +350,12 @@ export class EnhancedPaymentAllocationEngine {
                 updatedAt: new Date()
               })
               .where(eq(invoices.id, allocation.invoiceId));
+
+            console.log(`✅ SHERLOCK v35.1: Invoice ${allocation.invoiceId} status updated to '${newStatus}'`);
+
+          } catch (statusUpdateError) {
+            console.error(`❌ SHERLOCK v35.1: Failed to update status for invoice ${allocation.invoiceId}:`, statusUpdateError);
+            // Continue with other invoices
           }
         }
 

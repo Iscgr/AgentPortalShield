@@ -721,7 +721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // SHERLOCK v18.4: Debtor Representatives moved to unified financial routes
+  // SHERLOCK v32.0: Representatives moved to unified financial routes
   // Available at: /api/unified-financial/debtors
 
   // Real-time Data Synchronization API - SHERLOCK v1.0 Core Feature
@@ -1512,11 +1512,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceId = null;    // Will be set after successful allocation
         console.log(`💰 SHERLOCK v33.2: Manual allocation planned - Payment to Invoice ${selectedInvoiceId}`);
       } else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v34.0: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
+        console.log(`🔄 SHERLOCK v35.1: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
         // Auto-allocation will be performed using Enhanced Payment Allocation Engine
         isAllocated = false; // Start as unallocated, will be updated after auto-allocation
         invoiceId = null;
-        console.log(`🎯 SHERLOCK v34.0: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
+        console.log(`🎯 SHERLOCK v35.1: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
       }
 
       // Create the payment initially as unallocated for manual assignments
@@ -2742,8 +2742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // xAI Grok Assistant API
-  // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use /api/settings/xai-grok/test instead
+  // AI Engine routes are integrated above in xAI Grok configuration section
 
   app.post("/api/ai/analyze-financial", authMiddleware, async (req, res) => {
     try {
@@ -2891,7 +2890,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize default settings on first run
   // 🛠️ SHERLOCK v12.0: ENHANCED INVOICE EDIT ROUTE WITH DEBUG LOGGING
   app.post("/api/invoices/edit", authMiddleware, async (req, res) => {
     const debug = {
@@ -3432,11 +3430,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // CRM Routes Integration
   // CRM routes are already registered via registerCrmRoutes() function
-
-  // AI Engine routes are integrated above in xAI Grok configuration section
-
-  // Initialize CRM real-time sync
-  // CRM data sync service removed for simplified system
 
   // Health check endpoint
   app.get("/health", (req, res) => {
