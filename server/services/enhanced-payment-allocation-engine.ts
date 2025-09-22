@@ -78,7 +78,7 @@ export class EnhancedPaymentAllocationEngine {
    * ATOMOS COMPLIANT - Enhanced atomic transaction processing with comprehensive validation
    */
   static async autoAllocatePayment(
-    paymentId: number, 
+    paymentId: number,
     rules: AllocationRule = {
       method: 'FIFO',
       allowPartialAllocation: true,
@@ -179,10 +179,10 @@ export class EnhancedPaymentAllocationEngine {
       auditTrail.push({
         timestamp: new Date().toISOString(),
         action: 'REPRESENTATIVE_VALIDATED',
-        details: { 
+        details: {
           representativeId: payment.representativeId,
           representativeName: representative[0].name,
-          paymentAmount 
+          paymentAmount
         },
         userId: 'SYSTEM',
         result: 'SUCCESS'
@@ -192,7 +192,7 @@ export class EnhancedPaymentAllocationEngine {
       console.log(`🔍 SHERLOCK v34.1: Getting eligible invoices using ${rules.method} method`);
 
       const eligibleInvoices = await this.getEligibleInvoices(
-        payment.representativeId!, 
+        payment.representativeId!,
         rules
       );
 
@@ -201,7 +201,7 @@ export class EnhancedPaymentAllocationEngine {
       auditTrail.push({
         timestamp: new Date().toISOString(),
         action: 'ELIGIBLE_INVOICES_RETRIEVED',
-        details: { 
+        details: {
           count: eligibleInvoices.length,
           method: rules.method,
           invoiceIds: eligibleInvoices.map(inv => inv.id).slice(0, 10) // First 10 for audit
@@ -400,7 +400,7 @@ export class EnhancedPaymentAllocationEngine {
             }
 
             await db.update(invoices)
-              .set({ 
+              .set({
                 status: newStatus,
                 updatedAt: new Date()
               })
@@ -586,9 +586,10 @@ export class EnhancedPaymentAllocationEngine {
 
         // 🎯 PHASE 2: ATOMIC ALLOCATION EXECUTION
 
+        // ✅ ATOMOS FIXED: Proper payment allocation
         const remainingPaymentAmount = paymentAmount - amount;
 
-        // Always update original payment to allocated with the specified amount
+        // Update original payment to allocated with the specified amount
         await tx.update(payments)
           .set({
             isAllocated: true,
