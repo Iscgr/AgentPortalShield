@@ -1069,15 +1069,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(invoices.representativeId, rep.id))
           .orderBy(invoices.issueDate, invoices.createdAt),
 
-          // Batch query 2: All payments for this representative
+          // Batch query 2: Only ALLOCATED payments for this representative (matching Unified Financial Engine)
           db.select({
             id: payments.id,
             amount: payments.amount,
             paymentDate: payments.paymentDate,
             description: payments.description,
-            createdAt: payments.createdAt
+            createdAt: payments.createdAt,
+            isAllocated: payments.isAllocated
           }).from(payments)
-          .where(eq(payments.representativeId, rep.id))
+          .where(and(
+            eq(payments.representativeId, rep.id),
+            eq(payments.isAllocated, true)
+          ))
           .orderBy(desc(payments.paymentDate))
         ]),
         new Promise((_, reject) => 
