@@ -78,9 +78,14 @@ export function BatchFinancialProvider({ children }: { children: React.ReactNode
 
       // ✅ RESOLVE INDIVIDUAL REQUESTS
       currentBatch.forEach(request => {
-        const representativeData = response.data.find((data: any) => data.id === request.representativeId);
+        // ✅ FIX: Search by representativeId, not id (API returns representativeId)
+        const representativeData = response.data.find((data: any) => 
+          data.representativeId === request.representativeId || data.id === request.representativeId
+        );
         
         if (representativeData) {
+          console.log(`✅ BATCH FINANCIAL: Found data for rep ${request.representativeId}:`, representativeData);
+          
           // ✅ CACHE INDIVIDUAL RESULTS for future queries
           queryClient.setQueryData(
             [`unified-financial-representative-${request.representativeId}`],
@@ -90,6 +95,7 @@ export function BatchFinancialProvider({ children }: { children: React.ReactNode
           request.resolve({ data: representativeData });
         } else {
           console.warn(`⚠️ BATCH FINANCIAL: No data found for representative ${request.representativeId}`);
+          console.warn(`⚠️ BATCH FINANCIAL: Available data keys:`, response.data.map((d: any) => ({ id: d.id, representativeId: d.representativeId })));
           request.reject(new Error(`No data found for representative ${request.representativeId}`));
         }
       });
