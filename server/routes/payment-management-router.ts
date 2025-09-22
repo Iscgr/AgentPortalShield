@@ -7,8 +7,9 @@ import { Router } from 'express';
 import { storage } from '../storage.js';
 import { unifiedAuthMiddleware } from '../middleware/unified-auth.js';
 import { EnhancedPaymentAllocationEngine } from '../services/enhanced-payment-allocation-engine.js';
-import { db, payments, invoices } from '../db.js'; // Assuming db, payments, and invoices are exported from '../db.js'
-import { eq } from 'drizzle-orm'; // Assuming eq is exported from drizzle-orm
+import { db } from '../db.js';
+import { payments, invoices } from '../../shared/schema.js';
+import { eq } from 'drizzle-orm';
 
 export const paymentManagementRouter = Router();
 export const requireAuth = unifiedAuthMiddleware;
@@ -717,6 +718,8 @@ paymentManagementRouter.post('/create', requireAuth, async (req, res) => {
     // MANDATORY manual allocation - NO generic payments allowed
     console.log(`🎯 TITAN-O: Creating payment with MANDATORY allocation to invoice ${invoiceId}`);
 
+    const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
+    
     const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
       newPayment.id,
       parseInt(invoiceId),
