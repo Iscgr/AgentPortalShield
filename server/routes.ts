@@ -10,7 +10,8 @@ import { unifiedAuthMiddleware, enhancedUnifiedAuthMiddleware } from "./middlewa
 import multer from "multer";
 
 // SHERLOCK v34.1: Import payment management router and its dependencies
-import { paymentManagementRouter, requireAuth } from "./routes/payment-management-router.js";
+    import { paymentManagementRouter, requireAuth } from "./routes/payment-management-router.js";
+    import { EnhancedPaymentAllocationEngine } from "./services/enhanced-payment-allocation-engine.js";
 
 // Extend Request interface to include multer file
 interface MulterRequest extends Request {
@@ -558,9 +559,9 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     const totalUnallocatedPayments = paymentsData
       .filter(p => !p.isAllocated)
       .reduce((sum, pay) => sum + parseFloat(pay.amount), 0);
-    
+
     const actualDebt = Math.max(0, totalSales - totalAllocatedPayments);
-    
+
     // ✅ Enhanced payment data with status information
     const enhancedPayments = paymentsData.map(payment => ({
       ...payment,

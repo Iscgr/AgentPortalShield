@@ -1,5 +1,5 @@
 /**
- * SHERLOCK v34.1: ENHANCED PAYMENT ALLOCATION ENGINE
+ * SHERLOCK v36.0: ENHANCED PAYMENT ALLOCATION ENGINE
  * 🎯 ATOMOS PROTOCOL COMPLIANT - Complete atomic payment allocation system
  * مطابق با اصول حسابداری استاندارد و FIFO دقیق
  */
@@ -853,7 +853,84 @@ export class EnhancedPaymentAllocationEngine {
 
     console.log(`📊 SHERLOCK v34.1: Found ${eligibleInvoices.length} eligible invoices`);
 
-    if (eligibleInvoices.length > 0) {
+    return eligibleInvoices;
+  }
+
+  /**
+   * ✅ SHERLOCK v36.0: محاسبه مقدار فعلی تخصیص یافته برای فاکتور
+   */
+  private static async getCurrentlyAllocatedAmount(invoiceId: number): Promise<number> {
+    try {
+      const [result] = await db.select({
+        total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
+      }).from(payments)
+      .where(and(
+        eq(payments.invoiceId, invoiceId),
+        eq(payments.isAllocated, true)
+      ));
+
+      return result.total || 0;
+    } catch (error) {
+      console.error(`❌ Error calculating allocated amount for invoice ${invoiceId}:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * ✅ بازمحاسبه وضعیت فاکتور
+   */
+  private static async recalculateInvoiceStatus(invoiceId: number): Promise<void> {
+    try {
+      const [invoice] = await db.select({
+        amount: invoices.amount
+      }).from(invoices).where(eq(invoices.id, invoiceId));
+
+      if (!invoice) return;
+
+      const currentAllocated = await this.getCurrentlyAllocatedAmount(invoiceId);
+      const invoiceAmount = parseFloat(invoice.amount);
+      const paymentRatio = invoiceAmount > 0 ? (currentAllocated / invoiceAmount) : 0;
+
+      let newStatus = 'unpaid';
+      if (paymentRatio >= 0.999) {
+        newStatus = 'paid';
+      } else if (currentAllocated > 0.01) {
+        newStatus = 'partial';
+      }
+
+      await db.update(invoices)
+        .set({ 
+          status: newStatus,
+          updatedAt: new Date()
+        })
+        .where(eq(invoices.id, invoiceId));
+
+      console.log(`✅ Invoice ${invoiceId} status updated to '${newStatus}'`);
+    } catch (error) {
+      console.error(`❌ Error recalculating invoice status for ${invoiceId}:`, error);
+    }
+  }
+
+  /**
+   * ✅ بروزرسانی تخصیص پرداخت
+   */
+  private static async updatePaymentAllocation(paymentId: number, allocationData: any): Promise<void> {
+    try {
+      // This would typically update the payment record with allocation details
+      // For now, we'll just mark it as allocated
+      await db.update(payments)
+        .set({ 
+          isAllocated: true,
+          updatedAt: new Date()
+        })
+        .where(eq(payments.id, paymentId));
+      
+      console.log(`✅ Payment ${paymentId} allocation updated`);
+    } catch (error) {
+      console.error(`❌ Error updating payment allocation for ${paymentId}:`, error);
+    }
+  }
+}
       console.log(`📋 SHERLOCK v34.1: First 3 invoices in order:`);
       eligibleInvoices.slice(0, 3).forEach((inv, index) => {
         console.log(`   ${index + 1}. Invoice ${inv.id}: Amount=${inv.amount}, Created=${inv.createdAt}, Issue=${inv.issueDate}`);
