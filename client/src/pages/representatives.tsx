@@ -207,9 +207,10 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     </div>;
   }
 
-  if (error || !financialData) {
-    // Use fallback debt if API fails
-    if (fallbackDebt) {
+  if (error) {
+    console.warn(`⚠️ BATCH FINANCIAL: Error for rep ${representativeId}:`, error);
+    // ✅ CRITICAL FIX: Only show fallback on actual errors, not missing data
+    if (fallbackDebt && parseFloat(fallbackDebt) > 0) {
       const debt = parseFloat(fallbackDebt);
       return (
         <span className={`transition-colors duration-200 ${
@@ -217,11 +218,19 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
           debt > 500000 ? "text-orange-600 dark:text-orange-400 font-semibold" : 
           "text-green-600 dark:text-green-400"
         }`}>
-          {formatCurrency(debt)}
+          {formatCurrency(debt)} <span className="text-xs opacity-60">(fallback)</span>
         </span>
       );
     }
     return <span className="text-gray-400 text-xs">خطا</span>;
+  }
+
+  // ✅ CRITICAL FIX: If no financialData but no error, keep loading (don't show fallback)
+  if (!financialData) {
+    return <div className="flex items-center gap-1">
+      <div className="animate-pulse bg-gray-200 dark:bg-gray-600 h-4 w-16 rounded"></div>
+      <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
+    </div>;
   }
 
   const debt = financialData.actualDebt || 0;
