@@ -29,6 +29,7 @@ import NotFound from "@/pages/not-found";
 import UnifiedAuth from "@/pages/unified-auth";
 import FinancialIntegrityPage from "@/pages/financial-integrity";
 import AllocationManagement from "@/pages/allocation-management";
+import PaymentAllocationV3 from "@/pages/payment-allocation-v3";
 
 
 
@@ -114,6 +115,8 @@ function AuthenticatedRouter() {
         <Route path="/financial-integrity" component={FinancialIntegrityPage} />
         <Route path="/settings" component={Settings} />
         <Route path="/admin-login" component={AdminLogin} /> {/* Explicitly route to AdminLogin */}
+        <Route path="/allocation-management" component={AllocationManagement} />
+        <Route path="/payment-allocation-v3" component={PaymentAllocationV3} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>

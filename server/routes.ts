@@ -3583,8 +3583,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
       const payment = paymentsData[0];
 
       // Calculate integrity metrics
-      const hasExcessPayments = payment.totalAmount > invoice.totalAmount;
-      const needsReconciliation = Math.abs(financialData.actualDebt - parseFloat(rep.totalDebt)) > 1000;
+      const hasExcessPayments = payment.totalAmount > invoice.totalAmount;const needsReconciliation = Math.abs(financialData.actualDebt - parseFloat(rep.totalDebt)) > 1000;
       const integrityScore = needsReconciliation ? 75 : hasExcessPayments ? 85 : 100;
 
       const snapshot = {
