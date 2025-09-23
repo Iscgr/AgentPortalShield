@@ -13,18 +13,8 @@ import { eq } from 'drizzle-orm';
 export const paymentManagementRouter = Router();
 export const requireAuth = unifiedAuthMiddleware;
 
-// DISABLED: Legacy payment management endpoints - replaced by unified payment system
 // Apply authentication to all routes
-// paymentManagementRouter.use(requireAuth);
-
-// Legacy endpoints disabled to prevent conflicts with unified payment system
-paymentManagementRouter.use((req, res, next) => {
-  res.status(410).json({
-    success: false,
-    error: "Legacy payment management endpoints have been disabled. Use /api/payments instead.",
-    redirectTo: "/api/payments"
-  });
-});
+paymentManagementRouter.use(requireAuth);
 
 // Get all payments
 paymentManagementRouter.get('/', async (req, res) => {
