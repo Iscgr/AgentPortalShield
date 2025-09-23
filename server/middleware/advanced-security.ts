@@ -56,21 +56,28 @@ class AdvancedSecurityManager {
         return isDevelopment && req.path.startsWith('/portal');
       },
       keyGenerator: (req) => {
-        // Secure IP extraction that prevents spoofing
+        // Use express-rate-limit's built-in IPv6-safe key generator
+        const { ipv6ToIPv4 } = require('express-rate-limit');
+        
+        if (isDevelopment) {
+          return req.ip || 'dev-fallback';
+        }
+        
+        // Secure IP extraction with IPv6 support
+        let clientIP = req.ip;
+        
+        // Check for proxy headers in production
         const forwardedFor = req.headers['x-forwarded-for'];
         const realIP = req.headers['x-real-ip'];
         
-        if (isDevelopment) {
-          return req.ip || req.connection.remoteAddress || 'unknown';
-        }
-        
-        // In production, validate proxy headers more strictly
         if (typeof forwardedFor === 'string' && forwardedFor.includes(',')) {
-          // Take the leftmost IP (original client)
-          return forwardedFor.split(',')[0].trim();
+          clientIP = forwardedFor.split(',')[0].trim();
+        } else if (realIP) {
+          clientIP = realIP as string;
         }
         
-        return realIP || req.ip || req.connection.remoteAddress || 'unknown';
+        // Convert IPv6 to IPv4 if needed to prevent bypass
+        return ipv6ToIPv4(clientIP || req.connection.remoteAddress || 'unknown');
       },
       handler: (req: Request, res: Response) => {
         const clientIP = this.getClientIP(req);

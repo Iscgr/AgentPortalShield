@@ -484,6 +484,108 @@ async function calculateAllRepresentativesIndividual(): Promise<any[]> {
 }
 
 /**
+ * ✅ SHERLOCK v32.3: Overdue Analysis Endpoint for Dashboard Widget
+ * GET /api/unified-financial/overdue-analysis
+ */
+router.get('/overdue-analysis', requireAuth, async (req, res) => {
+  try {
+    console.log('🔍 SHERLOCK v32.3: Overdue analysis request initiated');
+
+    // Get all representatives with debt
+    const allReps = await db.select({
+      id: representatives.id,
+      name: representatives.name,
+      code: representatives.code
+    }).from(representatives).where(eq(representatives.isActive, true));
+
+    const overdueRepresentatives = [];
+    let totalOverdueAmount = 0;
+    let overdueInvoicesCount = 0;
+
+    // Process in batches to avoid overwhelming
+    const BATCH_SIZE = 30;
+    for (let i = 0; i < allReps.length; i += BATCH_SIZE) {
+      const batch = allReps.slice(i, i + BATCH_SIZE);
+      
+      const batchResults = await Promise.all(batch.map(async (rep) => {
+        try {
+          const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
+          
+          if (financialData.actualDebt > 1000) {
+            const isOverdue = financialData.debtLevel === 'HIGH' ||
+                            financialData.debtLevel === 'CRITICAL' ||
+                            financialData.actualDebt > 2000000;
+
+            if (isOverdue) {
+              totalOverdueAmount += financialData.actualDebt;
+              overdueInvoicesCount += parseInt(financialData.invoiceCount || '0');
+              
+              return {
+                representativeId: rep.id,
+                representativeName: rep.name,
+                representativeCode: rep.code,
+                overdueAmount: financialData.actualDebt,
+                invoiceCount: financialData.invoiceCount,
+                debtLevel: financialData.debtLevel,
+                lastActivity: financialData.lastActivity
+              };
+            }
+          }
+          return null;
+        } catch (error) {
+          console.warn(`⚠️ Error processing rep ${rep.id}:`, error);
+          return null;
+        }
+      }));
+
+      overdueRepresentatives.push(...batchResults.filter(Boolean));
+    }
+
+    // Sort by overdue amount (highest first)
+    overdueRepresentatives.sort((a, b) => b.overdueAmount - a.overdueAmount);
+
+    const analysisResult = {
+      representatives: overdueRepresentatives,
+      totals: {
+        totalOverdueAmount,
+        overdueInvoicesCount,
+        overdueRepresentativesCount: overdueRepresentatives.length
+      },
+      analysis: {
+        criticalDebtors: overdueRepresentatives.filter(r => r.overdueAmount > 10000000).length,
+        highRiskDebtors: overdueRepresentatives.filter(r => r.overdueAmount > 5000000).length,
+        averageOverdueAmount: overdueRepresentatives.length > 0 ? 
+          Math.round(totalOverdueAmount / overdueRepresentatives.length) : 0
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    console.log('✅ SHERLOCK v32.3: Overdue analysis completed:', {
+      totalOverdue: overdueRepresentatives.length,
+      totalAmount: totalOverdueAmount,
+      criticalCount: analysisResult.analysis.criticalDebtors
+    });
+
+    res.json({
+      success: true,
+      data: analysisResult,
+      meta: {
+        source: "UNIFIED FINANCIAL ENGINE OVERDUE ANALYSIS v32.3",
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ SHERLOCK v32.3: Overdue analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: "خطا در تحلیل مطالبات معوق",
+      details: error.message
+    });
+  }
+});
+
+/**
  * ✅ SHERLOCK v23.0: محاسبه دستی مجموع بدهی و تایید صحت
  * GET /api/unified-financial/verify-total-debt
  */

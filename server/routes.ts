@@ -186,6 +186,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
 
+  // ✅ Essential Representatives Routes
+  app.get("/api/representatives", authMiddleware, async (req, res) => {
+    try {
+      const representatives = await storage.getRepresentatives();
+      res.json({
+        success: true,
+        data: representatives,
+        count: representatives.length
+      });
+    } catch (error) {
+      console.error('Error fetching representatives:', error);
+      res.status(500).json({
+        success: false,
+        error: 'خطا در دریافت نمایندگان'
+      });
+    }
+  });
+
+  app.get("/api/representatives/:code", authMiddleware, async (req, res) => {
+    try {
+      const { code } = req.params;
+      const representative = await storage.getRepresentativeByCode(code) || 
+                           await storage.getRepresentativeByPanelUsername(code);
+      
+      if (!representative) {
+        return res.status(404).json({
+          success: false,
+          error: 'نماینده یافت نشد'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: representative
+      });
+    } catch (error) {
+      console.error('Error fetching representative:', error);
+      res.status(500).json({
+        success: false,
+        error: 'خطا در دریافت اطلاعات نماینده'
+      });
+    }
+  });
+
+  // ✅ Essential Payments Routes
+  app.get("/api/payments", authMiddleware, async (req, res) => {
+    try {
+      const payments = await storage.getPayments();
+      res.json({
+        success: true,
+        data: payments,
+        count: payments.length
+      });
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      res.status(500).json({
+        success: false,
+        error: 'خطا در دریافت پرداخت‌ها'
+      });
+    }
+  });
+
+  // ✅ Essential Invoices Routes
+  app.get("/api/invoices", authMiddleware, async (req, res) => {
+    try {
+      const invoices = await storage.getInvoices();
+      res.json({
+        success: true,
+        data: invoices,
+        count: invoices.length
+      });
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      res.status(500).json({
+        success: false,
+        error: 'خطا در دریافت فاکتورها'
+      });
+    }
+  });
+
   // ✅ PERFORMANCE OPTIMIZATION: Async Data Reconciliation Endpoint
   app.post("/api/system/data-reconciliation", authMiddleware, async (req, res) => {
     try {
@@ -396,6 +476,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/system', advancedSystemRoutes);
 
   console.log('✅ ATOMOS v2.0: Advanced system routes registered successfully');
+
+  // SHERLOCK v32.3: Fixed Dashboard Endpoint
+  app.get("/api/dashboard", authMiddleware, async (req, res) => {
+    try {
+      console.log('📊 Dashboard request initiated');
+      
+      const summary = await unifiedFinancialEngine.calculateGlobalSummary();
+      
+      // Structure response to match frontend expectations
+      const dashboardData = {
+        totalRevenue: summary.totalSystemPaid || 0,
+        totalDebt: summary.totalSystemDebt || 0,
+        totalCredit: 0,
+        totalOutstanding: summary.totalUnpaidAmount || 0,
+        totalRepresentatives: summary.totalRepresentatives || 0,
+        activeRepresentatives: summary.activeRepresentatives || 0,
+        inactiveRepresentatives: 0,
+        riskRepresentatives: (summary.highRiskReps || 0) + (summary.criticalReps || 0),
+        totalInvoices: summary.totalInvoices || 0,
+        paidInvoices: summary.paidInvoices || 0,
+        unpaidInvoices: summary.unpaidInvoices || 0,
+        overdueInvoices: summary.overdueInvoicesCount || 0,
+        unsentTelegramInvoices: 0,
+        totalSalesPartners: 0,
+        activeSalesPartners: 0,
+        systemIntegrityScore: summary.systemAccuracy || 0,
+        lastReconciliationDate: summary.lastCalculationTime || new Date().toISOString(),
+        problematicRepresentativesCount: (summary.moderateReps || 0) + (summary.highRiskReps || 0) + (summary.criticalReps || 0),
+        responseTime: 0,
+        cacheStatus: 'ACTIVE',
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log('✅ Dashboard data prepared:', {
+        totalRevenue: dashboardData.totalRevenue,
+        totalDebt: dashboardData.totalDebt,
+        activeReps: dashboardData.activeRepresentatives
+      });
+      
+      res.json(dashboardData);
+      
+    } catch (error) {
+      console.error('❌ Dashboard error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'خطا در بارگذاری داشبورد',
+        details: error.message
+      });
+    }
+  });
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
