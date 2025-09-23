@@ -1592,6 +1592,17 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     try {
       const { representativeId, amount, paymentDate, description, selectedInvoiceId } = req.body;
 
+      // ✅ DEBUG: Log received values from frontend
+      console.log(`🔍 DEBUG POST /api/payments received:`, {
+        representativeId,
+        amount,
+        paymentDate,
+        description,
+        selectedInvoiceId,
+        selectedInvoiceIdType: typeof selectedInvoiceId,
+        selectedInvoiceIdValue: JSON.stringify(selectedInvoiceId)
+      });
+
       // Basic validation
       if (!representativeId || !amount || !paymentDate) {
         return res.status(400).json({ error: "فیلدهای ضروری ناقص است" });
@@ -1617,17 +1628,31 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
       let finalPaymentStatus = null;
 
       // Determine allocation status before creating payment
+      console.log(`🎯 DEBUG ALLOCATION LOGIC: selectedInvoiceId="${selectedInvoiceId}", type=${typeof selectedInvoiceId}, conditions:`, {
+        "selectedInvoiceId": selectedInvoiceId,
+        "truthy": !!selectedInvoiceId,
+        "not_auto": selectedInvoiceId !== "auto",
+        "not_empty": selectedInvoiceId !== "",
+        "equals_auto": selectedInvoiceId === "auto"
+      });
+
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
         // ✅ CRITICAL FIX: For manual allocation, set isAllocated=true and invoiceId correctly
         isAllocated = true;
         invoiceId = parseInt(selectedInvoiceId);
-        console.log(`💰 TITAN-O FIXED: Manual allocation - Payment will be allocated to Invoice ${selectedInvoiceId}`);
+        console.log(`💰 TITAN-O FIXED: Manual allocation - Payment will be allocated to Invoice ${selectedInvoiceId} (parsed as ${invoiceId})`);
       } else if (selectedInvoiceId === "auto") {
         console.log(`🔄 SHERLOCK v35.1: UNIFIED Auto-allocation planneded for Representative ${representativeId}`);
         // Auto-allocation will be performed using Enhanced Payment Allocation Engine
         isAllocated = false; // Start as unallocated, will be updated after auto-allocation
         invoiceId = null;
         console.log(`🎯 SHERLOCK v35.1: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
+      } else {
+        console.log(`⚠️ DEBUG: No allocation condition met - defaulting to unallocated`, {
+          selectedInvoiceId,
+          isAllocated: false,
+          invoiceId: null
+        });
       }
 
       // Create the payment with correct allocation status
