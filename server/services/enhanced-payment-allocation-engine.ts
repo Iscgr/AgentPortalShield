@@ -287,18 +287,28 @@ export class EnhancedPaymentAllocationEngine {
       console.log(`🔄 SHERLOCK v34.1: Starting database updates...`);
 
       try {
-        // ✅ TITAN-O FIXED: Simplified and correct auto-allocation logic
+        // ✅ CRITICAL BUG FIX: Always mark original payment as allocated and show primary invoice
         if (allocations.length > 0) {
+          // ✅ FIX: Always update original payment to show as allocated with primary invoice
+          const primaryAllocation = allocations[0]; // FIFO: First allocation is primary
+          
+          await db.update(payments)
+            .set({ 
+              isAllocated: true,
+              invoiceId: primaryAllocation.invoiceId,
+              description: `${payment.description || 'پرداخت'} - تخصیص به ${allocations.length} فاکتور (اصلی: ${primaryAllocation.invoiceId})`
+            })
+            .where(eq(payments.id, paymentId));
+
           if (remainingAmount <= 0.01) {
-            // Full allocation - update original payment to allocated with first invoice
+            // Full allocation - update amount to first allocation, create records for remaining
             await db.update(payments)
               .set({ 
-                isAllocated: true,
-                invoiceId: allocations[0].invoiceId
+                amount: primaryAllocation.allocatedAmount.toString()
               })
               .where(eq(payments.id, paymentId));
 
-            // Create additional allocation records for remaining invoices
+            // Create additional allocation records for remaining invoices  
             for (let i = 1; i < allocations.length; i++) {
               const allocation = allocations[i];
               await db.insert(payments).values({
@@ -306,27 +316,42 @@ export class EnhancedPaymentAllocationEngine {
                 invoiceId: allocation.invoiceId,
                 amount: allocation.allocatedAmount.toString(),
                 paymentDate: payment.paymentDate,
-                description: `Auto-allocation split from payment ${paymentId}`,
+                description: `تخصیص خودکار تقسیمی از پرداخت ${paymentId}`,
                 isAllocated: true
               });
             }
           } else {
-            // Partial allocation: create allocated portion and update original
-            for (const allocation of allocations) {
+            // Partial allocation: Set original to primary allocation, create records for others and remaining
+            await db.update(payments)
+              .set({ 
+                amount: primaryAllocation.allocatedAmount.toString()
+              })
+              .where(eq(payments.id, paymentId));
+
+            // Create additional allocation records
+            for (let i = 1; i < allocations.length; i++) {
+              const allocation = allocations[i];
               await db.insert(payments).values({
                 representativeId: payment.representativeId!,
                 invoiceId: allocation.invoiceId,
                 amount: allocation.allocatedAmount.toString(),
                 paymentDate: payment.paymentDate,
-                description: `Auto-allocation from payment ${paymentId}`,
+                description: `تخصیص خودکار از پرداخت ${paymentId}`,
                 isAllocated: true
               });
             }
 
-            // Update original payment with remaining amount (stays unallocated)
-            await db.update(payments)
-              .set({ amount: remainingAmount.toString() })
-              .where(eq(payments.id, paymentId));
+            // Create remaining unallocated portion if significant
+            if (remainingAmount > 0.01) {
+              await db.insert(payments).values({
+                representativeId: payment.representativeId!,
+                invoiceId: null,
+                amount: remainingAmount.toString(),
+                paymentDate: payment.paymentDate,
+                description: `باقیمانده پس از تخصیص خودکار پرداخت ${paymentId}`,
+                isAllocated: false
+              });
+            }
           }
         } else {
           // If no allocations were made, ensure the payment remains unallocated.
@@ -570,39 +595,30 @@ export class EnhancedPaymentAllocationEngine {
         // ✅ TITAN-O FIXED: Enhanced manual allocation with detailed logging
         console.log(`🎯 TITAN-O: Processing allocation - Full: ${Math.abs(remainingPaymentAmount) <= 0.01}`);
         
-        if (Math.abs(remainingPaymentAmount) <= 0.01) {
-          // Full allocation - update original payment
-          await tx.update(payments)
-            .set({ 
-              isAllocated: true,
-              invoiceId: invoiceId,
-              description: `${payment.description || 'پرداخت'} - تخصیص کامل به فاکتور ${invoice.invoiceNumber}`
-            })
-            .where(eq(payments.id, paymentId));
-
-          console.log(`✅ TITAN-O: Payment ${paymentId} fully allocated to invoice ${invoiceId}`);
-        } else {
-          // Partial allocation - create allocated portion
-          await tx.insert(payments).values({
-            representativeId: payment.representativeId!,
+        // ✅ CRITICAL BUG FIX: Always update original payment to show as allocated
+        await tx.update(payments)
+          .set({ 
+            isAllocated: true,
             invoiceId: invoiceId,
             amount: amount.toString(),
+            description: `${payment.description || 'پرداخت'} - تخصیص دستی به فاکتور ${invoice.invoiceNumber}`
+          })
+          .where(eq(payments.id, paymentId));
+
+        console.log(`✅ CRITICAL FIX: Payment ${paymentId} marked as allocated to invoice ${invoiceId} with amount ${amount}`);
+
+        // ✅ Create remaining unallocated portion if there's a remainder
+        if (Math.abs(remainingPaymentAmount) > 0.01) {
+          await tx.insert(payments).values({
+            representativeId: payment.representativeId!,
+            invoiceId: null,
+            amount: remainingPaymentAmount.toString(),
             paymentDate: payment.paymentDate,
-            description: `تخصیص دستی از پرداخت ${paymentId} به فاکتور ${invoice.invoiceNumber}`,
-            isAllocated: true
+            description: `باقیمانده پس از تخصیص دستی ${amount} تومان از پرداخت ${paymentId} به فاکتور ${invoice.invoiceNumber}`,
+            isAllocated: false
           });
           
-          // Update original payment with remaining amount
-          await tx.update(payments)
-            .set({ 
-              amount: remainingPaymentAmount.toString(),
-              isAllocated: false,
-              invoiceId: null,
-              description: `${payment.description || 'پرداخت'} - باقیمانده پس از تخصیص ${amount} تومان به فاکتور ${invoice.invoiceNumber}`
-            })
-            .where(eq(payments.id, paymentId));
-
-          console.log(`✅ TITAN-O: Created allocated payment of ${amount} to invoice ${invoiceId}, remaining ${remainingPaymentAmount} unallocated`);
+          console.log(`✅ CRITICAL FIX: Created remaining unallocated payment of ${remainingPaymentAmount} from original payment ${paymentId}`);
         }
 
         // 🎯 CRITICAL FIX 2: Update invoice status with accurate calculation
