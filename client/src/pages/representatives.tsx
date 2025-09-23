@@ -149,7 +149,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     }
   };
 
-  // ✅ PERFORMANCE: Throttled event handling to prevent rapid-fire updates
+  // ✅ PERFORMANCE: Throttled event handling to prevent Query Storm
   React.useEffect(() => {
     const handlePaymentUpdate = (event?: CustomEvent) => {
       const eventType = event?.type || 'payment-update';
@@ -1761,12 +1761,8 @@ export default function Representatives() {
                                   <span className="font-mono text-sm">
                                     {selectedRep.invoices?.find(inv => inv.id === payment.invoiceId)?.invoiceNumber || `#${payment.invoiceId}`}
                                   </span>
-                                ) : payment.isAllocated === false ? (
-                                  <Badge variant="outline" className="text-amber-600 border-amber-300">
-                                    تخصیص نیافته
-                                  </Badge>
                                 ) : (
-                                  <span className="text-gray-400">-</span>
+                                  <span className="text-gray-500">عمومی</span>
                                 )}
                               </TableCell>
                               <TableCell>
@@ -2424,7 +2420,6 @@ function CreatePaymentDialog({
   const [paymentDate, setPaymentDate] = useState("");
   const [description, setDescription] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>(""); // Changed default to empty string
-  const [selectedInvoiceNumber, setSelectedInvoiceNumber] = useState<string>(""); // New state for invoice number
   const [isLoading, setIsLoading] = useState(false);
 
   // Use the invoices from the representative object directly
@@ -2616,18 +2611,24 @@ function CreatePaymentDialog({
           representativeId: representative.id,
           amount: parseFloat(amount),
           paymentDate: paymentDate,
-          description: description || `پرداخت تخصیص یافته به فاکتور ${selectedInvoiceNumber}`, // Use selectedInvoiceNumber here
+          description: description || `پرداخت تخصیص یافته به فاکتور ${selectedInvoiceId}`,
           invoiceId: parseInt(selectedInvoiceId),
           allocationMethod: 'MANUAL',
           isAllocated: true
         };
 
         // TITAN-O: Enhanced payment creation with invoice number support
+        let selectedInvoiceData = null;
+        if (paymentData.invoiceId) {
+          // Find the selected invoice to get its number
+          selectedInvoiceData = invoices.find(inv => inv.id === paymentData.invoiceId);
+        }
+
         await apiRequest("/api/payments", {
           method: "POST",
           data: {
             ...paymentData,
-            selectedInvoiceNumber: selectedInvoiceNumber // Pass the selected invoice number
+            selectedInvoiceNumber: selectedInvoiceData?.invoiceNumber || null
           }
         });
       }
@@ -2652,8 +2653,7 @@ function CreatePaymentDialog({
       setAmount("");
       setPaymentDate("");
       setDescription("");
-      setSelectedInvoiceId("");
-      setSelectedInvoiceNumber(""); // Reset invoice number as well
+      setSelectedInvoiceId(""); // Reset to empty
 
       // ✅ SHERLOCK v24.0: همگام‌سازی با force cache invalidation
       try {
@@ -2763,20 +2763,7 @@ function CreatePaymentDialog({
 
           <div>
             <Label htmlFor="invoiceId" className="text-white">تخصیص به فاکتور</Label>
-            <Select
-              value={selectedInvoiceId}
-              onValueChange={(value) => {
-                setSelectedInvoiceId(value);
-                // Set selectedInvoiceNumber when invoice is selected
-                if (value && value !== "") {
-                  const selectedInvoice = invoices.find((inv: any) => inv.id.toString() === value);
-                  setSelectedInvoiceNumber(selectedInvoice?.invoiceNumber || "");
-                } else {
-                  setSelectedInvoiceNumber("");
-                }
-              }}
-              required
-            >
+            <Select value={selectedInvoiceId || ""} onValueChange={setSelectedInvoiceId} required>
               <SelectTrigger
                 className="bg-white/10 border-white/20 text-white mt-1"
                 data-testid="select-invoice-allocation"

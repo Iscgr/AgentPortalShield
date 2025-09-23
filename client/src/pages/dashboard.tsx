@@ -330,43 +330,14 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
     select: (data: any) => {
-      console.log('🔍 SHERLOCK v32.3: Raw API response structure:', data);
+      console.log('🔍 SHERLOCK v32.2: Raw API response structure:', data);
       
-      // Handle direct response structure from fixed API
-      if (data && typeof data === 'object' && !data.success && !data.data) {
-        console.log('🔍 SHERLOCK v32.3: Processing direct dashboard data:', data);
-        
-        return {
-          totalRevenue: parseFloat(data.totalRevenue || '0'),
-          totalDebt: parseFloat(data.totalDebt || '0'),
-          totalCredit: parseFloat(data.totalCredit || '0'),
-          totalOutstanding: parseFloat(data.totalOutstanding || '0'),
-          totalRepresentatives: parseInt(data.totalRepresentatives || '0'),
-          activeRepresentatives: parseInt(data.activeRepresentatives || '0'),
-          inactiveRepresentatives: parseInt(data.inactiveRepresentatives || '0'),
-          riskRepresentatives: parseInt(data.riskRepresentatives || '0'),
-          totalInvoices: parseInt(data.totalInvoices || '0'),
-          paidInvoices: parseInt(data.paidInvoices || '0'),
-          unpaidInvoices: parseInt(data.unpaidInvoices || '0'),
-          overdueInvoices: parseInt(data.overdueInvoices || '0'),
-          unsentTelegramInvoices: parseInt(data.unsentTelegramInvoices || '0'),
-          totalSalesPartners: parseInt(data.totalSalesPartners || '0'),
-          activeSalesPartners: parseInt(data.activeSalesPartners || '0'),
-          systemIntegrityScore: parseInt(data.systemIntegrityScore || '0'),
-          lastReconciliationDate: data.lastReconciliationDate || '',
-          problematicRepresentativesCount: parseInt(data.problematicRepresentativesCount || '0'),
-          responseTime: data.responseTime || 0,
-          cacheStatus: data.cacheStatus || 'UNKNOWN',
-          lastUpdated: data.lastUpdated || new Date().toISOString()
-        };
-      }
-      
-      // Fallback to nested structure handling
+      // Extract from the correct API response structure
       const summary = data?.data?.summary || data?.summary || data?.value || data;
       const representatives = data?.data?.representatives || {};
       const invoices = data?.data?.invoices || {};
       
-      console.log('🔍 SHERLOCK v32.3: Extracted summary:', summary);
+      console.log('🔍 SHERLOCK v32.2: Extracted summary:', summary);
       
       return {
         totalRevenue: parseFloat(summary?.totalSystemPaid || '0'),

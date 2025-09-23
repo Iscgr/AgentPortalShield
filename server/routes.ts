@@ -186,86 +186,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
 
-  // ✅ Essential Representatives Routes
-  app.get("/api/representatives", authMiddleware, async (req, res) => {
-    try {
-      const representatives = await storage.getRepresentatives();
-      res.json({
-        success: true,
-        data: representatives,
-        count: representatives.length
-      });
-    } catch (error) {
-      console.error('Error fetching representatives:', error);
-      res.status(500).json({
-        success: false,
-        error: 'خطا در دریافت نمایندگان'
-      });
-    }
-  });
-
-  app.get("/api/representatives/:code", authMiddleware, async (req, res) => {
-    try {
-      const { code } = req.params;
-      const representative = await storage.getRepresentativeByCode(code) || 
-                           await storage.getRepresentativeByPanelUsername(code);
-      
-      if (!representative) {
-        return res.status(404).json({
-          success: false,
-          error: 'نماینده یافت نشد'
-        });
-      }
-      
-      res.json({
-        success: true,
-        data: representative
-      });
-    } catch (error) {
-      console.error('Error fetching representative:', error);
-      res.status(500).json({
-        success: false,
-        error: 'خطا در دریافت اطلاعات نماینده'
-      });
-    }
-  });
-
-  // ✅ Essential Payments Routes
-  app.get("/api/payments", authMiddleware, async (req, res) => {
-    try {
-      const payments = await storage.getPayments();
-      res.json({
-        success: true,
-        data: payments,
-        count: payments.length
-      });
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-      res.status(500).json({
-        success: false,
-        error: 'خطا در دریافت پرداخت‌ها'
-      });
-    }
-  });
-
-  // ✅ Essential Invoices Routes
-  app.get("/api/invoices", authMiddleware, async (req, res) => {
-    try {
-      const invoices = await storage.getInvoices();
-      res.json({
-        success: true,
-        data: invoices,
-        count: invoices.length
-      });
-    } catch (error) {
-      console.error('Error fetching invoices:', error);
-      res.status(500).json({
-        success: false,
-        error: 'خطا در دریافت فاکتورها'
-      });
-    }
-  });
-
   // ✅ PERFORMANCE OPTIMIZATION: Async Data Reconciliation Endpoint
   app.post("/api/system/data-reconciliation", authMiddleware, async (req, res) => {
     try {
@@ -476,56 +396,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/system', advancedSystemRoutes);
 
   console.log('✅ ATOMOS v2.0: Advanced system routes registered successfully');
-
-  // SHERLOCK v32.3: Fixed Dashboard Endpoint
-  app.get("/api/dashboard", authMiddleware, async (req, res) => {
-    try {
-      console.log('📊 Dashboard request initiated');
-      
-      const summary = await unifiedFinancialEngine.calculateGlobalSummary();
-      
-      // Structure response to match frontend expectations
-      const dashboardData = {
-        totalRevenue: summary.totalSystemPaid || 0,
-        totalDebt: summary.totalSystemDebt || 0,
-        totalCredit: 0,
-        totalOutstanding: summary.totalUnpaidAmount || 0,
-        totalRepresentatives: summary.totalRepresentatives || 0,
-        activeRepresentatives: summary.activeRepresentatives || 0,
-        inactiveRepresentatives: 0,
-        riskRepresentatives: (summary.highRiskReps || 0) + (summary.criticalReps || 0),
-        totalInvoices: summary.totalInvoices || 0,
-        paidInvoices: summary.paidInvoices || 0,
-        unpaidInvoices: summary.unpaidInvoices || 0,
-        overdueInvoices: summary.overdueInvoicesCount || 0,
-        unsentTelegramInvoices: 0,
-        totalSalesPartners: 0,
-        activeSalesPartners: 0,
-        systemIntegrityScore: summary.systemAccuracy || 0,
-        lastReconciliationDate: summary.lastCalculationTime || new Date().toISOString(),
-        problematicRepresentativesCount: (summary.moderateReps || 0) + (summary.highRiskReps || 0) + (summary.criticalReps || 0),
-        responseTime: 0,
-        cacheStatus: 'ACTIVE',
-        lastUpdated: new Date().toISOString()
-      };
-      
-      console.log('✅ Dashboard data prepared:', {
-        totalRevenue: dashboardData.totalRevenue,
-        totalDebt: dashboardData.totalDebt,
-        activeReps: dashboardData.activeRepresentatives
-      });
-      
-      res.json(dashboardData);
-      
-    } catch (error) {
-      console.error('❌ Dashboard error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'خطا در بارگذاری داشبورد',
-        details: error.message
-      });
-    }
-  });
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
@@ -1755,7 +1625,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         console.log(`   Selected Invoice ID: ${selectedInvoiceId}`);
         console.log(`   Selected Invoice Number: ${selectedInvoiceNumber}`);
 
-        finalPaymentStatus = 'allocated';
+        finalPaymentStatus = null; // Will be determined by allocation result
       } else {
         // Auto allocation or no allocation
         isAllocated = false;
@@ -1764,77 +1634,120 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         console.log(`💰 TITAN-O: Payment will be created as unallocated`);
       }
 
-      // Create the payment with correct allocation status for manual allocation
+      // Create the payment with correct allocation status
       const newPayment = await storage.createPayment({
         representativeId,
         amount,
-        paymentDate: normalizedPaymentDate,
-        description: description || (isAllocated ? `پرداخت تخصیص یافته به فاکتور ${selectedInvoiceNumber || selectedInvoiceId}` : 'پرداخت تخصیص نیافته'),
-        isAllocated: isAllocated, // Set correct allocation status
-        invoiceId: isAllocated ? invoiceId : null // Set invoice ID for manual allocation
+        paymentDate: normalizedPaymentDate, // Now as text to match database
+        description: description || `پرداخت تخصیص یافته به فاکتور ${selectedInvoiceNumber || selectedInvoiceId}`,
+        isAllocated: isAllocated,
+        invoiceId: invoiceId
       });
 
-      let responseData = {
-        id: newPayment.id,
-        representativeId: newPayment.representativeId,
-        amount: newPayment.amount,
-        paymentDate: newPayment.paymentDate,
-        description: newPayment.description,
-        isAllocated: newPayment.isAllocated,
-        invoiceId: newPayment.invoiceId,
-        createdAt: newPayment.createdAt,
-        updatedAt: newPayment.updatedAt
-      };
+      finalPaymentStatus = newPayment; // Initialize with the newly created payment
 
-      if (isAllocated) {
-        console.log(`📝 SHERLOCK v33.2: Payment ${newPayment.id} created with manual allocation to invoice ${invoiceId}`);
+      // TITAN-O FIXED: Manual allocation logic - only update invoice status since payment is already correctly linked
+      if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
+        console.log(`💰 TITAN-O FIXED: Manual allocation - Payment ${newPayment.id} created with Invoice ${selectedInvoiceId} link`);
 
-        // For manual allocation, the payment is already correctly created with the invoice ID
-        // No need for additional allocation engine call
-
-        // Update invoice status
         try {
-          const [targetInvoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+          // Update invoice status based on new payment allocation
+          await storage.updateInvoiceStatusAfterAllocation(parseInt(selectedInvoiceId));
 
-          if (targetInvoice) {
-            // Calculate new invoice status
-            const [paidResult] = await db.select({
-              totalPaid: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
-            }).from(payments)
-            .where(and(
-              eq(payments.invoiceId, invoiceId),
-              eq(payments.isAllocated, true)
-            ));
+          finalPaymentStatus = newPayment;
+          console.log(`✅ TITAN-O FIXED: Manual allocation completed successfully`);
 
-            const invoiceAmount = parseFloat(targetInvoice.amount);
-            const totalPaid = paidResult.totalPaid || 0;
-            const paymentRatio = totalPaid / invoiceAmount;
-
-            let newStatus = 'unpaid';
-            if (paymentRatio >= 0.999) {
-              newStatus = 'paid';
-            } else if (totalPaid > 0) {
-              newStatus = 'partial';
+          // Create activity log for manual allocation
+          await storage.createActivityLog({
+            type: 'payment_manual_allocation_direct',
+            description: `تخصیص دستی پرداخت ${newPayment.id} به فاکتور ${selectedInvoiceId} - مبلغ: ${amount} تومان`,
+            relatedId: newPayment.id,
+            metadata: {
+              paymentId: newPayment.id,
+              invoiceId: parseInt(selectedInvoiceId),
+              representativeId,
+              allocatedAmount: parseFloat(amount),
+              allocationMethod: 'DIRECT_MANUAL',
+              timestamp: new Date().toISOString()
             }
+          });
 
-            await db.update(invoices)
-              .set({ status: newStatus, updatedAt: new Date() })
-              .where(eq(invoices.id, invoiceId));
-
-            console.log(`✅ SHERLOCK v33.2: Invoice ${invoiceId} status updated to '${newStatus}'`);
-          }
-
-          responseData = {
-            ...responseData,
-            isAllocated: true,
-            invoiceId: invoiceId,
-            allocatedAmount: parseFloat(amount),
-            allocationStatus: 'success'
-          };
-        } catch (statusError) {
-          console.error(`❌ SHERLOCK v33.2: Invoice status update failed:`, statusError);
+        } catch (allocationError) {
+          console.error(`❌ TITAN-O: Manual allocation error:`, allocationError);
+          finalPaymentStatus = newPayment;
         }
-      } else {
+      } else if (selectedInvoiceId === "auto") {
+          console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation for Representative ${representativeId}`);
+
+          try {
+            // 🎯 SHERLOCK v34.0: UNIFIED Auto-allocation with Enhanced Engine
+            const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
+              method: 'FIFO',
+              allowPartialAllocation: true,
+              allowOverAllocation: false,
+              priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
+              strictValidation: true,
+              auditMode: true
+            });
+
+            if (allocationResult.success) {
+              console.log(`✅ SHERLOCK v34.0: Auto-allocation successful - ${allocationResult.allocatedAmount} allocated`);
+
+              // ✅ Force cache invalidation after successful allocation
+              UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
+                cascadeGlobal: true,
+                reason: 'payment_allocation_success',
+                immediate: true,
+                includePortal: true
+              });
+
+              // ✅ Enhanced activity log for successful allocation
+              await storage.createActivityLog({
+                type: 'payment_auto_allocation_success',
+                description: `تخصیص خودکار پرداخت ${paymentId} موفق - مبلغ: ${allocationResult.allocatedAmount} تومان`,
+                relatedId: representativeId,
+                metadata: {
+                  paymentId,
+                  allocatedAmount: allocationResult.allocatedAmount,
+                  allocationsCount: allocationResult.allocations.length,
+                  transactionId: allocationResult.transactionId,
+                  engine: 'Enhanced Payment Allocation Engine v34.1'
+                }
+              });
+            } else {
+              console.log(`❌ SHERLOCK v34.0: Auto-allocation failed:`, allocationResult.errors);
+
+              await storage.createActivityLog({
+                type: 'payment_auto_allocation_failed',
+                description: `تخصیص خودکار پرداخت ${paymentId} ناموفق: ${allocationResult.errors.join(', ')}`,
+                relatedId: representativeId,
+                metadata: {
+                  paymentId,
+                  errors: allocationResult.errors,
+                  warnings: allocationResult.warnings,
+                  transactionId: allocationResult.transactionId,
+                  engine: 'Enhanced Payment Allocation Engine v34.1'
+                }
+              });
+            }
+          } catch (allocationError) {
+            console.error('❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:', allocationError);
+
+            await storage.createActivityLog({
+              type: 'payment_auto_allocation_failed',
+              description: `تخصیص خودکار پرداخت ${paymentId} ناموفق: ${allocationError.message}`,
+              relatedId: representativeId,
+              metadata: {
+                paymentId,
+                error: allocationError.message,
+                stack: allocationError.stack,
+                engine: 'Enhanced Payment Allocation Engine v34.1'
+              }
+            });
+          }
+      }
+      // If no allocation specified, payment remains unallocated
+      else {
         console.log(`📝 SHERLOCK v33.2: Payment ${newPayment.id} created without allocation (manual later)`);
       }
 
@@ -1865,10 +1778,10 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
       }
 
       // Log final status for debugging
-      console.log(`🔍 SHERLOCK v33.2: Final payment status - ID: ${newPayment.id}, Allocated: ${newPayment.isAllocated}, Invoice: ${newPayment.invoiceId}`);
+      console.log(`🔍 SHERLOCK v33.2: Final payment status - ID: ${finalPaymentStatus.id}, Allocated: ${finalPaymentStatus.isAllocated}, Invoice: ${finalPaymentStatus.invoiceId}`);
       console.log(`✅ SHERLOCK v33.2: Payment processing completed with financial sync`);
 
-      res.json(responseData);
+      res.json(finalPaymentStatus);
     } catch (error) {
       console.error('Error creating payment:', error);
       res.status(500).json({ error: "خطا در ایجاد پرداخت" });
@@ -3713,7 +3626,8 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
       const payment = paymentsData[0];
 
       // Calculate integrity metrics
-      const hasExcessPayments = payment.totalAmount > invoice.totalAmount;const needsReconciliation = Math.abs(financialData.actualDebt - parseFloat(rep.totalDebt)) > 1000;
+      const hasExcessPayments = payment.totalAmount > invoice.totalAmount;
+      const needsReconciliation = Math.abs(financialData.actualDebt - parseFloat(rep.totalDebt)) > 1000;
       const integrityScore = needsReconciliation ? 75 : hasExcessPayments ? 85 : 100;
 
       const snapshot = {
@@ -3859,9 +3773,6 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   const { registerTelegramRoutes } = await import('./routes/telegram-routes');
   registerTelegramRoutes(app, authMiddleware);
   console.log('✅ SHERLOCK v32.0: Enhanced Telegram Management Routes Registered');
-
-  // Payment Management Router - DISABLED (Legacy endpoints disabled)
-  // app.use('/api/payment-management', paymentManagementRouter);
 
   const httpServer = createServer(app);
   return httpServer;
