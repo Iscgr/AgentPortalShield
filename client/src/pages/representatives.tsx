@@ -149,7 +149,7 @@ function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId
     }
   };
 
-  // ✅ PERFORMANCE: Throttled event handling to prevent Query Storm
+  // ✅ PERFORMANCE: Throttled event handling to prevent rapid-fire updates
   React.useEffect(() => {
     const handlePaymentUpdate = (event?: CustomEvent) => {
       const eventType = event?.type || 'payment-update';
@@ -1761,8 +1761,12 @@ export default function Representatives() {
                                   <span className="font-mono text-sm">
                                     {selectedRep.invoices?.find(inv => inv.id === payment.invoiceId)?.invoiceNumber || `#${payment.invoiceId}`}
                                   </span>
+                                ) : payment.isAllocated === false ? (
+                                  <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                    تخصیص نیافته
+                                  </Badge>
                                 ) : (
-                                  <span className="text-gray-500">عمومی</span>
+                                  <span className="text-gray-400">-</span>
                                 )}
                               </TableCell>
                               <TableCell>
