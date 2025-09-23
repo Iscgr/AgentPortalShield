@@ -16,12 +16,8 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Fix for Replit GCE deployment - trust proxy for authentication  
-// Use specific proxy configuration instead of 'true' to avoid rate limiting issues
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1); // Trust first proxy only
-} else {
-  app.set('trust proxy', false); // Disable in development
-}
+// Always trust proxy in Replit environment to fix rate limiting issues
+app.set('trust proxy', true);
 
 // Enhanced CORS and security headers with special handling for portal routes
 app.use((req, res, next) => {

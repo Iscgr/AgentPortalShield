@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { db } from '../db';
 import { activityLogs } from '../../shared/schema';
 import crypto from 'crypto';
+import { MemoryStore } from 'express-rate-limit'; // Import MemoryStore
 
 interface SecurityConfig {
   rateLimiting: {
@@ -37,50 +38,26 @@ class AdvancedSecurityManager {
 
   // Enhanced rate limiting with progressive restrictions
   createAdaptiveRateLimit() {
+    const isDevelopment = process.env.NODE_ENV === 'development';
     return rateLimit({
-      windowMs: this.config.rateLimiting.windowMs,
-      skip: (req: Request) => {
-        // Skip rate limiting for development assets and Vite HMR
-        if (process.env.NODE_ENV === 'development') {
-          const path = req.path;
-          if (path.includes('/@fs/') || path.includes('/@vite/') || 
-              path.includes('.js') || path.includes('.css') || 
-              path.includes('.svg') || path.includes('.png') || 
-              path.includes('node_modules')) {
-            return true;
-          }
-        }
-        
-        // Skip for whitelisted IPs
-        const clientIP = this.getClientIP(req);
-        return this.config.ipWhitelisting.includes(clientIP);
-      },
-      max: (req: Request) => {
-        const clientIP = this.getClientIP(req);
-
-        // Blocked IPs get 0 requests
-        if (this.blockedIPs.has(clientIP)) {
-          return 0;
-        }
-
-        // Suspicious IPs get reduced limits
-        const suspiciousCount = this.suspiciousIPs.get(clientIP) || 0;
-        if (suspiciousCount >= this.config.suspiciousActivityThreshold) {
-          return Math.max(10, this.config.rateLimiting.max - (suspiciousCount * 10));
-        }
-
-        return this.config.rateLimiting.max;
-      },
+      windowMs: isDevelopment ? 1000 : 15 * 60 * 1000, // 1 second in dev, 15 minutes in production
+      max: isDevelopment ? 1000 : 100, // Very high limit in dev, 100 per window in production
       message: {
-        error: 'درخواست‌های بیش از حد مجاز',
-        message: 'لطفاً کمی صبر کنید و سپس دوباره تلاش کنید',
-        retryAfter: '15 دقیقه'
+        error: 'خیلی زیاد درخواست فرستادید. لطفاً کمی صبر کنید',
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: '15 minutes'
       },
       standardHeaders: true,
       legacyHeaders: false,
+      store: new MemoryStore(),
+      trustProxy: true, // Trust proxy headers in Replit environment
+      skip: (req) => {
+        // Skip rate limiting for portal routes in development
+        return isDevelopment && req.path.startsWith('/portal');
+      },
       handler: (req: Request, res: Response) => {
         const clientIP = this.getClientIP(req);
-        
+
         // Don't mark localhost as suspicious in development
         if (process.env.NODE_ENV !== 'development' || !this.config.ipWhitelisting.includes(clientIP)) {
           this.markSuspiciousIP(clientIP);
@@ -437,7 +414,7 @@ class AdvancedSecurityManager {
       lastUpdate: new Date().toISOString()
     };
   }
-  
+
 
   /**
    * Sanitize object properties
