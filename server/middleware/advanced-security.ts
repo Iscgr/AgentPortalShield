@@ -40,18 +40,12 @@ class AdvancedSecurityManager {
     return rateLimit({
       windowMs: this.config.rateLimiting.windowMs,
       skip: (req: Request) => {
-        // Skip rate limiting for development assets and Vite HMR
+        // ✅ FIX: Skip ALL rate limiting in development to prevent trust proxy conflicts
         if (process.env.NODE_ENV === 'development') {
-          const path = req.path;
-          if (path.includes('/@fs/') || path.includes('/@vite/') || 
-              path.includes('.js') || path.includes('.css') || 
-              path.includes('.svg') || path.includes('.png') || 
-              path.includes('node_modules')) {
-            return true;
-          }
+          return true; // Skip all rate limiting in development
         }
         
-        // Skip for whitelisted IPs
+        // Skip for whitelisted IPs in production
         const clientIP = this.getClientIP(req);
         return this.config.ipWhitelisting.includes(clientIP);
       },
