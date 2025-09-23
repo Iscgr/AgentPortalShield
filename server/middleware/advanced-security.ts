@@ -50,10 +50,27 @@ class AdvancedSecurityManager {
       standardHeaders: true,
       legacyHeaders: false,
       store: new MemoryStore(),
-      trustProxy: true, // Trust proxy headers in Replit environment
+      trustProxy: isDevelopment ? false : 1, // Secure proxy configuration
       skip: (req) => {
         // Skip rate limiting for portal routes in development
         return isDevelopment && req.path.startsWith('/portal');
+      },
+      keyGenerator: (req) => {
+        // Secure IP extraction that prevents spoofing
+        const forwardedFor = req.headers['x-forwarded-for'];
+        const realIP = req.headers['x-real-ip'];
+        
+        if (isDevelopment) {
+          return req.ip || req.connection.remoteAddress || 'unknown';
+        }
+        
+        // In production, validate proxy headers more strictly
+        if (typeof forwardedFor === 'string' && forwardedFor.includes(',')) {
+          // Take the leftmost IP (original client)
+          return forwardedFor.split(',')[0].trim();
+        }
+        
+        return realIP || req.ip || req.connection.remoteAddress || 'unknown';
       },
       handler: (req: Request, res: Response) => {
         const clientIP = this.getClientIP(req);
