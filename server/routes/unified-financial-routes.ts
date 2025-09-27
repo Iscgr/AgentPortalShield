@@ -13,32 +13,32 @@ import { eq, desc } from 'drizzle-orm'; // ✅ SHERLOCK v32.0: Added desc import
 import { invoices } from '../../shared/schema.js'; // Assuming invoices schema is available
 import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
 import { storage } from '../storage.js';
-import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
-import { performance } from 'perf_hooks'; // Import performance for timing
-import { isFeatureEnabled } from '../utils/featureFlags.js'; // Assuming feature flag utility exists
-import { featureFlagManager } from '../services/feature-flag-manager.js'; // Added for Phase 8B
+import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js';
+import { performance } from 'perf_hooks';
+import { featureFlagManager } from '../services/feature-flag-manager.js';
 
 const router = Router();
 
 // Import authentication middleware from main routes
 import type { Request, Response, NextFunction } from 'express';
 
-// ✅ SHERLOCK v26.0: FIXED NO-VALIDATION MIDDLEWARE
+// SHERLOCK v32.0: SECURE AUTHENTICATION - Use proper auth middleware
 const requireAuth = (req: any, res: any, next: any) => {
-  console.log('🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests');
-
-  // Force session authentication for compatibility
-  if (req.session) {
-    req.session.authenticated = true;
-    req.session.user = {
-      id: 1,
-      username: 'auto-admin',
-      role: 'admin',
-      permissions: ['*']
-    };
+  // Check if user is authenticated via session
+  if (req.session && req.session.authenticated) {
+    return next();
   }
 
-  next();
+  // Check if user is logged in as admin
+  if (req.session && req.session.user && req.session.user.role === 'admin') {
+    return next();
+  }
+
+  // Return 401 for unauthenticated requests
+  return res.status(401).json({
+    success: false,
+    error: "احراز هویت لازم است"
+  });
 };
 
 /**
@@ -256,6 +256,7 @@ router.get('/all-representatives', requireAuth, async (req, res) => {
 
     // Performance headers for monitoring
     res.header('X-Performance-Time', totalTime.toString());
+    const isOptimizationEnabled = featureFlagManager.isEnabled('batchOptimization');
     res.header('X-Query-Pattern', optimizationUsed ? 'BATCH_OPTIMIZED' : 'INDIVIDUAL_N+1');
     res.header('X-Representative-Count', allData.length.toString());
     res.header('X-Feature-Flag-Active', isOptimizationEnabled.toString());
