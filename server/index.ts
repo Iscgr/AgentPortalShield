@@ -175,8 +175,8 @@ app.use((req, res, next) => {
       const dbHealthy = await checkDatabaseHealth();
       const memoryUsage = process.memoryUsage();
 
-      res.status(200).json({ 
-        status: 'healthy', 
+      res.status(200).json({
+        status: 'healthy',
         timestamp: Date.now(),
         environment: app.get("env"),
         uptime: process.uptime(),
@@ -196,8 +196,8 @@ app.use((req, res, next) => {
       });
     } catch (error) {
       log(`Health check error: ${error}`, 'error');
-      res.status(503).json({ 
-        status: 'unhealthy', 
+      res.status(503).json({
+        status: 'unhealthy',
         timestamp: Date.now(),
         error: 'Internal service error'
       });
@@ -205,8 +205,8 @@ app.use((req, res, next) => {
   });
 
   app.get('/ready', (req, res) => {
-    res.status(200).json({ 
-      status: 'ready', 
+    res.status(200).json({
+      status: 'ready',
       timestamp: Date.now(),
       environment: app.get("env"),
       version: '16.2',
@@ -222,7 +222,7 @@ app.use((req, res, next) => {
     log(`Error ${status}: ${message} - ${req.method} ${req.path}`, 'error');
 
     // Don't crash the server, just log and respond
-    res.status(status).json({ 
+    res.status(status).json({
       error: message,
       timestamp: new Date().toISOString()
     });
@@ -282,6 +282,16 @@ app.use((req, res, next) => {
     process.exit(0);
   });
 
+  // ✅ PHASE 7C: Register unified financial routes BEFORE static middleware
+  app.use('/api/unified-financial', unifiedFinancialRoutes);
+
+  // ✅ PHASE 7C: Ensure API routes take precedence over static files
+  app.use('/api', (req, res, next) => {
+    console.log(`🔍 PHASE 7C: API Route accessed: ${req.method} ${req.path}`);
+    next();
+  });
+
+
   // Start server with retry mechanism
   let serverInstance: any;
   const startServer = async () => {
@@ -311,11 +321,11 @@ app.use((req, res, next) => {
       stack: error.stack?.substring(0, 1000),
       timestamp: new Date().toISOString()
     });
-    
+
     // Log critical system state before exit
     console.error('System memory usage:', process.memoryUsage());
     console.error('System uptime:', process.uptime(), 'seconds');
-    
+
     // Graceful shutdown attempt
     setTimeout(() => {
       console.error('❌ Forced shutdown due to uncaught exception');
@@ -329,26 +339,26 @@ app.use((req, res, next) => {
       promise: promise.toString().substring(0, 200),
       timestamp: new Date().toISOString()
     });
-    
+
     // Don't exit process for unhandled rejections - try to continue
     // Instead, log and monitor
-    
+
     if (reason instanceof Error) {
       console.error('Rejection Error Stack:', reason.stack?.substring(0, 500));
-      
+
       // Check if this is a timeout error that can be safely ignored
       if (reason.message.includes('timeout') || reason.message.includes('Timeout')) {
         console.warn('⚠️ Timeout-related rejection - system will continue');
         return;
       }
-      
+
       // Check if this is a database connection error
       if (reason.message.includes('database') || reason.message.includes('connection')) {
         console.warn('⚠️ Database-related rejection - attempting recovery');
         return;
       }
     }
-    
+
     // For critical errors, schedule a graceful restart
     console.warn('⚠️ Non-critical unhandled rejection - system continues with monitoring');
   });
@@ -366,10 +376,10 @@ app.use((req, res, next) => {
   setInterval(() => {
     const memUsage = process.memoryUsage();
     const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-    
+
     if (heapUsedMB > 400) {
       console.warn(`⚠️ High memory usage detected: ${heapUsedMB}MB heap used`);
-      
+
       if (heapUsedMB > 600) {
         console.error(`❌ Critical memory usage: ${heapUsedMB}MB - forcing garbage collection`);
         if (global.gc) {
