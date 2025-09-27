@@ -105,16 +105,20 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
-  // Safe timeout handling
+  // Safe timeout handling with increased timeout for batch operations
   app.use((req, res, next) => {
-    // Set a reasonable timeout for all requests
-    req.setTimeout(45000, () => {
-      console.error(`⏰ Global timeout: ${req.method} ${req.url}`);
+    // Set different timeouts based on endpoint
+    const isBatchOperation = req.url.includes('/batch') || req.url.includes('/dashboard');
+    const timeoutMs = isBatchOperation ? 120000 : 60000; // 2 minutes for batch, 1 minute for others
+    
+    req.setTimeout(timeoutMs, () => {
+      console.error(`⏰ Global timeout after ${timeoutMs}ms: ${req.method} ${req.url}`);
       if (!res.headersSent) {
         res.status(408).json({
           error: "Request timeout",
-          message: "درخواست طولانی شد",
-          url: req.url
+          message: "درخواست طولانی شد - لطفاً صبر کنید",
+          url: req.url,
+          timeout: timeoutMs
         });
       }
     });

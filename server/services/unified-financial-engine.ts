@@ -565,11 +565,11 @@ export class UnifiedFinancialEngine {
       // For very large datasets, fall back to chunked individual calculations
       const results: RepresentativeFinancialData[] = [];
       const CHUNK_SIZE = 50;
-      
+
       for (let i = 0; i < representativesData.length; i += CHUNK_SIZE) {
         const chunk = representativesData.slice(i, i + CHUNK_SIZE);
         console.log(`🔄 Processing chunk ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(representativesData.length/CHUNK_SIZE)}`);
-        
+
         const chunkResults = await Promise.all(chunk.map(async (rep) => {
           const debt = parseFloat(rep.totalDebt) || 0;
           return {
@@ -586,10 +586,10 @@ export class UnifiedFinancialEngine {
             debtLevel: this.calculateDebtLevel(debt)
           };
         }));
-        
+
         results.push(...chunkResults);
       }
-      
+
       const endTime = performance.now();
       const processingTime = Math.round(endTime - startTime);
       console.log(`✅ ATOMOS CHUNKED: Processed ${results.length} representatives in ${processingTime}ms`);
