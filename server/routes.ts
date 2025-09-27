@@ -57,9 +57,9 @@ import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-route
 import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
 
 // Import AI Engine routes
-import { registerAiEngineRoutes } from './routes/ai-engine-routes.js';
+import aiEngineRoutes from './routes/ai-engine-routes.js';
 // Import Workspace Routes
-import { registerWorkspaceRoutes } from './routes/workspace-routes.js';
+import workspaceRoutes from './routes/workspace-routes.js';
 // Import Batch Rollback Routes
 import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 
@@ -67,7 +67,7 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
 
 // --- Interfaces for Authentication Middleware ---
-interface AuthSession extends Express.Session {
+interface AuthSession {
   authenticated?: boolean;
   userId?: number;
   username?: string;
@@ -81,7 +81,16 @@ interface AuthSession extends Express.Session {
 }
 
 interface AuthRequest extends Request {
-  session?: AuthSession;
+  session: AuthSession & {
+    save: (callback?: (err?: any) => void) => void;
+    regenerate: (callback: (err?: any) => void) => void;
+    destroy: (callback: (err?: any) => void) => void;
+    reload: (callback: (err?: any) => void) => void;
+    touch: () => void;
+    resetMaxAge: () => void;
+    id: string;
+    cookie: any;
+  };
 }
 
 
@@ -646,36 +655,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         setTimeout(() => reject(new Error('Request timeout')), timeout);
       });
 
-      // Get base representatives data
-      const representatives = await storage.getRepresentatives();
+      // Get base representatives data with timeout protection
+      const representatives = await Promise.race([
+        storage.getRepresentatives(),
+        timeoutPromise
+      ]);
 
       // ✅ SHERLOCK v32.0: Enhanced with real-time financial calculations
-      const enhancedRepresentatives = await Promise.all(
-        representatives.map(async (rep) => {
-          try {
-            // Get real-time financial data from unified engine
-            const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
+      const enhancedRepresentatives = await Promise.race([
+        Promise.all(
+          representatives.map(async (rep) => {
+            try {
+              // Get real-time financial data from unified engine
+              const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
 
-            return {
-              ...rep,
-              // ✅ Override stored debt with calculated debt
-              totalDebt: financialData.actualDebt.toString(),
-              totalSales: financialData.totalSales.toString(),
-              // Additional real-time data for UI
-              financialData: {
-                actualDebt: financialData.actualDebt,
-                paymentRatio: financialData.paymentRatio,
-                debtLevel: financialData.debtLevel,
-                lastSync: financialData.calculationTimestamp
-              }
-            };
-          } catch (error) {
-            console.warn(`⚠️ SHERLOCK v32.0: Failed to calculate financial data for rep ${rep.id}:`, error);
-            // Fallback to stored data if calculation fails
-            return rep;
-          }
-        })
-      );
+              return {
+                ...rep,
+                // ✅ Override stored debt with calculated debt
+                totalDebt: financialData.actualDebt.toString(),
+                totalSales: financialData.totalSales.toString(),
+                // Additional real-time data for UI
+                financialData: {
+                  actualDebt: financialData.actualDebt,
+                  paymentRatio: financialData.paymentRatio,
+                  debtLevel: financialData.debtLevel,
+                  lastSync: financialData.calculationTimestamp
+                }
+              };
+            } catch (error) {
+              console.warn(`⚠️ SHERLOCK v32.0: Failed to calculate financial data for rep ${rep.id}:`, error);
+              // Fallback to stored data if calculation fails
+              return rep;
+            }
+          })
+        ),
+        timeoutPromise
+      ]);
 
       console.log(`✅ SHERLOCK v32.0: Enhanced ${enhancedRepresentatives.length} representatives with real-time financial data`);
       res.json(enhancedRepresentatives);
