@@ -1,0 +1,83 @@
+# Git
+.git
+.gitignore
+
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Build outputs
+dist
+build
+.next
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+logs/**
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+
+# Test files and debugging
+test-*.js
+test-*.json
+*-test-*
+*-debug-*
+debug-*
+temp-*
+*-temp.*
+*-cookies.txt
+*-session.txt
+*-auth.txt
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Scripts
+deploy.sh
+docker-deploy.sh
+scripts/
+
+# SSL and certificates
+ssl/
+certs/
+*.pem
+*.crt
+*.key
+
+# Backups
+backups/
+*.sql
+*.backup
+
+# Development files
+src/**/*.test.*
+src/**/*.spec.*
