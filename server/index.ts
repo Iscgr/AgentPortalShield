@@ -282,9 +282,6 @@ app.use((req, res, next) => {
     process.exit(0);
   });
 
-  // ✅ PHASE 7C: Register unified financial routes BEFORE static middleware
-  app.use('/api/unified-financial', unifiedFinancialRoutes);
-
   // ✅ PHASE 7C: Ensure API routes take precedence over static files
   app.use('/api', (req, res, next) => {
     console.log(`🔍 PHASE 7C: API Route accessed: ${req.method} ${req.path}`);
