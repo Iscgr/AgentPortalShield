@@ -2339,6 +2339,39 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  /**
+   * ✅ ATOMOS v1.0: بروزرسانی اطلاعات پرداخت
+   */
+  async updatePayment(paymentId: number, updates: Partial<{
+    isAllocated: boolean;
+    invoiceId: number;
+    amount: string;
+    description: string;
+  }>): Promise<Payment> {
+    return await withDatabaseRetry(
+      async () => {
+        console.log(`🔄 ATOMOS v1.0: Updating payment ${paymentId} with:`, updates);
+        
+        const [updatedPayment] = await db
+          .update(payments)
+          .set({
+            ...updates,
+            updatedAt: new Date()
+          })
+          .where(eq(payments.id, paymentId))
+          .returning();
+
+        if (!updatedPayment) {
+          throw new Error(`Payment ${paymentId} not found for update`);
+        }
+
+        console.log(`✅ ATOMOS v1.0: Payment ${paymentId} updated successfully`);
+        return updatedPayment;
+      },
+      'updatePayment'
+    );
+  }
+
   async getPaymentAllocationSummary(representativeId: number): Promise<{
     totalPayments: number;
     allocatedPayments: number;

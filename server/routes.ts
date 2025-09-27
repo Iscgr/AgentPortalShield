@@ -1387,16 +1387,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let finalPaymentStatus = newPayment;
 
-      // ✅ ENHANCED: Execute allocation with proper error handling and status update
+      // ✅ ATOMOS ENHANCED: Execute allocation using Enhanced Payment Allocation Engine
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
-        console.log(`💰 SHERLOCK v33.2: Executing manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
+        console.log(`💰 ATOMOS v1.0: Executing manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
 
         try {
-          // Allocate payment to specific invoice
-          await storage.allocatePaymentToInvoice(newPayment.id, parseInt(selectedInvoiceId));
+          // Import Enhanced Payment Allocation Engine
+          const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+          
+          // Execute manual allocation using enhanced engine
+          const allocationResult = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
+            newPayment.id,
+            parseInt(selectedInvoiceId),
+            parseFloat(amount),
+            'SYSTEM'
+          );
 
-          // ✅ CRITICAL: Update payment record to reflect allocation
-          finalPaymentStatus = await storage.updatePayment(newPayment.id, {
+          if (allocationResult.success) {
+            console.log(`✅ ATOMOS v1.0: Manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
+            
+            // Update payment status to reflect allocation
+            finalPaymentStatus = await storage.updatePayment(newPayment.id, {
+              isAllocated: true,
+              invoiceId: parseInt(selectedInvoiceId)
+            });
+            
+            console.log(`📊 ATOMOS v1.0: Payment ${newPayment.id} updated - isAllocated: true, invoiceId: ${selectedInvoiceId}`);
+          } else {
+            console.error(`❌ ATOMOS v1.0: Manual allocation failed:`, allocationResult.errors);
+          }
+
+        } catch (error) {
+          console.error(`💥 ATOMOS v1.0: Error in manual allocation:`, error);
+        }
+
+      } else if (selectedInvoiceId === "auto") {
+        console.log(`🔄 ATOMOS v1.0: Executing auto-allocation for Representative ${representativeId}`);
+
+        try {
+          // Import Enhanced Payment Allocation Engine  
+          const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+          
+          // Execute auto allocation using enhanced engine
+          const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(
+            newPayment.id,
+            {
+              method: 'FIFO', // Oldest invoices first
+              allowPartialAllocation: true,
+              allowOverAllocation: false,
+              priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
+            }
+          );
+
+          if (allocationResult.success && allocationResult.allocatedAmount > 0) {
+            console.log(`✅ ATOMOS v1.0: Auto-allocation successful - ${allocationResult.allocatedAmount} allocated to ${allocationResult.allocations.length} invoices`);
+            
+            // Find the first allocated invoice for payment update
+            if (allocationResult.allocations.length > 0) {
+              const firstAllocation = allocationResult.allocations[0];
+              
+              finalPaymentStatus = await storage.updatePayment(newPayment.id, {
+                isAllocated: true,
+                invoiceId: firstAllocation.invoiceId
+              });
+              
+              console.log(`📊 ATOMOS v1.0: Payment ${newPayment.id} auto-allocated to invoice ${firstAllocation.invoiceId}`);
+            }
+          } else {
+            console.log(`⚠️ ATOMOS v1.0: Auto-allocation completed but no allocations made - remaining unallocated`);
+          }
+
+        } catch (error) {
+          console.error(`💥 ATOMOS v1.0: Error in auto-allocation:`, error);
+        }
+      }
+
+      // ✅ CRITICAL: Update payment record to reflect final allocation status
+      if (finalPaymentStatus.id === newPayment.id) {
+        finalPaymentStatus = await storage.getPayment(newPayment.id) || finalPaymentStatusent(newPayment.id, {
             isAllocated: true,
             invoiceId: parseInt(selectedInvoiceId)
           });

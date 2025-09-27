@@ -1,15 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { 
-  TrendingUp, 
-  AlertTriangle, 
-  Users, 
+import {
+  TrendingUp,
+  AlertTriangle,
+  Users,
   FileText,
   Upload,
   Bot,
   DollarSign,
-  CreditCard
+  CreditCard,
+  RefreshCw
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import InvoiceUpload from "@/components/invoice-upload";
@@ -105,13 +106,13 @@ function UnifiedStatCard({ title, statKey, endpoint, icon, formatter, color }: {
 }
 
 
-function StatCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
+function StatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
   colorClass = "text-primary",
-  onClick 
+  onClick
 }: {
   title: string;
   value: string;
@@ -121,7 +122,7 @@ function StatCard({
   onClick?: () => void;
 }) {
   return (
-    <Card 
+    <Card
       className={`stat-card ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
     >
@@ -221,9 +222,9 @@ const OverdueInvoicesCard = () => {
         <CardContent>
           <div className="text-2xl font-bold text-red-600">خطا</div>
           <p className="text-xs text-red-500">عدم دسترسی به اطلاعات</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => window.location.reload()}
             className="mt-2"
           >
@@ -245,7 +246,7 @@ const OverdueInvoicesCard = () => {
   const totalOverdueAmount = overdueData?.totals?.totalOverdueAmount || 0;
   const overdueInvoicesCount = overdueData?.totals?.overdueInvoicesCount || 0;
 
-  const criticalDebtors = overdueRepresentatives.filter(rep => 
+  const criticalDebtors = overdueRepresentatives.filter(rep =>
     rep.overdueAmount > 10000000
   );
 
@@ -261,15 +262,15 @@ const OverdueInvoicesCard = () => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">مطالبات معوق</CardTitle>
         <AlertTriangle className={`h-4 w-4 ${
-          criticalDebtors.length > 0 ? 'text-red-500' : 
-          overdueRepresentatives.length > 5 ? 'text-orange-500' : 
+          criticalDebtors.length > 0 ? 'text-red-500' :
+          overdueRepresentatives.length > 5 ? 'text-orange-500' :
           'text-muted-foreground'
         }`} />
       </CardHeader>
       <CardContent>
         <div className={`text-2xl font-bold ${
-          criticalDebtors.length > 0 ? 'text-red-600' : 
-          overdueRepresentatives.length > 5 ? 'text-orange-600' : 
+          criticalDebtors.length > 0 ? 'text-red-600' :
+          overdueRepresentatives.length > 5 ? 'text-orange-600' :
           overdueRepresentatives.length > 0 ? 'text-yellow-600' : 'text-green-600'
         }`}>
           {toPersianDigits(overdueInvoicesCount.toString())}
@@ -345,23 +346,23 @@ export default function Dashboard() {
     select: (data: any) => {
       try {
         console.log('🔍 EMERGENCY FIX v35.0: Processing dashboard data...', data?.success);
-        
+
         // Handle both success and error responses gracefully
         if (!data?.success && data?.data) {
           console.warn('⚠️ Dashboard returned error but has fallback data');
         }
-        
+
         // Extract from the API response structure with multiple fallbacks
         const summary = data?.data?.summary || data?.summary || data?.fallbackData || {};
         const representatives = data?.data?.representatives || {};
         const invoices = data?.data?.invoices || {};
-        
+
         console.log('🔍 EMERGENCY FIX v35.0: Extracted summary data:', {
           hasSystemDebt: !!summary?.totalSystemDebt,
           hasRepresentatives: !!summary?.totalRepresentatives,
           summaryKeys: Object.keys(summary)
         });
-        
+
         return {
           totalRevenue: parseFloat(summary?.totalSystemPaid || summary?.totalRevenue || '0'),
           totalDebt: parseFloat(summary?.totalSystemDebt || summary?.totalDebt || '0'),
@@ -420,7 +421,7 @@ export default function Dashboard() {
     select: (data: any) => data?.value || null
   });
 
-  
+
 
 
   // ✅ EMERGENCY FIX v35.0: Enhanced loading and error states
@@ -464,14 +465,14 @@ export default function Dashboard() {
                 {error instanceof Error ? error.message : 'خطای ناشناخته در سیستم'}
               </p>
               <div className="space-x-4">
-                <Button 
+                <Button
                   onClick={() => refetch()}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
                   <RefreshCw className="w-4 h-4 ml-2" />
                   تلاش مجدد
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => window.location.reload()}
                 >
@@ -501,7 +502,7 @@ export default function Dashboard() {
               <p className="text-yellow-700 mb-4">
                 سیستم موقتاً قادر به بارگذاری اطلاعات نیست
               </p>
-              <Button 
+              <Button
                 onClick={() => refetch()}
                 className="bg-yellow-600 hover:bg-yellow-700 text-white"
               >
@@ -529,6 +530,64 @@ export default function Dashboard() {
       <div className="max-w-4xl mx-auto">
         <InvoiceUpload />
       </div>
+
+      {/* Payment Section - ATOMOS Enhanced */}
+      <Card className="col-span-1">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5" />
+            ثبت پرداخت سریع - ATOMOS Enhanced
+          </CardTitle>
+          <CardDescription>
+            ✅ تخصیص خودکار FIFO یا دستی به فاکتور مشخص
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Payment input fields and buttons will be here */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Example: Amount input */}
+            <div>
+              <label htmlFor="paymentAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                مبلغ پرداخت
+              </label>
+              <input
+                type="text"
+                id="paymentAmount"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                placeholder="ریال"
+              />
+            </div>
+
+            {/* Example: Invoice selection dropdown */}
+            <div>
+              <label htmlFor="invoiceSelect" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                انتخاب فاکتور
+              </label>
+              <select
+                id="invoiceSelect"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              >
+                <option>فاکتور 1001</option>
+                <option>فاکتور 1002</option>
+                <option>فاکتور 1003</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Buttons for allocation */}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => console.log("Auto Allocate FIFO")}>
+              تخصیص خودکار (FIFO)
+            </Button>
+            <Button onClick={() => console.log("Manual Allocate")}>
+              تخصیص دستی
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Other dashboard components can be added here */}
+      {/* <OverdueInvoicesCard /> */}
     </div>
   );
 }

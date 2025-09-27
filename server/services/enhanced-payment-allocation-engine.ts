@@ -69,13 +69,15 @@ export class EnhancedPaymentAllocationEngine {
       
       console.log(`📋 Found ${eligibleInvoices.length} eligible invoices for allocation`);
       
-      // تخصیص خودکار
+      // ✅ ATOMOS v1.0: تخصیص خودکار بهبود یافته با FIFO کامل
       for (const invoice of eligibleInvoices) {
         if (remainingAmount <= 0) break;
         
         const invoiceAmount = parseFloat(invoice.amount);
         const currentlyAllocated = await this.getCurrentlyAllocatedAmount(invoice.id);
         const invoiceBalance = invoiceAmount - currentlyAllocated;
+        
+        console.log(`🔍 ATOMOS FIFO: Invoice ${invoice.id} - Amount: ${invoiceAmount}, Allocated: ${currentlyAllocated}, Balance: ${invoiceBalance}`);
         
         if (invoiceBalance <= 0) {
           warnings.push(`Invoice ${invoice.id} is already fully allocated`);
@@ -85,7 +87,7 @@ export class EnhancedPaymentAllocationEngine {
         // محاسبه مبلغ قابل تخصیص
         const allocationAmount = Math.min(remainingAmount, invoiceBalance);
         
-        // ثبت تخصیص
+        // ✅ ثبت تخصیص با اطلاعات کامل
         allocations.push({
           invoiceId: invoice.id,
           allocatedAmount: allocationAmount,
@@ -94,9 +96,24 @@ export class EnhancedPaymentAllocationEngine {
           allocatedBy: 'SYSTEM'
         });
         
+        // ✅ فوری: تخصیص واقعی در پایگاه داده
+        await db.update(payments)
+          .set({
+            invoiceId: invoice.id,
+            isAllocated: true,
+            updatedAt: new Date()
+          })
+          .where(eq(payments.id, paymentId));
+        
         remainingAmount -= allocationAmount;
         
-        console.log(`✅ Allocated ${allocationAmount} to invoice ${invoice.id}, remaining: ${remainingAmount}`);
+        console.log(`✅ ATOMOS FIFO: Allocated ${allocationAmount} to invoice ${invoice.id}, remaining: ${remainingAmount}`);
+        
+        // ✅ اگر پرداخت کاملاً تخصیص یافت، خروج از حلقه
+        if (remainingAmount <= 0) {
+          console.log(`🎯 ATOMOS FIFO: Payment ${paymentId} fully allocated`);
+          break;
+        }
       }
       
       // بروزرسانی پرداخت
@@ -141,7 +158,7 @@ export class EnhancedPaymentAllocationEngine {
   }
   
   /**
-   * تخصیص دستی پرداخت به فاکتور خاص
+   * ✅ ATOMOS v1.0: تخصیص دستی پرداخت به فاکتور خاص - بهبود یافته
    */
   static async manualAllocatePayment(
     paymentId: number,
