@@ -300,16 +300,46 @@ export class UnifiedFinancialEngine {
   static async calculateBatch(representativeIds: number[]): Promise<Map<number, any>> {
     const results = new Map();
 
-    // Process in chunks to avoid overwhelming the database
-    for (let i = 0; i < representativeIds.length; i += this.batchSize) {
-      const chunk = representativeIds.slice(i, i + this.batchSize);
-      const chunkResults = await Promise.all(
-        chunk.map(id => this.calculateRepresentative(id))
-      );
+    // Enhanced batch processing with timeout protection
+    const BATCH_TIMEOUT = 15000; // 15 seconds per batch
+    
+    try {
+      // Process in chunks to avoid overwhelming the database
+      for (let i = 0; i < representativeIds.length; i += this.batchSize) {
+        const chunk = representativeIds.slice(i, i + this.batchSize);
+        
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`Batch timeout for chunk ${i}`)), BATCH_TIMEOUT);
+        });
+        
+        const chunkResults = await Promise.race([
+          Promise.all(
+            chunk.map(async (id) => {
+              try {
+                const engine = new UnifiedFinancialEngine(null);
+                return await engine.calculateRepresentative(id);
+              } catch (error) {
+                console.warn(`Failed to calculate representative ${id}:`, error);
+                return null;
+              }
+            })
+          ),
+          timeoutPromise
+        ]);
 
-      chunk.forEach((id, index) => {
-        results.set(id, chunkResults[index]);
-      });
+        chunk.forEach((id, index) => {
+          if (chunkResults[index]) {
+            results.set(id, chunkResults[index]);
+          }
+        });
+        
+        // Small delay between chunks to prevent overwhelming
+        if (i + this.batchSize < representativeIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+    } catch (error) {
+      console.error('Batch calculation error:', error);
     }
 
     return results;

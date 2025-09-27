@@ -347,18 +347,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Dashboard endpoint - Updated to use unified financial data with enhanced error handling
   app.get("/api/dashboard", authMiddleware, async (req, res) => {
+    // Set request timeout to 25 seconds
+    const timeoutDuration = 25000;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Dashboard request timeout')), timeoutDuration);
+    });
+
     try {
       console.log("📊 SHERLOCK v32.0: Dashboard request received");
       console.log("🔍 SHERLOCK v32.0: Starting dashboard data collection...");
 
-      // Test database connection first
-      try {
-        await db.execute(sql`SELECT 1 as test`);
-        console.log("✅ SHERLOCK v32.0: Database connection verified");
-      } catch (dbError) {
-        console.error("❌ SHERLOCK v32.0: Database connection failed:", dbError);
-        throw new Error("Database connection failed");
-      }
+      // Wrap the entire dashboard logic in Promise.race to handle timeout
+      const dashboardData = await Promise.race([
+        (async () => {
+          // Test database connection first
+          try {
+            await db.execute(sql`SELECT 1 as test`);
+            console.log("✅ SHERLOCK v32.0: Database connection verified");
+          } catch (dbError) {
+            console.error("❌ SHERLOCK v32.0: Database connection failed:", dbError);
+            throw new Error("Database connection failed");
+          }
 
       // Calculate global summary with error handling
       let summary;
@@ -449,6 +458,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           queryTimeMs: 0 // Placeholder, actual calculation would be needed
         }
       };
+
+      return dashboardData;
+        })(),
+        timeoutPromise
+      ]);
 
       res.json(dashboardData);
 

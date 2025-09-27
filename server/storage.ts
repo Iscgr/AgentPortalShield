@@ -110,11 +110,11 @@ export interface IStorage {
 
   // Payments
   getPayments(): Promise<Payment[]>;
+  getPayment(id: number): Promise<Payment | undefined>;
   getPaymentsByRepresentative(repId: number): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: number, payment: Partial<Payment>): Promise<Payment>;
   deletePayment(id: number): Promise<void>;
-  updatePayment(id: number, payment: Partial<Payment>): Promise<Payment>;
   allocatePaymentToInvoice(paymentId: number, invoiceId: number): Promise<Payment>;
   autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<void>;
   getPaymentStatistics(): Promise<any>;
@@ -978,6 +978,16 @@ export class DatabaseStorage implements IStorage {
         return updated;
       },
       'updatePayment'
+    );
+  }
+
+  async getPayment(id: number): Promise<Payment | undefined> {
+    return await withDatabaseRetry(
+      async () => {
+        const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+        return payment || undefined;
+      },
+      'getPayment'
     );
   }
 
