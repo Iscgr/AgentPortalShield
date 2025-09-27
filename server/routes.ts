@@ -105,6 +105,63 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
+  // Safe timeout handling
+  app.use((req, res, next) => {
+    // Set a reasonable timeout for all requests
+    req.setTimeout(45000, () => {
+      console.error(`⏰ Global timeout: ${req.method} ${req.url}`);
+      if (!res.headersSent) {
+        res.status(408).json({
+          error: "Request timeout",
+          message: "درخواست طولانی شد",
+          url: req.url
+        });
+      }
+    });
+    next();
+  });
+
+  // Enhanced error handling with crash prevention
+  process.on('uncaughtException', (error) => {
+    console.error('🚨 Uncaught Exception:', error.message);
+    console.error('Stack:', error.stack?.substring(0, 1000));
+
+    // Try to clean up and continue instead of crashing
+    if (global.gc) {
+      global.gc();
+    }
+
+    // Only exit for critical errors
+    if (error.message?.includes('ENOSPC') || error.message?.includes('ENOMEM')) {
+      console.error('🚨 Critical system error - restarting...');
+      process.exit(1);
+    }
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('🚨 Unhandled Rejection at:', promise);
+    console.error('🚨 Reason:', reason);
+
+    // Log but don't crash for promise rejections
+    console.error('⚠️ Continuing execution despite unhandled rejection');
+  });
+
+  // Add memory monitoring
+  setInterval(() => {
+    const memUsage = process.memoryUsage();
+    const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+
+    if (heapUsedMB > 500) {
+      console.warn(`🧠 High memory usage: ${heapUsedMB}MB`);
+
+      if (global.gc) {
+        global.gc();
+        console.log('🗑️ Forced garbage collection');
+      }
+    }
+  }, 30000); // Check every 30 seconds
+
+
   // Initialize default admin user
   try {
     await storage.initializeDefaultAdminUser("mgr", "8679");
@@ -1038,10 +1095,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/allocation/metrics", authMiddleware, async (req, res) => {
     try {
       console.log('📊 SHERLOCK v35.0: Fetching allocation metrics');
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const metrics = await AllocationMonitoringService.calculateGlobalMetrics();
-      
+
       res.json({
         success: true,
         data: metrics,
@@ -1057,10 +1114,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const days = parseInt(req.query.days as string) || 30;
       console.log(`📈 SHERLOCK v35.0: Fetching allocation trends for ${days} days`);
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const trends = await AllocationMonitoringService.analyzeTrends(days);
-      
+
       res.json({
         success: true,
         data: trends,
@@ -1076,10 +1133,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/allocation/alerts", authMiddleware, async (req, res) => {
     try {
       console.log('🚨 SHERLOCK v35.0: Generating allocation alerts');
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const alerts = await AllocationMonitoringService.generateAlerts();
-      
+
       res.json({
         success: true,
         data: alerts,
@@ -1096,10 +1153,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/allocation/monitoring-report", authMiddleware, async (req, res) => {
     try {
       console.log('📋 SHERLOCK v35.0: Generating comprehensive monitoring report');
-      
+
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const report = await AllocationMonitoringService.generateMonitoringReport();
-      
+
       res.json({
         success: true,
         data: report,

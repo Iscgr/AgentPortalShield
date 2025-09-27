@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-// Enhanced performance monitoring middleware with batch detection
+// Enhanced performance monitoring middleware with crash prevention
 export function performanceMonitoringMiddleware(req: Request, res: Response, next: NextFunction) {
   const startTime = Date.now();
 
@@ -8,74 +8,96 @@ export function performanceMonitoringMiddleware(req: Request, res: Response, nex
   const isBatchOperation = req.url?.includes('batch-calculate') || 
                           (req.body && Array.isArray(req.body.representativeIds) && req.body.representativeIds.length > 10);
 
+  // Set request timeout to prevent crashes
+  req.setTimeout(30000, () => {
+    console.error(`⏰ Request timeout: ${req.method} ${req.url}`);
+    if (!res.headersSent) {
+      res.status(408).json({ 
+        error: "Request timeout", 
+        message: "درخواست طولانی شد و لغو شد",
+        timeout: 30000
+      });
+    }
+  });
+
   // Track error responses and memory monitoring
   const originalJson = res.json;
   let hasError = false;
 
-  // SHERLOCK v32.2: Memory monitoring and cleanup
+  // SHERLOCK v32.3: Enhanced memory monitoring with crash prevention
   res.json = function(body: any) {
     const duration = Date.now() - startTime;
     
-    // Memory leak prevention for large responses
-    if (body && typeof body === 'object' && JSON.stringify(body).length > 1000000) {
-      console.warn(`⚠️ Large response detected: ${JSON.stringify(body).length} bytes for ${req.url}`);
+    // Prevent large response crashes
+    try {
+      const bodySize = body ? JSON.stringify(body).length : 0;
+      if (bodySize > 5000000) { // 5MB limit
+        console.error(`🚨 Response too large: ${bodySize} bytes for ${req.url}`);
+        return originalJson.call(this, {
+          error: "Response too large",
+          message: "پاسخ بیش از حد بزرگ است",
+          size: bodySize
+        });
+      }
+    } catch (e) {
+      console.error(`🚨 Error processing response body for ${req.url}:`, e);
+      return originalJson.call(this, {
+        error: "Response processing error",
+        message: "خطا در پردازش پاسخ"
+      });
     }
     
     // Check for error responses
     if (res.statusCode >= 400) {
       hasError = true;
-      console.error(`❌ SHERLOCK v32.1: Error response ${res.statusCode} for ${req.method} ${req.url} in ${duration}ms`);
+      console.error(`❌ Error response ${res.statusCode} for ${req.method} ${req.url} in ${duration}ms`);
       if (body?.error) {
-        console.error(`❌ Error details:`, body.error);
+        console.error(`❌ Error details:`, String(body.error).substring(0, 500));
       }
     }
 
-    // Dynamic thresholds based on endpoint type
-    let threshold = 200;
+    // Dynamic thresholds based on endpoint type - more conservative
+    let threshold = 1000; // Increased base threshold
     if (req.url?.includes('/statistics') || req.url?.includes('/global')) {
-      threshold = 1000;
+      threshold = 5000;
     } else if (req.url?.includes('/debtors') || req.url?.includes('/unified-financial')) {
-      threshold = isBatchOperation ? 2000 : 500; // More lenient for financial calculations
+      threshold = isBatchOperation ? 10000 : 2000; // Much more lenient
     } else if (req.url?.includes('/batch-calculate')) {
-      threshold = 3000; // Even more lenient for explicit batch operations
+      threshold = 15000; // Very lenient for batch operations
     }
 
-    // Performance categorization
+    // Performance categorization - more conservative
     let perfLevel = '✅';
-    if (duration > threshold * 2) {
+    if (duration > threshold * 3) {
       perfLevel = '🔴 CRITICAL';
-    } else if (duration > threshold) {
+    } else if (duration > threshold * 2) {
       perfLevel = '⚠️ SLOW';
-    } else if (duration > threshold * 0.5) {
+    } else if (duration > threshold) {
       perfLevel = '🟡 MODERATE';
     }
 
-    // Enhanced logging with batch detection
+    // Enhanced logging with batch detection - only critical logs
     const batchInfo = isBatchOperation ? 
       `[BATCH: ${req.body?.representativeIds?.length || 'unknown'} items]` : '';
 
-    if (duration > threshold || process.env.NODE_ENV === 'development') {
+    if (duration > threshold * 2) { // Only log really slow requests
       console.log(`${perfLevel} ${req.method} ${req.url} ${batchInfo} ${res.statusCode} in ${duration}ms`);
     }
 
-    // Memory usage check for heavy endpoints with batch awareness
-    if (duration > (isBatchOperation ? 2000 : 1000)) {
+    // Memory cleanup for heavy operations
+    if (duration > 5000) {
       const memUsage = process.memoryUsage();
       const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-      if (heapUsedMB > 300) {
-        console.warn(`🧠 High memory usage: ${heapUsedMB}MB after ${req.url} ${batchInfo}`);
+      
+      if (heapUsedMB > 400) {
+        console.warn(`🧠 High memory usage: ${heapUsedMB}MB after ${req.url}`);
+        
+        // Force garbage collection if available
+        if (global.gc) {
+          global.gc();
+          console.log('🗑️ Forced garbage collection');
+        }
       }
-    }
-
-    // Special handling for 400 errors to help debugging
-    if (res.statusCode === 400 && req.url?.includes('batch-calculate')) {
-      console.error(`❌ Batch calculation 400 error: ${req.url}`, {
-        bodyKeys: req.body ? Object.keys(req.body) : [],
-        bodyType: typeof req.body,
-        hasRepIds: !!(req.body?.representativeIds),
-        repIdsType: typeof req.body?.representativeIds,
-        repIdsLength: Array.isArray(req.body?.representativeIds) ? req.body.representativeIds.length : 'not array'
-      });
     }
 
     return originalJson.call(this, body);
