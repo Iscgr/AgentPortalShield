@@ -353,7 +353,7 @@ router.get('/total-debt', requireAuth, async (req, res) => {
 /**
  * 🎯 PHASE 6B: OPTIMIZED ENDPOINT - Uses Service Layer with Repository Pattern
  */
-app.get('/all-representatives-optimized', authMiddleware, async (req, res) => {
+router.get('/all-representatives-optimized', requireAuth, async (req, res) => {
   try {
     console.log('🚀 PHASE 6B: Optimized all-representatives endpoint called');
     
