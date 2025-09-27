@@ -3,20 +3,14 @@
 ## Overview
 MarFaNet is a simplified financial management system focused on core business needs: invoice management, representative oversight, and AI-powered assistance. **SHERLOCK v18.4 STANDARDIZATION COMPLETE**: Successfully eliminated all parallel/legacy systems and test data contamination. The system now uses a single unified financial engine with 100% calculation accuracy guarantee.
 
-## Recent Changes (September 22, 2025)
-**🚀 PERFORMANCE OPTIMIZATION v2.1 - PHASE 2 COMPLETE SUCCESS** - Enterprise-scale optimization:
-- **Query Storm Resolution**: Eliminated N+1 problems, reduced 1389 queries to 3 queries (99.7% reduction)
-- **Cache Strategy Overhaul**: Implemented smart invalidation, extended TTL values, achieved 93% response time improvement (2381ms→153ms)
-- **Load Performance**: System handles 347 representatives with concurrent requests averaging 420ms
-- **Memory Optimization**: Stable memory usage at 57.7MB with 0.8% CPU utilization
-- **Error Prevention**: Added comprehensive unhandled promise rejection handling
-- **Portal Synchronization**: Fixed payment allocation filter to match Unified Financial Engine accuracy
-
-**✅ Previous Major Update (August 30, 2025)**
-**SHERLOCK v32.0 TELEGRAM INTEGRATION OVERHAUL** - Comprehensive architectural migration:
-- Unified admin panel with enhanced Telegram bot system
-- Added employee management tables and Persian command recognition
-- Implemented AI-powered message processing and task automation
+## Recent Changes (August 30, 2025)
+**✅ SHERLOCK v32.0 TELEGRAM INTEGRATION OVERHAUL - COMPLETE SUCCESS** - Comprehensive architectural migration:
+- **Removed CRM dual-panel architecture**: Successfully eliminated all CRM components and authentication
+- **Unified to single admin panel**: Now using only admin authentication (mgr/8679 credentials) 
+- **Enhanced Telegram bot system**: Advanced message parsing with AI-powered Persian command recognition
+- **Added new database tables**: employees, employee_tasks, telegram_messages, leave_requests, technical_reports, daily_reports, ai_knowledge_base
+- **Implemented intelligent message processing**: Persian command handlers (#گزارش, #وظیفه, #مرخصی)
+- **Created comprehensive API routes**: Full Telegram management interface with task automation
 
 ## User Preferences
 - **Communication Style**: Simple, everyday Persian language for non-technical users

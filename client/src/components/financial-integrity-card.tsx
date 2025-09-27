@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,27 +11,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface FinancialIntegrityCardProps {
   representativeId: number;
-  representativeName: string;
-  representativeCode: string;
-  totalSales: number;
-  totalDebt: number;
-  invoiceCount: number;
-  paymentCount: number;
-  lastInvoiceDate?: string;
-  lastPaymentDate?: string;
 }
 
 interface FinancialData {
   representativeId: number;
   representativeName: string;
   representativeCode: string;
-
+  
   // ✅ آمار مالی صحیح طبق تعاریف استاندارد
   totalSales: number;           // فروش کل (استاندارد)
   totalPaid: number;           // پرداخت تخصیص یافته
   totalUnpaid: number;         // مجموع پرداخت نشده
   actualDebt: number;          // بدهی استاندارد
-
+  
   paymentRatio: number;
   debtLevel: 'HEALTHY' | 'MODERATE' | 'HIGH' | 'CRITICAL';
   invoiceCount: number;
@@ -174,16 +167,16 @@ export function FinancialIntegrityCard({ representativeId }: FinancialIntegrityC
           {/* Transaction Summary */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-bold text-lg text-green-600">
-                {(financialData.invoiceCount || 0).toString()}
+              <div className="font-bold text-lg text-blue-600">
+                {toPersianDigits(financialData.invoiceCount.toString())}
               </div>
               <div className="text-gray-500">فاکتور</div>
             </div>
             <div className="text-center">
-              <div className="font-bold text-lg text-blue-600">
-                {(financialData.paymentCount || 0).toString()}
+              <div className="font-bold text-lg text-green-600">
+                {toPersianDigits(financialData.paymentCount.toString())}
               </div>
-              <p className="text-xs text-muted-foreground">تعداد پرداخت</p>
+              <div className="text-gray-500">پرداخت</div>
             </div>
           </div>
 

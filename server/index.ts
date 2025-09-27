@@ -5,23 +5,12 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { checkDatabaseHealth, closeDatabaseConnection, pool } from "./db";
 import { performanceMonitoringMiddleware } from "./middleware/performance";
-import { advancedSecurity } from "./middleware/advanced-security";
 
 
 const app = express();
 
-// Clear blocked IPs on startup (useful for development)
-if (process.env.NODE_ENV === 'development') {
-  advancedSecurity.clearAllBlocks();
-}
-
-// Fix for Replit GCE deployment - trust proxy for authentication  
-// Use specific proxy configuration instead of 'true' to avoid rate limiting issues
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1); // Trust first proxy only
-} else {
-  app.set('trust proxy', false); // Disable in development
-}
+// Fix for Replit GCE deployment - trust proxy for authentication
+app.set('trust proxy', true);
 
 // Enhanced CORS and security headers with special handling for portal routes
 app.use((req, res, next) => {
@@ -315,55 +304,15 @@ app.use((req, res, next) => {
 
   startServer();
 
-  // ✅ PERFORMANCE: Enhanced graceful error handling for production stability
+  // Simplified error handling
   process.on('uncaughtException', (error) => {
-    console.error('🚨 Uncaught Exception:', error);
-    console.error('Stack:', error.stack);
-    
-    // In production, log and continue. In development, crash for debugging
-    if (process.env.NODE_ENV === 'production') {
-      console.error('⚠️ PRODUCTION: Continuing operation despite uncaught exception');
-    } else {
-      console.error('🛑 DEVELOPMENT: Exiting process for debugging');
-      process.exit(1);
-    }
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
   });
 
-  process.on('unhandledRejection', (reason: any, promise) => {
-    console.error('🚨 Unhandled Promise Rejection at:', promise);
-    console.error('Reason:', reason);
-    
-    // Enhanced logging with stack trace if available
-    if (reason && reason.stack) {
-      console.error('Stack:', reason.stack);
-    }
-    
-    // In production, log and continue. In development, crash for debugging
-    if (process.env.NODE_ENV === 'production') {
-      console.error('⚠️ PRODUCTION: Continuing operation despite unhandled rejection');
-      
-      // Close any affected database connections gracefully
-      try {
-        if (reason && reason.message && reason.message.includes('database')) {
-          console.log('🔄 Attempting to refresh database connection...');
-          checkDatabaseHealth().catch(() => {
-            console.error('Failed to refresh database connection');
-          });
-        }
-      } catch (dbError) {
-        console.error('Error during database recovery:', dbError);
-      }
-    } else {
-      console.error('🛑 DEVELOPMENT: Exiting process for debugging');
-      process.exit(1);
-    }
-  });
-
-  // ✅ PERFORMANCE: Additional error monitoring for async operations
-  process.on('warning', (warning) => {
-    console.warn('⚠️ Node.js Warning:', warning.name);
-    console.warn('Message:', warning.message);
-    console.warn('Stack:', warning.stack);
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection:', reason);
+    process.exit(1);
   });
 
 })();

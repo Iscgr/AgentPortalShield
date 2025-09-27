@@ -53,8 +53,8 @@ export class AllocationMonitoringService {
         totalPayments: sql<number>`COUNT(*)`,
         allocatedPayments: sql<number>`COUNT(*) FILTER (WHERE is_allocated = true)`,
         unallocatedPayments: sql<number>`COUNT(*) FILTER (WHERE is_allocated = false)`,
-        totalAllocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`,
-        totalUnallocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN amount ELSE 0 END), 0)`,
+        totalAllocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+        totalUnallocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
         lastAllocationDate: sql<string>`MAX(CASE WHEN is_allocated = true THEN updated_at END)`
       }).from(payments);
       
@@ -92,7 +92,7 @@ export class AllocationMonitoringService {
       const trends = await db.select({
         date: sql<string>`DATE(created_at)`,
         allocatedCount: sql<number>`COUNT(*) FILTER (WHERE is_allocated = true)`,
-        allocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`,
+        allocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
         totalCount: sql<number>`COUNT(*)`
       })
       .from(payments)

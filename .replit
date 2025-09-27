@@ -15,23 +15,11 @@ run = ["sh", "-c", "npm start"]
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 34815
-externalPort = 3002
-
-[[ports]]
-localPort = 42067
-externalPort = 3000
-
-[[ports]]
-localPort = 46815
-externalPort = 3001
-
 [env]
 PORT = "5000"
 
 [workflows]
-runButton = "Crash-Resistant Run"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -62,15 +50,6 @@ args = "npm run dev"
 
 [[workflows.workflow]]
 name = "Optimized Production Run"
-author = 45267462
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-
-[[workflows.workflow]]
-name = "Crash-Resistant Run"
 author = 45267462
 mode = "sequential"
 

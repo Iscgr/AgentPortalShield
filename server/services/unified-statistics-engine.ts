@@ -273,7 +273,7 @@ export class UnifiedStatisticsEngine {
     const [revenueQuery, debtQuery, creditQuery] = await Promise.all([
       // Total Revenue (All allocated payments)
       db.select({ 
-        total: sql<number>`COALESCE(SUM(amount), 0)` 
+        total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)` 
       }).from(payments).where(eq(payments.isAllocated, true)),
 
       // Total Debt (Unpaid + Overdue invoices minus allocated payments per representative)
@@ -288,7 +288,7 @@ export class UnifiedStatisticsEngine {
       }).from(sql`(
         SELECT 
           r.id,
-          COALESCE(SUM(CASE WHEN i.status IN ('unpaid', 'overdue') THEN i.amount ELSE 0 END), 0) as amount
+          COALESCE(SUM(CASE WHEN i.status IN ('unpaid', 'overdue') THEN CAST(i.amount as DECIMAL) ELSE 0 END), 0) as amount
         FROM representatives r
         LEFT JOIN invoices i ON r.id = i.representative_id
         GROUP BY r.id
@@ -296,7 +296,7 @@ export class UnifiedStatisticsEngine {
       .leftJoin(sql`(
         SELECT 
           representative_id,
-          COALESCE(SUM(amount), 0) as amount
+          COALESCE(SUM(CAST(amount as DECIMAL)), 0) as amount
         FROM payments 
         WHERE is_allocated = true
         GROUP BY representative_id
@@ -304,7 +304,7 @@ export class UnifiedStatisticsEngine {
 
       // Total Credit (Unallocated payments)
       db.select({ 
-        total: sql<number>`COALESCE(SUM(amount), 0)` 
+        total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)` 
       }).from(payments).where(eq(payments.isAllocated, false))
     ]);
 

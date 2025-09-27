@@ -30,8 +30,6 @@ interface Payment {
   amount: string;
   paymentDate: string;
   description?: string;
-  isAllocated: boolean; // Added to reflect the new database field
-  invoiceId?: number; // Added to link payment to invoice
 }
 
 interface PortalData {
@@ -47,8 +45,6 @@ interface PortalData {
     debtLevel: string;
     lastCalculation: string;
     accuracyGuaranteed: boolean;
-    totalSales?: string; // Added for clarity and potential use
-    actualDebt?: string; // Added for clarity and potential use
   };
 }
 
@@ -140,7 +136,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
               }}>
                 ریز جزئیات مصرف دوره (فاکتور خودکار)
               </h5>
-
+              
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {invoice.usageData.records.map((record: any, idx: number) => (
                   <div key={idx} style={{
@@ -177,7 +173,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
                   </div>
                 ))}
               </div>
-
+              
               {/* Summary */}
               <div style={{
                 marginTop: '12px',
@@ -193,7 +189,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
               </div>
             </div>
           )}
-
+          
           {/* Manual Invoice Details (Hand-created invoices) */}
           {invoice.usageData.type === 'manual' && (
             <div style={{
@@ -211,7 +207,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
               }}>
                 جزئیات فاکتور دستی
               </h5>
-
+              
               <div style={{
                 background: '#374151',
                 padding: '12px',
@@ -238,7 +234,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
                     </p>
                   </div>
                 </div>
-
+                
                 {invoice.usageData.description && (
                   <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #4b5563' }}>
                     <p style={{ color: '#9ca3af', fontSize: '12px', lineHeight: '1.5' }}>
@@ -247,7 +243,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
                   </div>
                 )}
               </div>
-
+              
               {/* Summary for Manual Invoice */}
               <div style={{
                 marginTop: '12px',
@@ -285,7 +281,7 @@ export default function Portal() {
   console.log('data:', data);
   console.log('isLoading:', isLoading);
   console.log('error:', error);
-
+  
   // ✅ SHERLOCK v32.1: اضافه کردن validation برای publicId
   if (!publicId || publicId.trim() === '') {
     console.error('❌ SHERLOCK v32.1: publicId خالی یا نامعتبر است');
@@ -320,78 +316,24 @@ export default function Portal() {
   }
 
   if (error || !data) {
-    console.error('=== ATOMOS PORTAL ERROR ANALYSIS ===');
+    console.error('=== SHERLOCK v32.1 PORTAL ERROR DETAILS ===');
     console.error('Error object:', error);
     console.error('Data object:', data);
     console.error('PublicId:', publicId);
     console.error('Current URL:', window.location.href);
 
-    // ✅ ATOMOS: Enhanced error detection with timeout handling
+    // تشخیص نوع خطا - Enhanced for TanStack Query error format  
     const responseError = (error as any)?.response || (error as any)?.cause?.response;
     const isQueryFnError = error?.message?.includes('Missing queryFn');
-    const isTimeoutError = responseError?.status === 504 || 
-                          error?.message?.includes('timeout') ||
-                          error?.message?.includes('Request timeout');
     const isNotFound = responseError?.status === 404 || 
                       error?.message?.includes('404') ||
                       (!data && !error && !isQueryFnError);
-    const isServerError = responseError?.status >= 500 && !isTimeoutError;
+    
+    const isServerError = responseError?.status >= 500;
     const isNetworkError = error?.message?.includes('Network') || 
                           error?.message?.includes('fetch') ||
                           error?.message?.includes('NetworkError');
-
-    // ✅ ATOMOS: Timeout error handling
-    if (isTimeoutError) {
-      return (
-        <div style={{ 
-          minHeight: '100vh', 
-          background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
-          color: 'white', 
-          padding: '40px',
-          fontFamily: 'Tahoma, sans-serif',
-          direction: 'rtl',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.1)', 
-            padding: '40px', 
-            borderRadius: '15px',
-            maxWidth: '600px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '64px', marginBottom: '20px' }}>⏰</div>
-            <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
-              زمان پاسخ سرور به پایان رسید!
-            </h1>
-            <p style={{ fontSize: '16px', marginBottom: '15px', lineHeight: '1.6' }}>
-              سرور در زمان مقرر پاسخ نداد. این معمولاً به دلیل حجم بالای داده‌ها است.
-            </p>
-            <p style={{ fontSize: '14px', opacity: 0.8, marginBottom: '20px' }}>
-              لطفاً چند لحظه صبر کنید و مجدداً تلاش کنید.
-            </p>
-            <button 
-              onClick={() => window.location.reload()} 
-              style={{
-                background: 'linear-gradient(135deg, #1e40af, #3730a3)',
-                color: 'white',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                fontSize: '16px',
-                cursor: 'pointer',
-                marginTop: '10px'
-              }}
-            >
-              🔄 تلاش مجدد
-            </button>
-          </div>
-        </div>
-      );
-    }
-
+    
     // خطای خاص queryFn
     if (isQueryFnError) {
       return (
@@ -462,7 +404,7 @@ export default function Portal() {
           textAlign: 'center'
         }}>
           <div style={{ fontSize: '64px', marginBottom: '20px' }}>⚠️</div>
-
+          
           {isNotFound && (
             <>
               <h1 style={{ fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
@@ -554,82 +496,50 @@ export default function Portal() {
     );
   }
 
-  // ✅ PORTAL FINANCIAL MIRROR: اتصال مستقیم به سیستم مالی یکپارچه
+  // ✅ SHERLOCK v32.1: اتصال به سیستم مالی استاندارد - محاسبات Real-time
   let totalSales: number, totalDebt: number, credit: number, invoices: Invoice[], payments: Payment[];
-
+  
   try {
-    console.log('🔍 PORTAL MIRROR: Portal data received:', data);
-    console.log('🔍 PORTAL MIRROR: Financial meta from unified engine:', data.financialMeta);
-
-    // ✅ MIRROR STRATEGY: استفاده مستقیم از داده‌های محاسبه شده unified engine
+    console.log('🔍 Portal data received:', data);
+    console.log('🔍 Financial meta from standardized engine:', data.financialMeta);
+    
+    // ✅ اولویت با سیستم مالی استاندارد (Unified Financial Engine)
     if (data.financialMeta && data.financialMeta.accuracyGuaranteed) {
-      console.log('🎯 PORTAL MIRROR: Using MIRROR data from Unified Financial Engine');
-
-      // Mirror exact values from unified financial calculations
-      totalSales = data.financialMeta.totalSales ? parseFloat(data.financialMeta.totalSales) : parseFloat(String(data.totalSales || '0'));
-      totalDebt = data.financialMeta.actualDebt ? parseFloat(data.financialMeta.actualDebt) : (data.financialMeta.totalDebt ? parseFloat(data.financialMeta.totalDebt) : parseFloat(String(data.totalDebt || '0')));
-
-      console.log('🔥 PORTAL MIRROR: Mirrored financial values:', {
-        totalSalesFromMeta: data.financialMeta.totalSales,
-        actualDebtFromMeta: data.financialMeta.actualDebt,
-        totalDebtFromMeta: data.financialMeta.totalDebt,
-        finalTotalSales: totalSales,
-        finalTotalDebt: totalDebt
-      });
+      console.log('🎯 Using STANDARDIZED financial data from Unified Engine');
+      totalSales = parseFloat(String(data.totalSales || '0'));
+      totalDebt = parseFloat(String(data.totalDebt || '0'));
     } else {
-      console.log('⚠️ PORTAL MIRROR: Fallback to database values - calculating real-time');
-
-      // Calculate from raw data as backup
-      const invoiceSum = Array.isArray(data.invoices) ? 
-        data.invoices.reduce((sum, inv) => sum + (parseFloat(inv.amount) || 0), 0) : 0;
-      const paymentSum = Array.isArray(data.payments) ? 
-        data.payments.reduce((sum, pay) => sum + (parseFloat(pay.amount) || 0), 0) : 0;
-
-      totalSales = invoiceSum || parseFloat(String(data.totalSales || '0'));
-      totalDebt = Math.max(0, invoiceSum - paymentSum) || parseFloat(String(data.totalDebt || '0'));
-
-      console.log('📊 PORTAL MIRROR: Calculated from raw data:', {
-        invoiceSum,
-        paymentSum,
-        calculatedDebt: totalSales - paymentSum,
-        finalTotalSales: totalSales,
-        finalTotalDebt: totalDebt
-      });
+      console.log('⚠️ Fallback to basic data extraction');
+      totalSales = parseFloat(String(data.totalSales || '0'));
+      totalDebt = parseFloat(String(data.totalDebt || '0'));
     }
-
+    
     credit = parseFloat(String(data.credit || '0'));
     invoices = Array.isArray(data.invoices) ? data.invoices : [];
     payments = Array.isArray(data.payments) ? data.payments : [];
-
-    // Enhanced validation with fallback to database values
-    if (isNaN(totalSales) || totalSales === 0) {
-      totalSales = parseFloat(String(data.totalSales || '0'));
-      console.log('🔧 PORTAL MIRROR: Sales fallback to DB value:', totalSales);
-    }
-    if (isNaN(totalDebt) || totalDebt === 0) {
-      totalDebt = parseFloat(String(data.totalDebt || '0'));
-      console.log('🔧 PORTAL MIRROR: Debt fallback to DB value:', totalDebt);
-    }
+    
+    // Validate numeric values
+    if (isNaN(totalSales)) totalSales = 0;
+    if (isNaN(totalDebt)) totalDebt = 0;
     if (isNaN(credit)) credit = 0;
-
-    console.log('✅ PORTAL MIRROR: Final mirrored values:', {
+    
+    console.log('✅ Portal final values:', {
       totalSales: totalSales.toLocaleString(),
       totalDebt: totalDebt.toLocaleString(),
       credit: credit.toLocaleString(),
       invoicesCount: invoices.length,
-      paymentsCount: payments.length,
-      mirrorSource: data.financialMeta ? 'UNIFIED_ENGINE' : 'RAW_CALCULATION'
+      paymentsCount: payments.length
     });
-
+    
   } catch (error) {
-    console.error('❌ PORTAL MIRROR: Data extraction error:', error);
+    console.error('❌ Portal data extraction error:', error);
     totalSales = 0;
     totalDebt = 0;
     credit = 0;
     invoices = [];
     payments = [];
   }
-
+  
   // ✅ SHERLOCK v32.1: استفاده از مقادیر محاسبه شده از سرور
   const actualTotalDebt = totalDebt;
 
@@ -651,7 +561,7 @@ export default function Portal() {
         border: '2px solid #3b82f6'
       }}>
         <h1 style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '10px' }}>
-          پورتال عمومی نماینده
+          پرتال عمومی نماینده
         </h1>
         <h2 style={{ fontSize: '24px', color: '#93c5fd', marginBottom: '10px' }}>
           {data.name}
@@ -758,117 +668,45 @@ export default function Portal() {
         </div>
       </div>
 
-      {/* Enhanced Payments Section - Shows ALL payments with status */}
-      <div style={{ marginTop: '40px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', color: '#e2e8f0' }}>
-          پرداخت‌های ثبت شده ({payments.length})
-        </h2>
-
-        {payments.length === 0 ? (
-          <div style={{ 
-            background: '#374151', 
-            padding: '20px', 
-            borderRadius: '8px',
-            textAlign: 'center',
-            color: '#9ca3af'
-          }}>
-            هیچ پرداختی ثبت نشده است
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {payments.map((payment) => (
-              <div key={payment.id} style={{ 
-                background: payment.isAllocated ? '#475569' : '#1f2937', 
-                padding: '15px', 
-                borderRadius: '8px',
-                border: `2px solid ${payment.isAllocated ? '#10b981' : '#f59e0b'}`,
-                position: 'relative'
-              }}>
-                {/* Payment Status Badge */}
-                <div style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  padding: '4px 8px',
-                  borderRadius: '12px',
-                  fontSize: '10px',
-                  fontWeight: 'bold',
-                  background: payment.isAllocated ? '#059669' : '#d97706',
-                  color: 'white'
-                }}>
-                  {payment.isAllocated ? 'تخصیص یافته' : 'تخصیص نیافته'}
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                  <div>
-                    <p style={{ fontSize: '14px', opacity: 0.8 }}>
-                      تاریخ: {payment.paymentDate}
-                    </p>
-                    <p style={{ fontSize: '12px', opacity: 0.6, marginTop: '2px' }}>
-                      شناسه پرداخت: {payment.id}
-                    </p>
-                    {payment.invoiceId && (
-                      <p style={{ fontSize: '12px', opacity: 0.6, marginTop: '2px', color: '#10b981' }}>
-                        مرتبط با فاکتور: {payment.invoiceId}
-                      </p>
-                    )}
-                    {payment.description && (
-                      <p style={{ fontSize: '12px', opacity: 0.6, marginTop: '5px' }}>
-                        {payment.description}
-                      </p>
-                    )}
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <p style={{ fontSize: '18px', fontWeight: 'bold', color: payment.isAllocated ? '#10b981' : '#f59e0b' }}>
-                      {parseFloat(payment.amount).toLocaleString('fa-IR')} تومان
-                    </p>
-                    <p style={{ fontSize: '10px', opacity: 0.6, marginTop: '2px' }}>
-                      {payment.isAllocated ? 'تأیید شده' : 'در انتظار تخصیص'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Enhanced status information */}
-                <div style={{ 
-                  marginTop: '10px', 
-                  padding: '8px', 
-                  background: payment.isAllocated ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)', 
-                  borderRadius: '4px' 
-                }}>
-                  <p style={{ fontSize: '11px', color: payment.isAllocated ? '#10b981' : '#f59e0b' }}>
-                    {payment.isAllocated 
-                      ? '✅ این پرداخت به فاکتور تخصیص یافته و در محاسبات بدهی لحاظ شده است'
-                      : '⚠️ این پرداخت هنوز به فاکتور تخصیص نیافته و در محاسبات بدهی لحاظ نشده است'
-                    }
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Summary statistics */}
+      {/* Payments Section */}
+      <div style={{ marginBottom: '40px' }}>
+        <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
+          ۳. تاریخچه پرداخت‌ها ({payments.length} پرداخت)
+        </h3>
         <div style={{ 
-          marginTop: '20px', 
-          padding: '15px', 
-          background: '#374151', 
-          borderRadius: '8px',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '15px'
+          background: '#334155', 
+          padding: '20px', 
+          borderRadius: '10px',
+          border: '2px solid #475569'
         }}>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>
-              {payments.filter(p => p.isAllocated).reduce((sum, p) => sum + parseFloat(p.amount), 0).toLocaleString('fa-IR')}
+          {payments.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {payments.map((payment: Payment, index: number) => (
+                <div key={index} style={{ 
+                  background: 'linear-gradient(135deg, #059669, #047857)', 
+                  padding: '15px', 
+                  borderRadius: '8px',
+                  border: '1px solid #10b981'
+                }}>
+                  <p style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                    {parseFloat(payment.amount).toLocaleString('fa-IR')} تومان
+                  </p>
+                  <p style={{ fontSize: '14px', opacity: 0.9 }}>
+                    تاریخ: {payment.paymentDate}
+                  </p>
+                  {payment.description && (
+                    <p style={{ fontSize: '12px', opacity: 0.8 }}>
+                      {payment.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ textAlign: 'center', fontSize: '18px', opacity: 0.7 }}>
+              پرداختی یافت نشد
             </p>
-            <p style={{ fontSize: '12px', opacity: 0.7 }}>مجموع پرداخت‌های تخصیص یافته</p>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#f59e0b' }}>
-              {payments.filter(p => !p.isAllocated).reduce((sum, p) => sum + parseFloat(p.amount), 0).toLocaleString('fa-IR')}
-            </p>
-            <p style={{ fontSize: '12px', opacity: 0.7 }}>مجموع پرداخت‌های تخصیص نیافته</p>
-          </div>
+          )}
         </div>
       </div>
     </div>

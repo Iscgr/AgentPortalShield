@@ -10,8 +10,7 @@ import { unifiedAuthMiddleware, enhancedUnifiedAuthMiddleware } from "./middlewa
 import multer from "multer";
 
 // SHERLOCK v34.1: Import payment management router and its dependencies
-    import { paymentManagementRouter, requireAuth } from "./routes/payment-management-router.js";
-    import { EnhancedPaymentAllocationEngine } from "./services/enhanced-payment-allocation-engine.js";
+import { paymentManagementRouter, requireAuth } from "./routes/payment-management-router.js";
 
 // Extend Request interface to include multer file
 interface MulterRequest extends Request {
@@ -41,7 +40,7 @@ import bcrypt from "bcryptjs";
 // Commented out temporarily - import { generateFinancialReport } from "./services/report-generator";
 
 // New import for unified financial engine
-import { unifiedFinancialEngine, UnifiedFinancialEngine } from './services/unified-financial-engine.js';
+import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
 
 // Import maintenance routes registration
 import { registerMaintenanceRoutes } from "./routes/maintenance-routes";
@@ -66,12 +65,6 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 
 // Import Debt Verification Routes
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
-
-// ATOMOS v2.0: Import Advanced System Routes
-import advancedSystemRoutes from './routes/advanced-system-routes.js';
-
-// Import Advanced Security Middleware
-import { adaptiveRateLimit, securityHeaders } from './middleware/advanced-security.js';
 
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession extends Express.Session {
@@ -111,12 +104,6 @@ const upload = multer({
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
-
-  // ATOMOS v2.0: Apply advanced security headers
-  app.use(securityHeaders);
-
-  // ATOMOS v2.0: Apply adaptive rate limiting
-  app.use(adaptiveRateLimit);
 
   // Initialize default admin user
   try {
@@ -185,217 +172,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
-
-  // ✅ PERFORMANCE OPTIMIZATION: Async Data Reconciliation Endpoint
-  app.post("/api/system/data-reconciliation", authMiddleware, async (req, res) => {
-    try {
-      console.log("🚀 PERFORMANCE: Starting ASYNC comprehensive data reconciliation...");
-
-      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
-      const asyncService = AsyncReconciliationService.getInstance();
-
-      // Extract configuration from request body
-      const config = {
-        batchSize: req.body.batchSize || 10,
-        maxConcurrency: req.body.maxConcurrency || 2,
-        delayBetweenBatches: req.body.delayBetweenBatches || 500,
-        includeOrphanedPayments: req.body.includeOrphanedPayments !== false,
-        includeAllocationConsistency: req.body.includeAllocationConsistency !== false,
-        includeDebtRecalculation: req.body.includeDebtRecalculation !== false
-      };
-
-      // Start async reconciliation
-      const jobId = await asyncService.startAsyncReconciliation(config);
-
-      console.log(`✅ PERFORMANCE: Async reconciliation started with job ID: ${jobId}`);
-
-      res.status(202).json({
-        success: true,
-        message: "تطبیق داده‌ها آغاز شد - لطفاً پیشرفت را پیگیری کنید",
-        jobId: jobId,
-        statusUrl: `/api/system/reconciliation-status/${jobId}`,
-        resultUrl: `/api/system/reconciliation-result/${jobId}`,
-        config: config,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error("❌ PERFORMANCE: Async reconciliation startup error:", error);
-      res.status(500).json({
-        success: false,
-        message: "خطا در شروع تطبیق داده‌ها",
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-
-  // ✅ PERFORMANCE OPTIMIZATION: Job Status Endpoint
-  app.get("/api/system/reconciliation-status/:jobId", authMiddleware, async (req, res) => {
-    try {
-      const { jobId } = req.params;
-
-      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
-      const asyncService = AsyncReconciliationService.getInstance();
-
-      const jobStatus = asyncService.getJobStatus(jobId);
-
-      if (!jobStatus) {
-        return res.status(404).json({
-          success: false,
-          message: "کار مورد نظر یافت نشد",
-          error: `Job ${jobId} not found`
-        });
-      }
-
-      // Calculate estimated time remaining
-      const { AsyncJobManager } = await import('./services/async-job-manager.js');
-      const jobManager = AsyncJobManager.getInstance();
-      const estimatedTimeRemaining = jobManager.estimateTimeRemaining(jobId);
-
-      res.json({
-        success: true,
-        job: jobStatus,
-        estimatedTimeRemaining: estimatedTimeRemaining,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error("❌ PERFORMANCE: Job status error:", error);
-      res.status(500).json({
-        success: false,
-        message: "خطا در دریافت وضعیت کار",
-        error: error.message
-      });
-    }
-  });
-
-  // ✅ PERFORMANCE OPTIMIZATION: Job Result Endpoint
-  app.get("/api/system/reconciliation-result/:jobId", authMiddleware, async (req, res) => {
-    try {
-      const { jobId } = req.params;
-
-      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
-      const asyncService = AsyncReconciliationService.getInstance();
-
-      const jobStatus = asyncService.getJobStatus(jobId);
-
-      if (!jobStatus) {
-        return res.status(404).json({
-          success: false,
-          message: "کار مورد نظر یافت نشد",
-          error: `Job ${jobId} not found`
-        });
-      }
-
-      if (jobStatus.status !== 'completed') {
-        return res.status(202).json({
-          success: false,
-          message: "کار هنوز تکمیل نشده است",
-          status: jobStatus.status,
-          progress: jobStatus.progress
-        });
-      }
-
-      // Cache the result for dashboard data integrity status
-      if (jobStatus.result) {
-        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-        UnifiedFinancialEngine.batchCache.set('last_reconciliation_status', {
-          data: jobStatus.result,
-          timestamp: Date.now()
-        });
-      }
-
-      res.json({
-        success: true,
-        message: "تطبیق داده‌ها با موفقیت تکمیل شد",
-        results: jobStatus.result,
-        dataIntegrityStatus: jobStatus.result?.finalDataIntegrityStatus,
-        job: {
-          id: jobStatus.id,
-          status: jobStatus.status,
-          startedAt: jobStatus.startedAt,
-          completedAt: jobStatus.completedAt
-        },
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error("❌ PERFORMANCE: Job result error:", error);
-      res.status(500).json({
-        success: false,
-        message: "خطا در دریافت نتیجه کار",
-        error: error.message
-      });
-    }
-  });
-
-  // ✅ PERFORMANCE OPTIMIZATION: Cancel Job Endpoint
-  app.delete("/api/system/reconciliation-job/:jobId", authMiddleware, async (req, res) => {
-    try {
-      const { jobId } = req.params;
-
-      const { AsyncReconciliationService } = await import('./services/async-reconciliation-service.js');
-      const asyncService = AsyncReconciliationService.getInstance();
-
-      const cancelled = asyncService.cancelJob(jobId);
-
-      if (cancelled) {
-        res.json({
-          success: true,
-          message: "کار با موفقیت لغو شد",
-          jobId: jobId
-        });
-      } else {
-        res.status(400).json({
-          success: false,
-          message: "امکان لغو کار وجود ندارد",
-          error: "Job is not in a cancellable state"
-        });
-      }
-
-    } catch (error) {
-      console.error("❌ PERFORMANCE: Job cancellation error:", error);
-      res.status(500).json({
-        success: false,
-        message: "خطا در لغو کار",
-        error: error.message
-      });
-    }
-  });
-
-  // ✅ PERFORMANCE OPTIMIZATION: Active Jobs List Endpoint
-  app.get("/api/system/reconciliation-jobs", authMiddleware, async (req, res) => {
-    try {
-      const { AsyncJobManager } = await import('./services/async-job-manager.js');
-      const jobManager = AsyncJobManager.getInstance();
-
-      const limit = parseInt(req.query.limit as string) || 10;
-      const activeJobs = jobManager.getActiveJobs();
-      const recentJobs = jobManager.getRecentJobs(limit);
-
-      res.json({
-        success: true,
-        activeJobs: activeJobs,
-        recentJobs: recentJobs,
-        totalActive: activeJobs.length,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error("❌ PERFORMANCE: Jobs list error:", error);
-      res.status(500).json({
-        success: false,
-        message: "خطا در دریافت لیست کارها",
-        error: error.message
-      });
-    }
-  });
-
-  // ATOMOS v2.0: Register Advanced System Routes
-  app.use('/api/system', advancedSystemRoutes);
-
-  console.log('✅ ATOMOS v2.0: Advanced system routes registered successfully');
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
@@ -498,116 +274,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).authenticated = true;
       (req.session as any).userId = adminUser.id;
       (req.session as any).username = adminUser.username;
-
-
-// ✅ ATOMOS v36.0: Enhanced Portal Endpoint - Returns ALL payments with proper status
-app.get('/api/public/portal/:publicId', async (req, res) => {
-  try {
-    const { publicId } = req.params;
-    console.log(`🚀 ATOMOS PORTAL v36.0: Enhanced portal request for publicId: ${publicId}`);
-
-    // Get representative by publicId
-    const [representative] = await db.select({
-      id: representatives.id,
-      name: representatives.name,
-      code: representatives.code,
-      panelUsername: representatives.panelUsername,
-      ownerName: representatives.ownerName,
-      credit: representatives.credit,
-      totalDebt: representatives.totalDebt,
-      totalSales: representatives.totalSales
-    }).from(representatives).where(eq(representatives.publicId, publicId));
-
-    if (!representative) {
-      return res.status(404).json({ error: 'نماینده یافت نشد' });
-    }
-
-    console.log(`✅ ATOMOS: Representative found: ${representative.name} (${representative.code})`);
-
-    // Get all invoices
-    const invoicesData = await db.select({
-      id: invoices.id,
-      invoiceNumber: invoices.invoiceNumber,
-      amount: invoices.amount,
-      issueDate: invoices.issueDate,
-      dueDate: invoices.dueDate,
-      status: invoices.status,
-      usageData: invoices.usageData,
-      createdAt: invoices.createdAt
-    }).from(invoices)
-    .where(eq(invoices.representativeId, representative.id))
-    .orderBy(invoices.issueDate, invoices.createdAt);
-
-    // ✅ CRITICAL FIX: Get ALL payments (both allocated and unallocated)
-    const paymentsData = await db.select({
-      id: payments.id,
-      amount: payments.amount,
-      paymentDate: payments.paymentDate,
-      description: payments.description,
-      createdAt: payments.createdAt,
-      isAllocated: payments.isAllocated,
-      invoiceId: payments.invoiceId
-    }).from(payments)
-    .where(eq(payments.representativeId, representative.id))
-    .orderBy(desc(payments.paymentDate));
-
-    // ✅ Enhanced financial calculations
-    const totalSales = invoicesData.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
-    const totalAllocatedPayments = paymentsData
-      .filter(p => p.isAllocated)
-      .reduce((sum, pay) => sum + parseFloat(pay.amount), 0);
-    const totalUnallocatedPayments = paymentsData
-      .filter(p => !p.isAllocated)
-      .reduce((sum, pay) => sum + parseFloat(pay.amount), 0);
-
-    const actualDebt = Math.max(0, totalSales - totalAllocatedPayments);
-
-    // ✅ Enhanced payment data with status information
-    const enhancedPayments = paymentsData.map(payment => ({
-      ...payment,
-      statusText: payment.isAllocated ? 'تخصیص یافته' : 'تخصیص نیافته',
-      statusColor: payment.isAllocated ? 'green' : 'orange'
-    }));
-
-    console.log(`📊 ATOMOS PORTAL: Enhanced calculations: {
-      totalSales: ${totalSales},
-      totalAllocatedPayments: ${totalAllocatedPayments},
-      totalUnallocatedPayments: ${totalUnallocatedPayments},
-      actualDebt: ${actualDebt},
-      invoiceCount: ${invoicesData.length},
-      totalPaymentCount: ${paymentsData.length},
-      allocatedPaymentCount: ${paymentsData.filter(p => p.isAllocated).length},
-      unallocatedPaymentCount: ${paymentsData.filter(p => !p.isAllocated).length}
-    }`);
-
-    res.json({
-      name: representative.name,
-      panelUsername: representative.panelUsername,
-      totalSales: totalSales.toString(),
-      totalDebt: actualDebt.toString(),
-      credit: representative.credit || '0',
-      invoices: invoicesData,
-      payments: enhancedPayments,
-      financialMeta: {
-        totalSales,
-        totalAllocatedPayments,
-        totalUnallocatedPayments,
-        actualDebt,
-        paymentRatio: totalSales > 0 ? (totalAllocatedPayments / totalSales) * 100 : 0,
-        debtLevel: actualDebt === 0 ? 'HEALTHY' : actualDebt > 500000 ? 'CRITICAL' : 'MODERATE',
-        lastCalculation: new Date().toISOString(),
-        accuracyGuaranteed: true,
-        enhancedPortal: true
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ ATOMOS PORTAL ERROR:', error);
-    res.status(500).json({ error: 'خطا در دریافت اطلاعات پرتال' });
-  }
-});
-
-
       (req.session as any).role = adminUser.role || 'ADMIN';
       (req.session as any).permissions = adminUser.permissions || [];
       (req.session as any).user = adminUser; // Store full user object for easier access
@@ -832,7 +498,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     }
   });
 
-  // SHERLOCK v32.0: Representatives moved to unified financial routes
+  // SHERLOCK v18.4: Debtor Representatives moved to unified financial routes
   // Available at: /api/unified-financial/debtors
 
   // Real-time Data Synchronization API - SHERLOCK v1.0 Core Feature
@@ -911,51 +577,44 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     try {
       console.log('🔍 SHERLOCK v32.2: Fetching representatives data with optimized batch processing');
 
-      // ✅ PERFORMANCE FIX: Disable timeout for batch operations
+      // SHERLOCK v32.2: Error boundary for large datasets
       const startTime = Date.now();
-      console.log('🚀 PERFORMANCE: Enhanced representatives query (timeout disabled)');
+      const timeout = 30000; // 30 second timeout
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), timeout);
+      });
 
       // Get base representatives data
       const representatives = await storage.getRepresentatives();
 
-      // ✅ ATOMOS v2.0: BATCH CALCULATION - ELIMINATING N+1 QUERIES
-      console.log('🚀 ATOMOS v2.0: Using BATCH calculation to eliminate N+1 queries...');
-      const batchStartTime = performance.now();
+      // ✅ SHERLOCK v32.0: Enhanced with real-time financial calculations
+      const enhancedRepresentatives = await Promise.all(
+        representatives.map(async (rep) => {
+          try {
+            // Get real-time financial data from unified engine
+            const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
 
-      // Use optimized batch calculation instead of individual queries
-      const allFinancialData = await unifiedFinancialEngine.calculateAllRepresentatives();
-
-      // Create lookup map for O(1) access
-      const financialDataMap = new Map(allFinancialData.map(data => [data.id, data]));
-
-      // Enhanced representatives with batch-calculated financial data
-      const enhancedRepresentatives = representatives.map(rep => {
-        const financialData = financialDataMap.get(rep.id);
-
-        if (financialData) {
-          return {
-            ...rep,
-            // ✅ Override stored debt with batch-calculated debt
-            totalDebt: financialData.totalDebt.toString(),
-            totalSales: financialData.totalSales.toString(),
-            // Additional real-time data for UI
-            financialData: {
-              actualDebt: financialData.totalDebt,
-              paymentRatio: financialData.totalSales > 0 ? (financialData.totalPaid / financialData.totalSales) * 100 : 0,
-              debtLevel: financialData.debtLevel,
-              lastSync: new Date().toISOString()
-            }
-          };
-        }
-
-        // Fallback to stored data if batch calculation didn't include this rep
-        console.warn(`⚠️ ATOMOS v2.0: No batch data for rep ${rep.id}, using stored data`);
-        return rep;
-      });
-
-      const batchEndTime = performance.now();
-      const batchProcessingTime = Math.round(batchEndTime - batchStartTime);
-      console.log(`✅ ATOMOS v2.0: BATCH PROCESSING completed in ${batchProcessingTime}ms - N+1 ELIMINATED!`);
+            return {
+              ...rep,
+              // ✅ Override stored debt with calculated debt
+              totalDebt: financialData.actualDebt.toString(),
+              totalSales: financialData.totalSales.toString(),
+              // Additional real-time data for UI
+              financialData: {
+                actualDebt: financialData.actualDebt,
+                paymentRatio: financialData.paymentRatio,
+                debtLevel: financialData.debtLevel,
+                lastSync: financialData.calculationTimestamp
+              }
+            };
+          } catch (error) {
+            console.warn(`⚠️ SHERLOCK v32.0: Failed to calculate financial data for rep ${rep.id}:`, error);
+            // Fallback to stored data if calculation fails
+            return rep;
+          }
+        })
+      );
 
       console.log(`✅ SHERLOCK v32.0: Enhanced ${enhancedRepresentatives.length} representatives with real-time financial data`);
       res.json(enhancedRepresentatives);
@@ -1111,203 +770,149 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     }
   });
 
-  // Public Portal API - ATOMOS OPTIMIZED VERSION
-  // ✅ ATOMOS PHASE 7: بهینه‌سازی کامل پرتال با batch processing
+  // Public Portal API
+  // ✅ SHERLOCK v32.0: Portal endpoint using Unified Financial Engine for consistency
   app.get("/api/public/portal/:publicId", async (req, res) => {
-    const portalStartTime = performance.now();
-
     try {
       const { publicId } = req.params;
 
-      console.log('🚀 ATOMOS PORTAL v2.0: Optimized portal request initiated');
+      console.log('=== SHERLOCK v32.1 PORTAL REQUEST ===');
       console.log('publicId:', publicId);
+      console.log('Request URL:', req.url);
+      console.log('Request IP:', req.ip);
+      console.log('User Agent:', req.get('User-Agent')?.slice(0, 100));
 
-      // Fast validation with timeout protection
+      // Basic validation
       if (!publicId || publicId.trim() === '') {
-        console.log('❌ Invalid publicId - immediate rejection');
+        console.log('❌ Invalid publicId - empty or null');
         return res.status(400).json({
           error: 'شناسه پرتال نامعتبر است',
           details: 'publicId خالی یا نامعتبر'
         });
       }
 
-      // ✅ ATOMOS OPTIMIZATION 1: Single query with timeout protection
-      const portalDataPromise = Promise.race([
-        db.select({
-          id: representatives.id,
-          name: representatives.name,
-          code: representatives.code,
-          panelUsername: representatives.panelUsername,
-          ownerName: representatives.ownerName,
-          credit: representatives.credit,
-          totalDebt: representatives.totalDebt,
-          totalSales: representatives.totalSales
-        }).from(representatives).where(eq(representatives.publicId, publicId)).limit(1),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Portal query timeout')), 3000)
-        )
-      ]);
+      // Find representative by publicId
+      console.log('🔍 Searching for representative with publicId:', publicId);
+      const representative = await db.select().from(representatives).where(eq(representatives.publicId, publicId)).limit(1);
 
-      const representativeResult = await portalDataPromise;
-
-      if (!Array.isArray(representativeResult) || !representativeResult.length) {
+      if (!representative.length) {
         console.log('❌ Representative not found for publicId:', publicId);
+        console.log('🔍 Checking if any representatives exist...');
+
+        // Additional debugging - check if any representatives exist at all
+        const totalReps = await db.select().from(representatives).limit(5);
+        console.log('Sample representatives:', totalReps.map(r => ({ id: r.id, code: r.code, publicId: r.publicId })));
+
         return res.status(404).json({
           error: 'نماینده یافت نشد',
           details: `پرتالی با شناسه "${publicId}" در سیستم موجود نیست`,
           publicId: publicId
         });
       }
+      const rep = representative[0];
 
-      const representative = representativeResult[0];
-      console.log(`✅ ATOMOS: Representative found: ${representative.name} (${representative.code})`);
-
-      // ✅ ATOMOS OPTIMIZATION 2: Parallel batch queries with timeout
-      const batchDataPromise = Promise.race([
-        Promise.all([
-          // Batch query 1: All invoices for this representative
-          db.select({
-            id: invoices.id,
-            invoiceNumber: invoices.invoiceNumber,
-            amount: invoices.amount,
-            issueDate: invoices.issueDate,
-            dueDate: invoices.dueDate,
-            status: invoices.status,
-            usageData: invoices.usageData,
-            createdAt: invoices.createdAt
-          }).from(invoices)
-          .where(eq(invoices.representativeId, representative.id))
-          .orderBy(invoices.issueDate, invoices.createdAt),
-
-          // Batch query 2: Only ALLOCATED payments for this representative (matching Unified Financial Engine)
-          db.select({
-            id: payments.id,
-            amount: payments.amount,
-            paymentDate: payments.paymentDate,
-            description: payments.description,
-            createdAt: payments.createdAt,
-            isAllocated: payments.isAllocated
-          }).from(payments)
-          .where(and(
-            eq(payments.representativeId, representative.id),
-            eq(payments.isAllocated, true)
-          ))
-          .orderBy(desc(payments.paymentDate))
-        ]),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Portal data timeout')), 2000)
-        )
-      ]);
-
-      const [invoiceData, paymentData] = await batchDataPromise;
-
-      // ✅ ATOMOS OPTIMIZATION 3: Direct financial calculation from data & PORTAL MIRROR
-      const unifiedFinancialData = await unifiedFinancialEngine.calculateRepresentative(representative.id);
-
-      const mirroredTotalSales = parseFloat(unifiedFinancialData.totalSales) || 0;
-      const mirroredTotalPaid = unifiedFinancialData.totalPaid || 0;
-      const mirroredActualDebt = Math.max(0, mirroredTotalSales - mirroredTotalPaid);
-
-      const paymentRatio = mirroredTotalSales > 0 ? (mirroredTotalPaid / mirroredTotalSales) * 100 : 0;
-      let debtLevel: string;
-      if (mirroredActualDebt === 0) debtLevel = 'HEALTHY';
-      else if (mirroredActualDebt <= 100000) debtLevel = 'MODERATE';
-      else if (mirroredActualDebt <= 500000) debtLevel = 'HIGH';
-      else debtLevel = 'CRITICAL';
-
-      // ✅ PORTAL MIRROR: Initial calculation for fallback
-      const totalSales = invoiceData.reduce((sum, invoice) => sum + parseFloat(invoice.amount), 0);
-      const totalPaid = paymentData.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-      const actualDebt = Math.max(0, totalSales - totalPaid);
-
-      console.log('📊 PORTAL MIRROR: Initial calculations:', {
-        totalSales,
-        totalPaid,
-        actualDebt,
-        invoiceCount: invoiceData.length,
-        paymentCount: paymentData.length
+      // ✅ SHERLOCK v32.1: استفاده از Unified Financial Engine برای محاسبات دقیق
+      const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
+      console.log(`🔍 Portal: Financial data for ${rep.code}:`, {
+        totalSales: financialData.totalSales,
+        actualDebt: financialData.actualDebt,
+        totalPaid: financialData.totalPaid
       });
 
-      // ✅ ATOMOS OPTIMIZATION 4: Minimal settings with fallbacks
+      const invoices = await storage.getInvoicesByRepresentative(rep.id);
+      const payments = await storage.getPaymentsByRepresentative(rep.id);
+
+      // Fetch portal customization settings
+      const [
+        portalTitle,
+        portalDescription,
+        showOwnerName,
+        showDetailedUsage,
+        customCss,
+        showUsageDetails,
+        showEventTimestamp,
+        showEventType,
+        showDescription,
+        showAdminUsername
+      ] = await Promise.all([
+        storage.getSetting('portal_title'),
+        storage.getSetting('portal_description'),
+        storage.getSetting('portal_show_owner_name'),
+        storage.getSetting('portal_show_detailed_usage'),
+        storage.getSetting('portal_custom_css'),
+        storage.getSetting('invoice_show_usage_details'),
+        storage.getSetting('invoice_show_event_timestamp'),
+        storage.getSetting('invoice_show_event_type'),
+        storage.getSetting('invoice_show_description'),
+        storage.getSetting('invoice_show_admin_username')
+      ]);
+
       const portalConfig = {
-        title: 'پرتال عمومی نماینده',
-        description: 'مشاهده وضعیت مالی و فاکتورهای شما',
-        showOwnerName: true,
-        showDetailedUsage: true,
-        customCss: '',
-        showUsageDetails: true,
-        showEventTimestamp: true,
-        showEventType: true,
-        showDescription: true,
-        showAdminUsername: true
+        title: portalTitle?.value || 'پرتال عمومی نماینده',
+        description: portalDescription?.value || 'مشاهده وضعیت مالی و فاکتورهای شما',
+        showOwnerName: showOwnerName?.value === 'true',
+        showDetailedUsage: showDetailedUsage?.value === 'true',
+        customCss: customCss?.value || '',
+
+        // Invoice display settings
+        showUsageDetails: showUsageDetails?.value === 'true',
+        showEventTimestamp: showEventTimestamp?.value === 'true',
+        showEventType: showEventType?.value === 'true',
+        showDescription: showDescription?.value === 'true',
+        showAdminUsername: showAdminUsername?.value === 'true'
       };
 
-      // ✅ ATOMOS: Direct data processing without additional queries
-      const sortedInvoices = invoiceData.sort((a, b) => {
+      // SHERLOCK v11.5: Sort invoices by FIFO principle (oldest first)
+      const sortedInvoices = invoices.sort((a, b) => {
         const dateA = new Date(a.issueDate || a.createdAt);
         const dateB = new Date(b.issueDate || b.createdAt);
         return dateA.getTime() - dateB.getTime(); // FIFO: Oldest first
       });
 
-      const sortedPayments = paymentData.sort((a, b) => {
-        const dateA = new Date(a.paymentDate);
-        const dateB = new Date(b.paymentDate);
-        return dateB.getTime() - dateA.getTime();
-      });
+      // ✅ SHERLOCK v32.1: ارسال داده‌های استاندارد با تضمین دقت 100%
+      const publicData = {
+        name: rep.name,
+        code: rep.code,
+        panelUsername: rep.panelUsername,
+        ownerName: rep.ownerName,
+        // ✅ داده‌های مالی استاندارد از Unified Financial Engine
+        totalDebt: financialData.actualDebt.toString(),
+        totalSales: financialData.totalSales.toString(),
+        credit: rep.credit,
+        portalConfig,
+        invoices: sortedInvoices.map(inv => ({
+          invoiceNumber: inv.invoiceNumber,
+          amount: inv.amount,
+          issueDate: inv.issueDate,
+          dueDate: inv.dueDate,
+          status: inv.status,
+          usageData: inv.usageData, // Include usage data for detailed view
+          createdAt: inv.createdAt
+        })),
+        payments: payments.map(pay => ({
+          amount: pay.amount,
+          paymentDate: pay.paymentDate,
+          description: pay.description
+        })).sort((a, b) => {
+          const dateA = new Date(a.paymentDate);
+          const dateB = new Date(b.paymentDate);
+          return dateB.getTime() - dateA.getTime();
+        }),
 
-      const credit = Math.max(0, mirroredTotalPaid - mirroredTotalSales);
-
-      res.json({
-        name: representative.name,
-        panelUsername: representative.panelUsername,
-        totalSales: mirroredTotalSales.toString(),
-        totalDebt: mirroredActualDebt.toString(),
-        credit: credit.toString(),
-        invoices: sortedInvoices,
-        payments: sortedPayments,
-        config: portalConfig,
-
-        // ✅ ATOMOS: Include unified financial metadata
-        financialMeta: unifiedFinancialData ? {
-          totalSales: mirroredTotalSales,
-          totalPaid: mirroredTotalPaid,
-          actualDebt: mirroredActualDebt,
-          paymentRatio: paymentRatio,
-          debtLevel: debtLevel,
-          lastCalculation: unifiedFinancialData.calculationTimestamp,
-          accuracyGuaranteed: unifiedFinancialData.accuracyGuaranteed || true,
-          mirrorSource: 'UNIFIED_FINANCIAL_ENGINE'
-        } : null,
-
-        // ✅ ATOMOS v2.0: Enhanced metadata for frontend optimization
-        meta: {
-          recordCount: sortedInvoices.length + sortedPayments.length,
-          lastUpdated: new Date().toISOString(),
-          dataFreshness: Date.now() - portalStartTime,
-          optimizationLevel: 'ATOMOS_v2.0_PORTAL_MIRROR_OPTIMIZED',
-          mirrorApplied: !!unifiedFinancialData
+        // ✅ اطلاعات اضافی برای نمایش در پرتال
+        financialMeta: {
+          paymentRatio: financialData.paymentRatio,
+          debtLevel: financialData.debtLevel,
+          lastCalculation: financialData.calculationTimestamp,
+          accuracyGuaranteed: financialData.accuracyGuaranteed
         }
-      });
+      };
+
+      // ✅ استفاده از داده‌های محاسبه شده از Unified Financial Engine
+      res.json(publicData);
     } catch (error) {
-      const processingTime = performance.now() - portalStartTime;
-      console.error(`❌ ATOMOS PORTAL ERROR after ${Math.round(processingTime)}ms:`, error);
-
-      // Enhanced error response with fallback data
-      if (error.message.includes('timeout')) {
-        return res.status(504).json({
-          error: "زمان پاسخ سرور به پایان رسید",
-          details: "سرور در زمان مقرر پاسخ نداد، لطفاً مجدداً تلاش کنید",
-          errorType: "TIMEOUT",
-          processingTime: Math.round(processingTime)
-        });
-      }
-
-      res.status(500).json({
-        error: "خطا در دریافت اطلاعات پورتال",
-        details: process.env.NODE_ENV === 'development' ? error.message : "خطای داخلی سرور",
-        errorType: "INTERNAL_ERROR",
-        processingTime: Math.round(processingTime)
-      });
+      console.error('Portal API error:', error);
+      res.status(500).json({ error: "خطا در دریافت اطلاعات پورتال" });
     }
   });
 
@@ -1433,10 +1038,10 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   app.get("/api/allocation/metrics", authMiddleware, async (req, res) => {
     try {
       console.log('📊 SHERLOCK v35.0: Fetching allocation metrics');
-
+      
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const metrics = await AllocationMonitoringService.calculateGlobalMetrics();
-
+      
       res.json({
         success: true,
         data: metrics,
@@ -1452,10 +1057,10 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     try {
       const days = parseInt(req.query.days as string) || 30;
       console.log(`📈 SHERLOCK v35.0: Fetching allocation trends for ${days} days`);
-
+      
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const trends = await AllocationMonitoringService.analyzeTrends(days);
-
+      
       res.json({
         success: true,
         data: trends,
@@ -1471,10 +1076,10 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   app.get("/api/allocation/alerts", authMiddleware, async (req, res) => {
     try {
       console.log('🚨 SHERLOCK v35.0: Generating allocation alerts');
-
+      
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const alerts = await AllocationMonitoringService.generateAlerts();
-
+      
       res.json({
         success: true,
         data: alerts,
@@ -1491,10 +1096,10 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   app.get("/api/allocation/monitoring-report", authMiddleware, async (req, res) => {
     try {
       console.log('📋 SHERLOCK v35.0: Generating comprehensive monitoring report');
-
+      
       const { AllocationMonitoringService } = await import('./services/allocation-monitoring-service.js');
       const report = await AllocationMonitoringService.generateMonitoringReport();
-
+      
       res.json({
         success: true,
         data: report,
@@ -1592,17 +1197,6 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     try {
       const { representativeId, amount, paymentDate, description, selectedInvoiceId } = req.body;
 
-      // ✅ DEBUG: Log received values from frontend
-      console.log(`🔍 DEBUG POST /api/payments received:`, {
-        representativeId,
-        amount,
-        paymentDate,
-        description,
-        selectedInvoiceId,
-        selectedInvoiceIdType: typeof selectedInvoiceId,
-        selectedInvoiceIdValue: JSON.stringify(selectedInvoiceId)
-      });
-
       // Basic validation
       if (!representativeId || !amount || !paymentDate) {
         return res.status(400).json({ error: "فیلدهای ضروری ناقص است" });
@@ -1622,40 +1216,26 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
       console.log(`📅 تطبیق تاریخ: ورودی="${paymentDate}" -> عادی‌سازی شده="${normalizedPaymentDate}"`);
 
-      // ✅ TITAN-O FIXED: Corrected allocation logic for manual allocation
+      // ✅ SHERLOCK v33.2: ENHANCED ALLOCATION LOGIC WITH FINANCIAL SYNC
       let isAllocated = false;
       let invoiceId = null;
       let finalPaymentStatus = null;
 
       // Determine allocation status before creating payment
-      console.log(`🎯 DEBUG ALLOCATION LOGIC: selectedInvoiceId="${selectedInvoiceId}", type=${typeof selectedInvoiceId}, conditions:`, {
-        "selectedInvoiceId": selectedInvoiceId,
-        "truthy": !!selectedInvoiceId,
-        "not_auto": selectedInvoiceId !== "auto",
-        "not_empty": selectedInvoiceId !== "",
-        "equals_auto": selectedInvoiceId === "auto"
-      });
-
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
-        // ✅ CRITICAL FIX: For manual allocation, set isAllocated=true and invoiceId correctly
-        isAllocated = true;
-        invoiceId = parseInt(selectedInvoiceId);
-        console.log(`💰 TITAN-O FIXED: Manual allocation - Payment will be allocated to Invoice ${selectedInvoiceId} (parsed as ${invoiceId})`);
+        // For manual allocation, start as unallocated and update after successful allocation
+        isAllocated = false; // Will be updated after successful allocation
+        invoiceId = null;    // Will be set after successful allocation
+        console.log(`💰 SHERLOCK v33.2: Manual allocation planned - Payment to Invoice ${selectedInvoiceId}`);
       } else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v35.1: UNIFIED Auto-allocation planneded for Representative ${representativeId}`);
+        console.log(`🔄 SHERLOCK v34.0: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
         // Auto-allocation will be performed using Enhanced Payment Allocation Engine
         isAllocated = false; // Start as unallocated, will be updated after auto-allocation
         invoiceId = null;
-        console.log(`🎯 SHERLOCK v35.1: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
-      } else {
-        console.log(`⚠️ DEBUG: No allocation condition met - defaulting to unallocated`, {
-          selectedInvoiceId,
-          isAllocated: false,
-          invoiceId: null
-        });
+        console.log(`🎯 SHERLOCK v34.0: UNIFIED Auto-allocation planned for Representative ${representativeId}`);
       }
 
-      // Create the payment with correct allocation status
+      // Create the payment initially as unallocated for manual assignments
       const newPayment = await storage.createPayment({
         representativeId,
         amount,
@@ -1667,102 +1247,75 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
       finalPaymentStatus = newPayment; // Initialize with the newly created payment
 
-      // ✅ TITAN-O FIXED: Manual allocation logic - only update invoice status since payment is already correctly linked
+      // ✅ SHERLOCK v34.0: UNIFIED ALLOCATION - استفاده انحصاری از Enhanced Payment Allocation Engine
       if (selectedInvoiceId && selectedInvoiceId !== "auto" && selectedInvoiceId !== "") {
-        console.log(`💰 TITAN-O FIXED: Manual allocation - Payment ${newPayment.id} created with Invoice ${selectedInvoiceId} link`);
+        console.log(`💰 SHERLOCK v34.0: Executing UNIFIED manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
 
         try {
-          // Update invoice status based on new payment allocation
-          await storage.updateInvoiceStatusAfterAllocation(parseInt(selectedInvoiceId));
+          // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص دستی
+          const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+          const allocationResult = await enhancedPaymentAllocationEngine.manualAllocatePayment(
+            newPayment.id,
+            parseInt(selectedInvoiceId),
+            parseFloat(amount),
+            'ADMIN_USER' // یا شناسه کاربری واقعی
+          );
 
-          finalPaymentStatus = newPayment;
-          console.log(`✅ TITAN-O FIXED: Manual allocation completed successfully`);
+          if (!allocationResult.success) {
+            throw new Error(`Manual allocation failed: ${allocationResult.errors.join(', ')}`);
+          }
 
-          // Create activity log for manual allocation
-          await storage.createActivityLog({
-            type: 'payment_manual_allocation_direct',
-            description: `تخصیص دستی پرداخت ${newPayment.id} به فاکتور ${selectedInvoiceId} - مبلغ: ${amount} تومان`,
-            relatedId: newPayment.id,
-            metadata: {
-              paymentId: newPayment.id,
-              invoiceId: parseInt(selectedInvoiceId),
-              representativeId,
-              allocatedAmount: parseFloat(amount),
-              allocationMethod: 'DIRECT_MANUAL',
-              timestamp: new Date().toISOString()
-            }
+          // بروزرسانی وضعیت پرداخت
+          finalPaymentStatus = await storage.updatePayment(newPayment.id, {
+            isAllocated: true,
+            invoiceId: parseInt(selectedInvoiceId)
           });
 
+          console.log(`✅ SHERLOCK v34.0: UNIFIED manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
+
         } catch (allocationError) {
-          console.error(`❌ TITAN-O: Manual allocation error:`, allocationError);
-          finalPaymentStatus = newPayment;
+          console.error(`❌ SHERLOCK v34.0: UNIFIED manual allocation failed:`, allocationError);
+          throw new Error(`خطا در تخصیص دستی یکپارچه: ${allocationError.message}`);
         }
       } else if (selectedInvoiceId === "auto") {
           console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation for Representative ${representativeId}`);
 
           try {
-            // 🎯 SHERLOCK v34.0: UNIFIED Auto-allocation with Enhanced Engine
-            const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
+            // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص خودکار
+            const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+            const allocationResult = await enhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
               method: 'FIFO',
               allowPartialAllocation: true,
               allowOverAllocation: false,
-              priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
-              strictValidation: true,
-              auditMode: true
+              priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
             });
 
-            if (allocationResult.success) {
-              console.log(`✅ SHERLOCK v34.0: Auto-allocation successful - ${allocationResult.allocatedAmount} allocated`);
+            if (allocationResult.success && allocationResult.allocatedAmount > 0) {
+              // دریافت وضعیت به‌روز شده پرداخت
+              const updatedPayments = await storage.getPaymentsByRepresentative(representativeId);
+              const thisPayment = updatedPayments.find(p => p.id === newPayment.id);
 
-              // ✅ Force cache invalidation after successful allocation
-              UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
-                cascadeGlobal: true,
-                reason: 'payment_allocation_success',
-                immediate: true,
-                includePortal: true
-              });
-
-              // ✅ Enhanced activity log for successful allocation
-              await storage.createActivityLog({
-                type: 'payment_auto_allocation_success',
-                description: `تخصیص خودکار پرداخت ${paymentId} موفق - مبلغ: ${allocationResult.allocatedAmount} تومان`,
-                relatedId: representativeId,
-                metadata: {
-                  paymentId,
-                  allocatedAmount: allocationResult.allocatedAmount,
-                  allocationsCount: allocationResult.allocations.length,
-                  transactionId: allocationResult.transactionId,
-                  engine: 'Enhanced Payment Allocation Engine v34.1'
-                }
-              });
+              finalPaymentStatus = thisPayment || newPayment;
+              console.log(`✅ SHERLOCK v34.0: UNIFIED auto-allocation successful - Payment ${newPayment.id} allocated ${allocationResult.allocatedAmount} تومان`);
+              console.log(`📋 SHERLOCK v34.0: Allocation details:`, allocationResult.allocations);
             } else {
-              console.log(`❌ SHERLOCK v34.0: Auto-allocation failed:`, allocationResult.errors);
-
-              await storage.createActivityLog({
-                type: 'payment_auto_allocation_failed',
-                description: `تخصیص خودکار پرداخت ${paymentId} ناموفق: ${allocationResult.errors.join(', ')}`,
-                relatedId: representativeId,
-                metadata: {
-                  paymentId,
-                  errors: allocationResult.errors,
-                  warnings: allocationResult.warnings,
-                  transactionId: allocationResult.transactionId,
-                  engine: 'Enhanced Payment Allocation Engine v34.1'
-                }
-              });
+              console.log(`⚠️ SHERLOCK v34.0: Auto-allocation completed but no allocation possible:`, allocationResult.warnings);
+              finalPaymentStatus = newPayment;
             }
-          } catch (allocationError) {
-            console.error('❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:', allocationError);
+          } catch (autoAllocationError) {
+            console.error(`❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:`, autoAllocationError);
+            // Keep payment as unallocated if auto-allocation fails
+            finalPaymentStatus = newPayment;
 
+            // Log detailed error for debugging
             await storage.createActivityLog({
-              type: 'payment_auto_allocation_failed',
-              description: `تخصیص خودکار پرداخت ${paymentId} ناموفق: ${allocationError.message}`,
+              type: "payment_auto_allocation_failed",
+              description: `تخصیص خودکار پرداخت ${newPayment.id} ناموفق: ${autoAllocationError.message}`,
               relatedId: representativeId,
               metadata: {
-                paymentId,
-                error: allocationError.message,
-                stack: allocationError.stack,
-                engine: 'Enhanced Payment Allocation Engine v34.1'
+                paymentId: newPayment.id,
+                error: autoAllocationError.message,
+                engine: "Enhanced Payment Allocation Engine"
               }
             });
           }
@@ -1772,30 +1325,23 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         console.log(`📝 SHERLOCK v33.2: Payment ${newPayment.id} created without allocation (manual later)`);
       }
 
-      // ✅ SHERLOCK v34.0: ATOMIC FINANCIAL SYNCHRONIZATION
-      // ✅ SHERLOCK v34.0: Force financial sync after payment creation
+      // ✅ SHERLOCK v33.2: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
+      console.log(`🔄 SHERLOCK v33.2: Starting comprehensive financial sync for representative ${representativeId}`);
+
+      // 1. Update representative financials
+      await storage.updateRepresentativeFinancials(representativeId);
+
+      // 2. Force invalidate financial engine cache for immediate UI updates
       try {
-        console.log('🔄 SHERLOCK v34.0: Starting ATOMIC financial sync for representative', representativeId);
-
-        // Get representative data for proper logging
-        const representative = await storage.getRepresentativeById(representativeId);
-        const representativeCode = representative?.code || `REP-${representativeId}`;
-
-        // Force cache invalidation for immediate sync
+        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
         UnifiedFinancialEngine.forceInvalidateRepresentative(representativeId, {
           cascadeGlobal: true,
           reason: 'payment_created',
-          immediate: true,
-          includePortal: true
+          immediate: true
         });
-
-        // Force debt recalculation
-        await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
-
-        console.log(`✅ SHERLOCK v34.0: Financial sync completed for representative ${representativeCode}`);
-      } catch (syncError) {
-        console.error('❌ SHERLOCK v34.0: Financial sync error:', syncError);
-        // Continue execution - sync error shouldn't fail payment creation
+        console.log(`✅ SHERLOCK v33.2: Financial cache invalidated for representative ${representativeId}`);
+      } catch (cacheError) {
+        console.warn(`⚠️ SHERLOCK v33.2: Cache invalidation warning:`, cacheError);
       }
 
       // Log final status for debugging
@@ -2108,7 +1654,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
         enhancedInvoices = enhancedInvoices.filter(invoice => invoice.status === statusFilter);
       }
 
-      // Apply telegram filter
+      // Apply telegram status filter
       if (telegramFilter && telegramFilter !== 'all') {
         if (telegramFilter === 'sent') {
           enhancedInvoices = enhancedInvoices.filter(invoice => invoice.sentToTelegram);
@@ -2118,7 +1664,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
       }
 
       // SHERLOCK v12.2: Apply Display sorting - newest invoices first for UI
-      // NOTE: This ONLY affects payment allocation (which uses FIFO)
+      // NOTE: This ONLY affects display order, not payment allocation (which uses FIFO)
       enhancedInvoices.sort((a, b) => {
         const dateA = new Date(a.issueDate || a.createdAt).getTime();
         const dateB = new Date(b.issueDate || b.createdAt).getTime();
@@ -2420,7 +1966,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   // فاز ۲: Payment Synchronization API Routes
 
   // Get unallocated payments API
-  app.get("/api/payments/unallocated", authMiddleware, async(req, res) => {
+  app.get("/api/payments/unallocated", authMiddleware, async (req, res) => {
     try {
       const representativeId = req.query.representativeId ? parseInt(req.query.representativeId as string) : undefined;
       const unallocatedPayments = await storage.getUnallocatedPayments(representativeId);
@@ -2502,7 +2048,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
       // Calculate total unpaid invoices for this representative
       const unpaidResult = await db.select({
-        totalDebt: sql<string>`COALESCE(SUM(amount), 0)`
+        totalDebt: sql<string>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
       }).from(invoices).where(
         and(
           eq(invoices.representativeId, representativeId),
@@ -2512,7 +2058,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
 
       // Calculate total sales (all invoices)
       const salesResult = await db.select({
-        totalSales: sql<string>`COALESCE(SUM(amount), 0)`
+        totalSales: sql<string>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
       }).from(invoices).where(eq(invoices.representativeId, representativeId));
 
       const actualTotalDebt = unpaidResult[0]?.totalDebt || "0";
@@ -2742,6 +2288,8 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   // All financial reconciliation now uses the standardized Financial Integrity Engine
   // Available at: /api/financial-integrity/representative/:id/reconcile
 
+
+
   // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use unified statistics endpoints instead
 
   // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use standardized payment processing endpoints
@@ -2878,7 +2426,8 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     }
   });
 
-  // AI Engine routes are integrated above in xAI Grok configuration section
+  // xAI Grok Assistant API
+  // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use /api/settings/xai-grok/test instead
 
   app.post("/api/ai/analyze-financial", authMiddleware, async (req, res) => {
     try {
@@ -3026,6 +2575,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
     }
   });
 
+  // Initialize default settings on first run
   // 🛠️ SHERLOCK v12.0: ENHANCED INVOICE EDIT ROUTE WITH DEBUG LOGGING
   app.post("/api/invoices/edit", authMiddleware, async (req, res) => {
     const debug = {
@@ -3567,6 +3117,11 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   // CRM Routes Integration
   // CRM routes are already registered via registerCrmRoutes() function
 
+  // AI Engine routes are integrated above in xAI Grok configuration section
+
+  // Initialize CRM real-time sync
+  // CRM data sync service removed for simplified system
+
   // Health check endpoint
   app.get("/health", (req, res) => {
     res.json({
@@ -3631,16 +3186,16 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
       // Get detailed invoice and payment info
       const invoicesData = await db.select({
         count: count(),
-        totalAmount: sql<number>`COALESCE(SUM(amount), 0)`,
-        unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue', 'partial') THEN amount ELSE 0 END), 0)`,
-        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0)`
+        totalAmount: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
+        unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue', 'partial') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'paid' THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
       }).from(invoices).where(eq(invoices.representativeId, representativeId));
 
       const paymentsData = await db.select({
         count: count(),
-        totalAmount: sql<number>`COALESCE(SUM(amount), 0)`,
-        allocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN amount ELSE 0 END), 0)`,
-        unallocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN amount ELSE 0 END), 0)`
+        totalAmount: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
+        allocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
+        unallocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
       }).from(payments).where(eq(payments.representativeId, representativeId));
 
       const invoice = invoicesData[0];
@@ -3727,7 +3282,7 @@ app.get('/api/public/portal/:publicId', async (req, res) => {
   // Real message sending to Telegram groups
   app.post("/api/telegram/send-to-group", authMiddleware, async (req, res) => {
     try {
-      const { message, groupId } = req.body;
+      const { message, groupId, messageType } = req.body;
 
       // Get bot credentials from settings
       const botTokenSetting = await storage.getSetting("telegram_bot_token");
