@@ -1509,16 +1509,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/payments/:id/allocate", authMiddleware, async (req, res) => {
     try {
-      const paymentId = parseInt(req.params.id);
-      const { invoiceId } = req.body;
-
-      const payment = await storage.allocatePaymentToInvoice(paymentId, invoiceId);
+      const id = parseInt(req.params.id);
+      const payment = await storage.allocatePaymentToInvoice(id, req.body.invoiceId);
       res.json(payment);
     } catch (error) {
       res.status(500).json({ error: "خطا در تخصیص پرداخت" });
     }
   });
 
+  // ✅ ATOMOS v2.0: Enhanced Payment Allocation Endpoints
+  app.post("/api/payments/allocate-auto", authMiddleware, async (req, res) => {
+    try {
+      const { paymentId, representativeId } = req.body;
+
+      console.log(`🔄 ATOMOS v2.0: Auto-allocation request for payment ${paymentId}, representative ${representativeId}`);
+
+      if (!paymentId) {
+        return res.status(400).json({ error: "Payment ID is required" });
+      }
+
+      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+      const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId);
+
+      if (result.success) {
+        // Force sync representative after successful allocation
+        if (representativeId) {
+          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+          await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
+        }
+
+        console.log(`✅ ATOMOS v2.0: Auto-allocation successful for payment ${paymentId}`);
+        res.json({
+          success: true,
+          message: "تخصیص خودکار با موفقیت انجام شد",
+          result
+        });
+      } else {
+        console.error(`❌ ATOMOS v2.0: Auto-allocation failed:`, result.errors);
+        res.status(400).json({
+          success: false,
+          error: "تخصیص خودکار ناموفق",
+          details: result.errors
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error in auto-allocation:", error);
+      res.status(500).json({ error: "خطا در تخصیص خودکار" });
+    }
+  });
+
+  app.post("/api/payments/allocate-manual", authMiddleware, async (req, res) => {
+    try {
+      const { paymentId, invoiceId, amount, representativeId } = req.body;
+
+      console.log(`🎯 ATOMOS v2.0: Manual allocation request - Payment: ${paymentId}, Invoice: ${invoiceId}, Amount: ${amount}`);
+
+      if (!paymentId || !invoiceId || !amount) {
+        return res.status(400).json({ error: "Payment ID, Invoice ID, and amount are required" });
+      }
+
+      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+      const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
+        paymentId, 
+        invoiceId, 
+        parseFloat(amount), 
+        'USER'
+      );
+
+      if (result.success) {
+        // Force sync representative after successful allocation
+        if (representativeId) {
+          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+          await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
+        }
+
+        console.log(`✅ ATOMOS v2.0: Manual allocation successful`);
+        res.json({
+          success: true,
+          message: "تخصیص دستی با موفقیت انجام شد",
+          result
+        });
+      } else {
+        console.error(`❌ ATOMOS v2.0: Manual allocation failed:`, result.errors);
+        res.status(400).json({
+          success: false,
+          error: "تخصیص دستی ناموفق", 
+          details: result.errors
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error in manual allocation:", error);
+      res.status(500).json({ error: "خطا در تخصیص دستی" });
+    }
+  });
+
+  app.post("/api/payments/deallocate", authMiddleware, async (req, res) => {
+    try {
+      const { paymentId, invoiceId, reason, representativeId } = req.body;
+
+      console.log(`🔄 ATOMOS v2.0: Deallocation request - Payment: ${paymentId}, Invoice: ${invoiceId}`);
+
+      if (!paymentId || !invoiceId) {
+        return res.status(400).json({ error: "Payment ID and Invoice ID are required" });
+      }
+
+      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+      const result = await EnhancedPaymentAllocationEngine.deallocatePayment(
+        paymentId, 
+        invoiceId, 
+        'USER',
+        reason || 'Manual deallocation'
+      );
+
+      if (result.success) {
+        // Force sync representative after successful deallocation
+        if (representativeId) {
+          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+          await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
+        }
+
+        console.log(`✅ ATOMOS v2.0: Deallocation successful`);
+        res.json({
+          success: true,
+          message: "لغو تخصیص با موفقیت انجام شد",
+          result
+        });
+      } else {
+        console.error(`❌ ATOMOS v2.0: Deallocation failed:`, result.errors);
+        res.status(400).json({
+          success: false,
+          error: "لغو تخصیص ناموفق",
+          details: result.errors
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error in deallocation:", error);
+      res.status(500).json({ error: "خطا در لغو تخصیص" });
+    }
+  });
 
   // AI Assistant API - Protected (SHERLOCK v1.0 Intelligent System)
   app.get("/api/ai/status", authMiddleware, async (req, res) => {

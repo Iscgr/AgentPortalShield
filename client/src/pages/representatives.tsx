@@ -199,6 +199,7 @@ interface Invoice {
   sentToTelegram: boolean;
   telegramSentAt?: string;
   usageData?: any;
+  createdAt: string; // Added for sorting
 }
 
 interface Payment {
@@ -208,6 +209,7 @@ interface Payment {
   description?: string;
   isAllocated: boolean;
   invoiceId?: number;
+  createdAt: string; // Added for sorting
 }
 
 // Form validation schema
@@ -2086,70 +2088,135 @@ function CreatePaymentDialog({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("auto");
   const [isLoading, setIsLoading] = useState(false);
 
-  // SHERLOCK v11.5: CRITICAL FIX - FIFO Auto-Allocation System (Oldest First)
+  // Get all invoices for the current representative, needed for the select dropdown
+  // Note: This assumes `representative` object has an `invoices` property populated
+  // If not, you might need to fetch invoices separately or ensure they are loaded with representative details.
+  const invoices = (representative as any).invoices || [];
+
+  // ✅ ATOMOS v2.0: تخصیص خودکار با API جدید
   const handleAutoAllocation = async (paymentAmount: number) => {
     try {
-      console.log('🔧 SHERLOCK v11.5 FIFO: Starting auto-allocation for oldest invoices first');
+      console.log('🔧 ATOMOS v2.0: Starting auto-allocation with new Enhanced Payment Allocation Engine');
 
-      // CRITICAL: Get unpaid invoices sorted by date (OLDEST FIRST - FIFO principle)
-      const unpaidInvoices = (representative as any).invoices?.filter(
-        (inv: any) => inv.status === 'unpaid' || inv.status === 'partial' || inv.status === 'overdue'
-      ).sort((a: any, b: any) => {
-        // FIFO: Oldest invoices first (ascending order by issue date)
-        const dateA = new Date(a.issueDate || a.createdAt).getTime();
-        const dateB = new Date(b.issueDate || b.createdAt).getTime();
-        return dateA - dateB; // Ascending: oldest first
-      }) || [];
-
-      console.log(`📊 FIFO Order: Processing ${unpaidInvoices.length} invoices from oldest to newest`);
-      if (unpaidInvoices.length > 0) {
-        console.log(`🔍 First invoice (oldest): ${unpaidInvoices[0].invoiceNumber} - ${unpaidInvoices[0].issueDate || unpaidInvoices[0].createdAt}`);
-        console.log(`🔍 Last invoice (newest): ${unpaidInvoices[unpaidInvoices.length-1].invoiceNumber} - ${unpaidInvoices[unpaidInvoices.length-1].issueDate || unpaidInvoices[unpaidInvoices.length-1].createdAt}`);
-      }
-
-      let remainingAmount = paymentAmount;
-      const allocations: Array<{invoiceId: number, amount: number, newStatus: string}> = [];
-
-      // Process invoices in FIFO order (oldest first)
-      for (const invoice of unpaidInvoices) {
-        if (remainingAmount <= 0) break;
-
-        console.log(`🔄 Processing invoice ${invoice.invoiceNumber} (${invoice.issueDate || invoice.createdAt}) - Amount: ${invoice.amount}`);
-
-        const invoiceAmount = parseFloat(invoice.amount);
-
-        // Get already paid amount for partial invoices
-        const alreadyPaidAmount = invoice.status === 'partial' 
-          ? await getCurrentlyPaidAmount(invoice.id)
-          : 0;
-
-        const remainingInvoiceAmount = invoiceAmount - alreadyPaidAmount;
-        const allocationAmount = Math.min(remainingAmount, remainingInvoiceAmount);
-
-        if (allocationAmount > 0) {
-          const totalAfterPayment = alreadyPaidAmount + allocationAmount;
-          const newStatus = totalAfterPayment >= invoiceAmount ? 'paid' : 'partial';
-
-          allocations.push({
-            invoiceId: invoice.id,
-            amount: allocationAmount,
-            newStatus
-          });
-
-          console.log(`✅ Allocated ${allocationAmount} to invoice ${invoice.invoiceNumber} - Status: ${newStatus}`);
-          remainingAmount -= allocationAmount;
-        }
-      }
-
-      console.log(`📊 FIFO allocation complete. ${allocations.length} invoices allocated, ${remainingAmount} remaining`);
-
-      // Create payment record with proper backend structure
+      // ابتدا پرداخت بدون تخصیص ثبت می‌کنیم
       const paymentData = {
         representativeId: representative.id,
+        invoiceId: null, // بدون تخصیص اولیه
         amount: paymentAmount.toString(),
         paymentDate,
-        description: description || `تخصیص خودکار پرداخت برای ${representative.name}`,
+        description: `تخصیص خودکار پرداخت برای ${representative.name}`,
         selectedInvoiceId: "auto"
+      };
+
+      const paymentResponse = await apiRequest("/api/payments", {
+        method: "POST",
+        data: paymentData
+      });
+
+      console.log('💰 ATOMOS v2.0: Payment created:', paymentResponse);
+
+      // سپس تخصیص خودکار را فراخوانی می‌کنیم
+      const allocationResponse = await apiRequest("/api/payments/allocate-auto", {
+        method: "POST",
+        data: {
+          paymentId: paymentResponse.id,
+          representativeId: representative.id
+        }
+      });
+
+      if (allocationResponse.success) {
+        console.log('✅ ATOMOS v2.0: Auto-allocation successful:', allocationResponse.result);
+
+        toast({
+          title: "✅ تخصیص خودکار موفق",
+          description: allocationResponse.message || "پرداخت با موفقیت به قدیمی‌ترین فاکتور تخصیص یافت",
+          duration: 5000,
+        });
+      } else {
+        console.error('❌ ATOMOS v2.0: Auto-allocation failed:', allocationResponse);
+
+        toast({
+          title: "⚠️ تخصیص خودکار ناموفق",
+          description: allocationResponse.error || "خطا در تخصیص خودکار پرداخت",
+          variant: "destructive",
+          duration: 7000,
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ ATOMOS v2.0: Auto-allocation error:', error);
+      throw error;
+    }
+  };
+
+  // ✅ ATOMOS v2.0: تخصیص دستی به فاکتور مشخص
+  const handleManualAllocation = async (paymentAmount: number, invoiceId: number) => {
+    try {
+      console.log(`🎯 ATOMOS v2.0: Manual allocation - Payment: ${paymentAmount}, Invoice: ${invoiceId}`);
+
+      // ابتدا پرداخت بدون تخصیص ثبت می‌کنیم
+      const paymentData = {
+        representativeId: representative.id,
+        invoiceId: null,
+        amount: paymentAmount.toString(),
+        paymentDate,
+        description: description || `تخصیص دستی پرداخت برای ${representative.name}`,
+      };
+
+      const paymentResponse = await apiRequest("/api/payments", {
+        method: "POST",
+        data: paymentData
+      });
+
+      console.log('💰 ATOMOS v2.0: Payment created for manual allocation:', paymentResponse);
+
+      // سپس تخصیص دستی را فراخوانی می‌کنیم
+      const allocationResponse = await apiRequest("/api/payments/allocate-manual", {
+        method: "POST",
+        data: {
+          paymentId: paymentResponse.id,
+          invoiceId: invoiceId,
+          amount: paymentAmount,
+          representativeId: representative.id
+        }
+      });
+
+      if (allocationResponse.success) {
+        console.log('✅ ATOMOS v2.0: Manual allocation successful:', allocationResponse.result);
+
+        toast({
+          title: "✅ تخصیص دستی موفق",
+          description: allocationResponse.message || "پرداخت با موفقیت به فاکتور انتخابی تخصیص یافت",
+          duration: 5000,
+        });
+      } else {
+        console.error('❌ ATOMOS v2.0: Manual allocation failed:', allocationResponse);
+
+        toast({
+          title: "⚠️ تخصیص دستی ناموفق",
+          description: allocationResponse.error || "خطا در تخصیص دستی پرداخت",
+          variant: "destructive",
+          duration: 7000,
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ ATOMOS v2.0: Manual allocation error:', error);
+      throw error;
+    }
+  };
+
+  // پرداخت عمومی بدون تخصیص
+  const handleGenericPayment = async (paymentAmount: number) => {
+    try {
+      console.log('💰 ATOMOS v2.0: Handling generic payment');
+      const paymentData = {
+        representativeId: representative.id,
+        invoiceId: null, // No specific invoice
+        amount: paymentAmount.toString(),
+        paymentDate,
+        description: description || `پرداخت عمومی برای ${representative.name}`,
+        selectedInvoiceId: null // Explicitly null for generic payment
       };
 
       await apiRequest("/api/payments", {
@@ -2157,23 +2224,14 @@ function CreatePaymentDialog({
         data: paymentData
       });
 
-      // Update representative debt - now handled by backend
-      // await updateRepresentativeDebt(paymentAmount);
-
+      toast({
+        title: "💰 پرداخت عمومی ثبت شد",
+        description: `مبلغ ${formatCurrency(paymentAmount)} بدون تخصیص به فاکتور ثبت شد`,
+        duration: 5000,
+      });
     } catch (error) {
+      console.error('❌ ATOMOS v2.0: Generic payment error:', error);
       throw error;
-    }
-  };
-
-  // Helper function to get currently paid amount for an invoice
-  const getCurrentlyPaidAmount = async (invoiceId: number): Promise<number> => {
-    try {
-      const paymentsResponse = await apiRequest(`/api/payments?invoiceId=${invoiceId}`);
-      const payments = Array.isArray(paymentsResponse) ? paymentsResponse : [];
-      return payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0);
-    } catch (error) {
-      console.warn('Could not fetch payment info for invoice', invoiceId, error);
-      return 0;
     }
   };
 
@@ -2240,82 +2298,52 @@ function CreatePaymentDialog({
     return () => clearInterval(interval);
   }, [open, toast]);
 
-  const handleSave = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || !paymentDate) {
+      toast({
+        title: "خطا",
+        description: "مبلغ و تاریخ پرداخت الزامی است",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-
-      if (!amount || !paymentDate) {
-        toast({
-          title: "خطا",
-          description: "مبلغ و تاریخ پرداخت الزامی است",
-          variant: "destructive"
-        });
-        return;
-      }
-
       const paymentAmount = parseFloat(amount);
 
-      // Auto-allocation logic (Smart Payment Processing)
       if (selectedInvoiceId === "auto") {
+        // ✅ ATOMOS v2.0: تخصیص خودکار
         await handleAutoAllocation(paymentAmount);
-      } else {
-        // Manual allocation to specific invoice
-        const paymentData = {
-          representativeId: representative.id,
-          amount,
-          paymentDate,
-          description: description || `پرداخت برای ${representative.name}`,
-          invoiceId: selectedInvoiceId ? parseInt(selectedInvoiceId) : null,
-          isAllocated: !!selectedInvoiceId
-        };
 
-        await apiRequest("/api/payments", {
-          method: "POST",
-          data: paymentData
-        });
+      } else if (selectedInvoiceId && selectedInvoiceId !== "auto") {
+        // ✅ ATOMOS v2.0: تخصیص دستی به فاکتور مشخص
+        await handleManualAllocation(paymentAmount, parseInt(selectedInvoiceId));
+
+      } else {
+        // پرداخت عمومی بدون تخصیص
+        await handleGenericPayment(paymentAmount);
       }
 
-      // ✅ SHERLOCK v24.0: Immediate UI refresh with custom events
-      window.dispatchEvent(new CustomEvent(`payment-updated-${representative.id}`));
-
-      // Force refresh all related data immediately
-      queryClient.invalidateQueries({ queryKey: ["representatives"] });
-      queryClient.invalidateQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/unified-financial/debtors"] });
-
-      // Trigger immediate re-fetch
-      await queryClient.refetchQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
-
-      toast({
-        title: "موفقیت",
-        description: "پرداخت با موفقیت ثبت و تخصیص داده شد - UI بروزرسانی شد"
-      });
+      // ✅ همگام‌سازی مالی کامل
+      await performComprehensiveFinancialSync();
 
       // Reset form
       setAmount("");
       setPaymentDate("");
-      setDescription("");
       setSelectedInvoiceId("auto");
-
-      // ✅ SHERLOCK v24.0: همگام‌سازی با force cache invalidation
-      try {
-        await apiRequest(`/api/unified-financial/sync-representative/${representative.id}`, {
-          method: "POST"
-        });
-      } catch (syncError) {
-        console.warn("Sync warning (non-critical):", syncError);
-      }
-
-      // Complete Financial Synchronization Checklist Implementation
-      await performComprehensiveFinancialSync();
-
+      setDescription("");
       onSave();
-    } catch (error: any) {
-      console.error('Payment submission error:', error);
+      onOpenChange(false);
+
+    } catch (error) {
+      console.error("❌ ATOMOS v2.0: Error creating payment:", error);
       toast({
-        title: "خطا",
-        description: error?.message || "خطا در ثبت پرداخت",
-        variant: "destructive"
+        title: "❌ خطا در ثبت پرداخت",
+        description: "لطفاً دوباره تلاش کنید",
+        variant: "destructive",
+        duration: 7000,
       });
     } finally {
       setIsLoading(false);
@@ -2332,9 +2360,11 @@ function CreatePaymentDialog({
       queryClient.invalidateQueries({ queryKey: ["unified-statistics/representatives"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: [`representatives/${representative.code}`] });
+      queryClient.invalidateQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
 
       // 2. Force refresh current representative data
       await queryClient.refetchQueries({ queryKey: [`representatives/${representative.code}`] });
+      await queryClient.refetchQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
 
       // 3. Refresh parent component data if available
       if (window.location.pathname.includes('/crm')) {
@@ -2349,6 +2379,7 @@ function CreatePaymentDialog({
       console.warn('Financial sync warning:', syncError);
     }
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -2365,7 +2396,7 @@ function CreatePaymentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 text-white">
+        <form onSubmit={handleSubmit} className="space-y-4 text-white">
           <div>
             <Label htmlFor="amount" className="text-white">مبلغ پرداخت (ریال) *</Label>
             <Input
@@ -2416,11 +2447,16 @@ function CreatePaymentDialog({
                 <SelectItem value="auto" className="text-white hover:bg-white/10">
                   🤖 تخصیص خودکار (پیشنهادی)
                 </SelectItem>
-                {representative && (representative as any).invoices?.filter((inv: any) => inv.status !== 'paid').map((invoice: Invoice) => (
+                {invoices
+                  .filter((inv: Invoice) => inv.status !== 'paid') // Filter out paid invoices
+                  .map((invoice: Invoice) => (
                   <SelectItem key={invoice.id} value={invoice.id.toString()} className="text-white hover:bg-white/10">
-                    📄 {invoice.invoiceNumber} - {formatCurrency(parseFloat(invoice.amount))}
+                    📄 {invoice.invoiceNumber} - {formatCurrency(parseFloat(invoice.amount))} - {invoice.issueDate}
                   </SelectItem>
                 ))}
+                 <SelectItem value="" className="text-white hover:bg-white/10">
+                  ✖️ بدون تخصیص
+                </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-blue-300 mt-1">
@@ -2457,27 +2493,27 @@ function CreatePaymentDialog({
               )}
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end space-x-2 pt-4 border-t border-white/10 mt-6">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-            className="ml-2 bg-white/10 border-white/20 text-white hover:bg-white/20"
-            data-testid="button-cancel-payment"
-          >
-            انصراف
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={isLoading}
-            className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white"
-            data-testid="button-save-payment"
-          >
-            {isLoading ? "در حال ثبت پرداخت..." : "💰 ثبت و تخصیص پرداخت"}
-          </Button>
-        </div>
+          <div className="flex justify-end space-x-2 pt-4 border-t border-white/10 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+              className="ml-2 bg-white/10 border-white/20 text-white hover:bg-white/20"
+              data-testid="button-cancel-payment"
+            >
+              انصراف
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isLoading}
+              className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white"
+              data-testid="button-save-payment"
+            >
+              {isLoading ? "در حال ثبت پرداخت..." : "💰 ثبت و تخصیص پرداخت"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
