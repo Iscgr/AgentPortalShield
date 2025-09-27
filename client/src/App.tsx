@@ -95,7 +95,7 @@ function AuthenticatedRouter() {
   if (!adminAuthenticated) {
     // Check if the current location is the admin login page
     if (location === "/admin-login") {
-      return <AdminLogin />;
+      return <AdminLogin onLoginSuccess={() => {}} />;
     }
     return <UnifiedAuth />;
   }
@@ -112,7 +112,12 @@ function AuthenticatedRouter() {
         <Route path="/sales-partners" component={SalesPartners} />
         <Route path="/financial-integrity" component={FinancialIntegrityPage} />
         <Route path="/settings" component={Settings} />
-        <Route path="/admin-login" component={AdminLogin} /> {/* Explicitly route to AdminLogin */}
+        <Route path="/admin-login">
+          <AdminLogin onLoginSuccess={() => {
+            // Handle successful login - could redirect or update auth state
+            console.log('Admin login successful');
+          }} />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>

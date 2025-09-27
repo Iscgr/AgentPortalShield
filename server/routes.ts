@@ -47,6 +47,7 @@ import { registerMaintenanceRoutes } from "./routes/maintenance-routes";
 // Import integration health routes for Phase 9
 import { registerIntegrationHealthRoutes } from "./routes/integration-health-routes";
 import featureFlagRoutes from './routes/feature-flag-routes.js';
+import { registerHealthRoutes } from './routes/health-routes';
 
 // Import unified statistics routes registration
 import { registerUnifiedStatisticsRoutes } from "./routes/unified-statistics-routes.js";
@@ -68,6 +69,8 @@ import debtVerificationRoutes from './routes/debt-verification-routes.js';
 
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession {
+  id: string; // Required by Session interface
+  cookie: any; // Required by Session interface
   authenticated?: boolean;
   userId?: number;
   username?: string;
@@ -80,18 +83,11 @@ interface AuthSession {
   crmUser?: any;
 }
 
-interface AuthRequest extends Request {
-  session: AuthSession & {
-    save: (callback?: (err?: any) => void) => void;
-    regenerate: (callback: (err?: any) => void) => void;
-    destroy: (callback: (err?: any) => void) => void;
-    reload: (callback: (err?: any) => void) => void;
-    touch: () => void;
-    resetMaxAge: () => void;
-    id: string;
-    cookie: any;
-  };
-}
+// Remove AuthRequest interface - use Request directly with type assertions
+// interface AuthRequest extends Request {
+//   // Extending Request with additional session properties
+//   // Using intersection types to avoid session type conflicts
+// }
 
 
 // Configure multer for file uploads with broader JSON acceptance
@@ -210,6 +206,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Settings routes (core system settings)
   registerSettingsRoutes(app);
+
+  // 💗 Register Health Check routes for Ubuntu Server monitoring
+  registerHealthRoutes(app);
 
   // SHERLOCK v18.4: Register STANDARDIZED Invoice Routes - eliminates 11,117,500 تومان discrepancy
   registerStandardizedInvoiceRoutes(app, authMiddleware, storage);
@@ -664,7 +663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ✅ SHERLOCK v32.0: Enhanced with real-time financial calculations
       const enhancedRepresentatives = await Promise.race([
         Promise.all(
-          representatives.map(async (rep) => {
+          (representatives as any[]).map(async (rep: any) => {
             try {
               // Get real-time financial data from unified engine
               const financialData = await unifiedFinancialEngine.calculateRepresentative(rep.id);
@@ -690,9 +689,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         ),
         timeoutPromise
-      ]);
+      ]) as any[];
 
-      console.log(`✅ SHERLOCK v32.0: Enhanced ${enhancedRepresentatives.length} representatives with real-time financial data`);
+      console.log(`✅ SHERLOCK v32.0: Enhanced ${(enhancedRepresentatives as any[]).length} representatives with real-time financial data`);
       res.json(enhancedRepresentatives);
     } catch (error) {
       console.error('❌ SHERLOCK v32.0: Error fetching representatives with financial enhancement:', error);
@@ -877,7 +876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Additional debugging - check if any representatives exist at all
         const totalReps = await db.select().from(representatives).limit(5);
-        console.log('Sample representatives:', totalReps.map(r => ({ id: r.id, code: r.code, publicId: r.publicId })));
+        console.log('Sample representatives:', totalReps.map((r: any) => ({ id: r.id, code: r.code, publicId: r.publicId })));
 
         return res.status(404).json({
           error: 'نماینده یافت نشد',
@@ -1208,7 +1207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL: Update representative financial data after payment deletion
       console.log(`🔄 به‌روزرسانی اطلاعات مالی نماینده ${payment.representativeId}`);
-      await storage.updateRepresentativeFinancials(payment.representativeId);
+      if (payment.representativeId) {
+        await storage.updateRepresentativeFinancials(payment.representativeId);
+      }
 
       // CRITICAL: Invalidate CRM cache to ensure real-time sync
       // invalidateCrmCache(); // This function needs to be defined or imported if used
@@ -1317,7 +1318,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount,
         paymentDate: normalizedPaymentDate, // Now as text to match database
         description,
-        isAllocated: isAllocated,
         invoiceId: invoiceId
       });
 
@@ -1329,8 +1329,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         try {
           // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص دستی
-          const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-          const allocationResult = await enhancedPaymentAllocationEngine.manualAllocatePayment(
+          const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+          const allocationResult = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
             newPayment.id,
             parseInt(selectedInvoiceId),
             parseFloat(amount),
@@ -1349,17 +1349,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`✅ SHERLOCK v34.0: UNIFIED manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
 
-        } catch (allocationError) {
+        } catch (allocationError: any) {
           console.error(`❌ SHERLOCK v34.0: UNIFIED manual allocation failed:`, allocationError);
-          throw new Error(`خطا در تخصیص دستی یکپارچه: ${allocationError.message}`);
+          throw new Error(`خطا در تخصیص دستی یکپارچه: ${allocationError.message || allocationError}`);
         }
       } else if (selectedInvoiceId === "auto") {
           console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation for Representative ${representativeId}`);
 
           try {
             // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص خودکار
-            const { enhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-            const allocationResult = await enhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
+            const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+            const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
               method: 'FIFO',
               allowPartialAllocation: true,
               allowOverAllocation: false,
@@ -1378,7 +1378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`⚠️ SHERLOCK v34.0: Auto-allocation completed but no allocation possible:`, allocationResult.warnings);
               finalPaymentStatus = newPayment;
             }
-          } catch (autoAllocationError) {
+          } catch (autoAllocationError: any) {
             console.error(`❌ SHERLOCK v34.0: UNIFIED auto-allocation failed:`, autoAllocationError);
             // Keep payment as unallocated if auto-allocation fails
             finalPaymentStatus = newPayment;
@@ -1386,11 +1386,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Log detailed error for debugging
             await storage.createActivityLog({
               type: "payment_auto_allocation_failed",
-              description: `تخصیص خودکار پرداخت ${newPayment.id} ناموفق: ${autoAllocationError.message}`,
+              description: `تخصیص خودکار پرداخت ${newPayment.id} ناموفق: ${autoAllocationError.message || autoAllocationError}`,
               relatedId: representativeId,
               metadata: {
                 paymentId: newPayment.id,
-                error: autoAllocationError.message,
+                error: autoAllocationError.message || autoAllocationError,
                 engine: "Enhanced Payment Allocation Engine"
               }
             });
@@ -2787,8 +2787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         editReason,
         originalAmount,
         editedAmount,
-        editedBy,
-        timestamp: new Date()
+        editedBy
       });
 
       debug.success('Edit Record Created', { editRecordId: editRecord.id });
@@ -2801,8 +2800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the invoice
       await storage.updateInvoice(invoiceId, {
         amount: editedAmount.toString(),
-        usageData: editedUsageData,
-        editedAt: new Date()
+        usageData: editedUsageData
       });
 
       debug.success('Invoice Updated Successfully', { invoiceId, newAmount: editedAmount });
@@ -2969,7 +2967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         records: records,
         usageData: usageData,
         recordsCount: records.length,
-        totalAmount: records.reduce((sum, r) => sum + parseFloat(r.amount || '0'), 0)
+        totalAmount: records.reduce((sum: number, r: any) => sum + parseFloat(r.amount || '0'), 0)
       };
 
       console.log(`✅ SHERLOCK v32.0: Returning usage details for invoice ${invoiceId}:`, {

@@ -11,7 +11,7 @@ export function useMobileOptimizations() {
       
       // Optimize viewport and scrolling
       document.documentElement.style.scrollBehavior = 'smooth';
-      document.documentElement.style.webkitOverflowScrolling = 'touch';
+      (document.documentElement.style as any).webkitOverflowScrolling = 'touch';
       
       // Set proper viewport
       let viewport = document.querySelector('meta[name="viewport"]');

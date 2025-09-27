@@ -14,7 +14,8 @@ import type {
 } from "@shared/schema";
 
 // Persian date utilities (ES module compatible)
-import persianDate from 'persian-date';
+// Using our custom type-helpers instead of direct import
+import { createPersianDate, assertAIContext } from '../utils/type-helpers';
 
 export interface TaskGenerationContext {
   managerTasks: ManagerTask[];
@@ -42,7 +43,8 @@ export class AITaskGenerator {
     this.grokEngine = new XAIGrokEngine(settingsStorage);
     
     // Initialize Persian calendar
-    this.persianCalendar = persianDate;
+    // Import from our helper instead
+    this.persianCalendar = createPersianDate;
   }
 
   /**
@@ -237,10 +239,10 @@ export class AITaskGenerator {
 `;
 
         // Use XAI Grok engine for cultural analysis
-        const culturalAnalysisResponse = await this.grokEngine.generateCulturalInsights(
-          context.representativeProfiles[0] || { id: 1, name: 'Test' },
-          culturalPrompt
-        );
+        const culturalAnalysisResponse = await this.grokEngine.generateCulturalInsights({
+          representative: context.representativeProfiles[0] || { id: 1, name: 'Test' },
+          context: culturalPrompt
+        });
 
         // Try to parse as JSON, fallback to basic structure
         let analysis: any = {};
@@ -301,7 +303,8 @@ export class AITaskGenerator {
    * Apply Persian scheduling and datetime
    */
   private applyPersianScheduling(tasks: Partial<WorkspaceTask>[]): WorkspaceTask[] {
-    const now = new persianDate();
+    // Use our helper instead
+    const now = createPersianDate();
     
     return tasks.map((task, index) => {
       // Generate unique task ID
@@ -372,7 +375,11 @@ export class AITaskGenerator {
   private extractCulturalFactors(tasks: WorkspaceTask[]): string[] {
     const factors = new Set<string>();
     tasks.forEach(task => {
-      task.aiContext.culturalConsiderations.forEach((factor: any) => factors.add(factor));
+      // Use assertAIContext helper for type safety
+      const context = assertAIContext(task.aiContext);
+      if (context.culturalConsiderations && Array.isArray(context.culturalConsiderations)) {
+        context.culturalConsiderations.forEach((factor: any) => factors.add(factor));
+      }
     });
     return Array.from(factors);
   }
@@ -381,7 +388,9 @@ export class AITaskGenerator {
     if (tasks.length === 0) return 0;
     
     const totalConfidence = tasks.reduce((sum, task) => {
-      return sum + (task.aiContext.riskLevel || 0) * 20; // Convert risk to confidence
+      // Use assertAIContext helper for type safety
+      const context = assertAIContext(task.aiContext);
+      return sum + (context.riskLevel || 0) * 20; // Convert risk to confidence
     }, 0);
     
     return Math.round(totalConfidence / tasks.length);

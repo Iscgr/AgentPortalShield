@@ -21,35 +21,10 @@ import {
   // AI Configuration Import
   type AiConfiguration, type InsertAiConfiguration
 } from "@shared/schema";
-import { db, checkDatabaseHealth } from "./db";
+import { db, checkDatabaseHealth, executeWithRetry } from "./database-manager";
 import { eq, desc, sql, and, or, ilike, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
-
-// Database operation wrapper with retry logic and error handling
-async function withDatabaseRetry<T>(
-  operation: () => Promise<T>,
-  operationName: string,
-  maxRetries: number = 3
-): Promise<T> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error: any) {
-      console.error(`Database operation "${operationName}" failed (attempt ${attempt}/${maxRetries}):`, error.message);
-
-      if (attempt === maxRetries) {
-        throw new Error(`Database operation "${operationName}" failed after ${maxRetries} attempts: ${error.message}`);
-      }
-
-      // Exponential backoff: wait 2^attempt seconds
-      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-    }
-  }
-
-  // This should never be reached, but TypeScript requires it
-  throw new Error(`Database operation "${operationName}" failed unexpectedly`);
-}
 
 export interface IStorage {
   // Representatives
@@ -261,14 +236,14 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getRepresentatives(): Promise<Representative[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(representatives).orderBy(desc(representatives.createdAt)),
       'getRepresentatives'
     );
   }
 
   async getRepresentative(id: number): Promise<Representative | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [rep] = await db.select().from(representatives).where(eq(representatives.id, id));
         return rep || undefined;
@@ -278,7 +253,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRepresentativeByCode(code: string): Promise<Representative | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [rep] = await db.select().from(representatives).where(eq(representatives.code, code));
         return rep || undefined;
@@ -327,14 +302,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSalesPartners(): Promise<SalesPartnerWithCount[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // Get all sales partners
         const partners = await db.select().from(salesPartners).orderBy(desc(salesPartners.createdAt));
 
         // For each partner, calculate representativesCount
         const partnersWithCounts = await Promise.all(
-          partners.map(async (partner) => {
+          partners.map(async (partner: SalesPartner) => {
             const [countResult] = await db
               .select({ count: sql<number>`count(*)::int` })
               .from(representatives)
@@ -384,14 +359,14 @@ export class DatabaseStorage implements IStorage {
 
   // فاز ۱: Implementation مدیریت دوره‌ای فاکتورها
   async getInvoiceBatches(): Promise<InvoiceBatch[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(invoiceBatches).orderBy(desc(invoiceBatches.createdAt)),
       'getInvoiceBatches'
     );
   }
 
   async getInvoiceBatch(id: number): Promise<InvoiceBatch | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [batch] = await db.select().from(invoiceBatches).where(eq(invoiceBatches.id, id));
         return batch || undefined;
@@ -401,7 +376,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoiceBatchByCode(batchCode: string): Promise<InvoiceBatch | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [batch] = await db.select().from(invoiceBatches).where(eq(invoiceBatches.batchCode, batchCode));
         return batch || undefined;
@@ -411,7 +386,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInvoiceBatch(batch: InsertInvoiceBatch): Promise<InvoiceBatch> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [newBatch] = await db
           .insert(invoiceBatches)
@@ -436,7 +411,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateInvoiceBatch(id: number, batch: Partial<InvoiceBatch>): Promise<InvoiceBatch> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [updated] = await db
           .update(invoiceBatches)
@@ -450,7 +425,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async completeBatch(batchId: number): Promise<void> {
-    await withDatabaseRetry(
+    executeWithRetry(
       async () => {
         // محاسبه آمار نهایی دسته
         const batchStats = await db
@@ -489,7 +464,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBatchInvoices(batchId: number): Promise<Invoice[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(invoices).where(eq(invoices.batchId, batchId)).orderBy(desc(invoices.createdAt)),
       'getBatchInvoices'
     );
@@ -503,14 +478,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoicesByBatch(batchId: number): Promise<Invoice[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(invoices).where(eq(invoices.batchId, batchId)).orderBy(desc(invoices.createdAt)),
       'getInvoicesByBatch'
     );
   }
 
   async getInvoicesWithBatchInfo(): Promise<(Invoice & { batch?: InvoiceBatch })[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db
           .select({
@@ -539,7 +514,7 @@ export class DatabaseStorage implements IStorage {
           .leftJoin(invoiceBatches, eq(invoices.batchId, invoiceBatches.id))
           .orderBy(desc(invoices.createdAt));
 
-        return result.map(row => ({
+        return result.map((row: any) => ({
           id: row.id,
           invoiceNumber: row.invoiceNumber,
           representativeId: row.representativeId,
@@ -601,7 +576,7 @@ export class DatabaseStorage implements IStorage {
 
     // Calculate real-time status for each invoice based on payments
     const enhancedInvoices = await Promise.all(
-      invoiceResults.map(async (invoice) => {
+      invoiceResults.map(async (invoice: Invoice) => {
         const calculatedStatus = await this.calculateInvoicePaymentStatus(invoice.id);
         return {
           ...invoice,
@@ -641,7 +616,7 @@ export class DatabaseStorage implements IStorage {
 
     // Calculate real-time status for each invoice based on payments - with error handling
     const enhancedInvoices = await Promise.all(
-      invoiceResults.map(async (invoice) => {
+      invoiceResults.map(async (invoice: Invoice) => {
         try {
           const calculatedStatus = await this.calculateInvoicePaymentStatus(invoice.id);
           return {
@@ -720,7 +695,7 @@ export class DatabaseStorage implements IStorage {
 
   // فاز ۲: Get single invoice method
   async getInvoice(id: number): Promise<Invoice | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
         return invoice || undefined;
@@ -730,7 +705,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateInvoice(id: number, invoice: Partial<Invoice>): Promise<Invoice> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [updated] = await db
           .update(invoices)
@@ -766,7 +741,7 @@ export class DatabaseStorage implements IStorage {
         .from(payments)
         .where(eq(payments.invoiceId, invoiceId));
 
-      const totalPaid = paymentResults.reduce((sum, payment) =>
+      const totalPaid = paymentResults.reduce((sum: number, payment: any) =>
         sum + parseFloat(payment.amount), 0);
 
       // Calculate status based on payment coverage
@@ -793,7 +768,7 @@ export class DatabaseStorage implements IStorage {
 
   // فاز ۲: Delete invoice method
   async deleteInvoice(id: number): Promise<void> {
-    await withDatabaseRetry(
+    executeWithRetry(
       async () => {
         await db.delete(invoices).where(eq(invoices.id, id));
       },
@@ -823,7 +798,7 @@ export class DatabaseStorage implements IStorage {
 
   // Telegram Send History Methods - for resending capability
   async getTelegramSendHistory(invoiceId: number): Promise<TelegramSendHistory[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(telegramSendHistory)
         .where(eq(telegramSendHistory.invoiceId, invoiceId))
         .orderBy(desc(telegramSendHistory.sentAt)),
@@ -832,7 +807,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTelegramSendHistory(history: InsertTelegramSendHistory): Promise<TelegramSendHistory> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [newHistory] = await db
           .insert(telegramSendHistory)
@@ -851,7 +826,7 @@ export class DatabaseStorage implements IStorage {
     chatId?: string,
     template?: string
   ): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const whereConditions = invoiceIds.map(id => eq(invoices.id, id));
         const whereClause = whereConditions.length === 1 ? whereConditions[0] : or(...whereConditions);
@@ -888,7 +863,7 @@ export class DatabaseStorage implements IStorage {
           });
         }
 
-        const resendCount = currentInvoices.filter(inv => inv.sentToTelegram).length;
+        const resendCount = currentInvoices.filter((inv: Invoice) => inv.sentToTelegram).length;
         const firstSendCount = invoiceIds.length - resendCount;
 
         let description = '';
@@ -935,7 +910,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(payments.createdAt));
 
     // Add missing fields as defaults for compatibility
-    return results.map(payment => ({
+    return results.map((payment: Payment) => ({
       ...payment,
       description: payment.description || 'پرداخت', // Add default description
       allocatedAmount: '0',
@@ -973,7 +948,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePayment(id: number, payment: Partial<Payment>): Promise<Payment> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // Get original payment to find representative
         const [originalPayment] = await db.select().from(payments).where(eq(payments.id, id));
@@ -1005,7 +980,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePayment(id: number): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // Get payment to find representative before deletion
         const [payment] = await db.select().from(payments).where(eq(payments.id, id));
@@ -1071,7 +1046,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDashboardData() {
-    return await withDatabaseRetry(async () => {
+    return executeWithRetry(async () => {
       // SHERLOCK v17.8 FINANCIAL INTEGRITY: Use standardized calculations
       const { unifiedFinancialEngine } = await import("./services/unified-financial-engine.js");
 
@@ -1097,7 +1072,7 @@ export class DatabaseStorage implements IStorage {
 
       // Calculate total remaining debt using INTEGRITY ENGINE standard (only positive debts)
       const totalRemainingDebt = remainingDebtQuery
-        .reduce((sum, rep) => {
+        .reduce((sum: number, rep: any) => {
           const debt = parseFloat(rep.remainingDebt) || 0;
           return sum + (debt > 0 ? debt : 0);
         }, 0);
@@ -1191,7 +1166,7 @@ export class DatabaseStorage implements IStorage {
 
   // SHERLOCK v11.0: Unified Batch-Based Active Representatives Calculation
   async getBatchBasedActiveRepresentatives(): Promise<number> {
-    return await withDatabaseRetry(async () => {
+    return executeWithRetry(async () => {
       // Find the batch with most representatives (>=10) within the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -1242,7 +1217,7 @@ export class DatabaseStorage implements IStorage {
     totalInvoices: string;
     totalPayments: string;
   }>> {
-    return await withDatabaseRetry(async () => {
+    return executeWithRetry(async () => {
       // SHERLOCK v17.8 AUTO-CLEANUP: Remove activity logs older than 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -1280,7 +1255,7 @@ export class DatabaseStorage implements IStorage {
   // SHERLOCK v18.4 - STANDARDIZED: Always use UNIFIED Financial Engine
   async updateRepresentativeFinancials(repId: number): Promise<void> {
     const { unifiedFinancialEngine } = await import("./services/unified-financial-engine.js");
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const data = await unifiedFinancialEngine.calculateRepresentative(repId);
         console.log(`💎 UNIFIED FINANCIAL ENGINE v18.4: Standardized update for representative ${repId}:`, {
@@ -1297,7 +1272,7 @@ export class DatabaseStorage implements IStorage {
 
   // Admin Users methods
   async getAdminUser(username: string): Promise<AdminUser | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [user] = await db.select().from(adminUsers).where(eq(adminUsers.username, username));
         return user || undefined;
@@ -1307,7 +1282,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAdminUser(user: InsertAdminUser): Promise<AdminUser> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [newUser] = await db.insert(adminUsers).values(user).returning();
         return newUser;
@@ -1317,7 +1292,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateAdminUserLogin(id: number): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         await db
           .update(adminUsers)
@@ -1388,7 +1363,7 @@ export class DatabaseStorage implements IStorage {
 
   // CRM Users (Authentication) Implementation
   async getCrmUser(username: string): Promise<CrmUser | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [user] = await db.select().from(crmUsers).where(eq(crmUsers.username, username));
         return user || undefined;
@@ -1398,7 +1373,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCrmUser(user: InsertCrmUser): Promise<CrmUser> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [newUser] = await db.insert(crmUsers).values(user).returning();
         return newUser;
@@ -1408,7 +1383,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCrmUserLogin(id: number): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         await db
           .update(crmUsers)
@@ -1474,7 +1449,7 @@ export class DatabaseStorage implements IStorage {
 
   // CRM Enhanced Methods
   async getRepresentativeById(representativeId: number): Promise<Representative | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [representative] = await db
           .select()
@@ -1496,7 +1471,7 @@ export class DatabaseStorage implements IStorage {
     settings: number;
     activityLogs: number;
   }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [repCount] = await db.select({ count: sql<number>`count(*)` }).from(representatives);
         const [invCount] = await db.select({ count: sql<number>`count(*)` }).from(invoices);
@@ -1536,7 +1511,7 @@ export class DatabaseStorage implements IStorage {
       total: number;
     };
   }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const deletedCounts = {
           representatives: 0,
@@ -1631,7 +1606,7 @@ export class DatabaseStorage implements IStorage {
 
   // Invoice Edits Methods
   async getInvoiceEdits(invoiceId: number): Promise<InvoiceEdit[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(invoiceEdits)
         .where(eq(invoiceEdits.invoiceId, invoiceId))
         .orderBy(desc(invoiceEdits.createdAt)),
@@ -1640,7 +1615,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInvoiceEdit(edit: InsertInvoiceEdit): Promise<InvoiceEdit> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [newEdit] = await db
           .insert(invoiceEdits)
@@ -1666,7 +1641,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoiceEditHistory(invoiceId: number): Promise<InvoiceEdit[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(invoiceEdits)
         .where(and(
           eq(invoiceEdits.invoiceId, invoiceId),
@@ -1678,7 +1653,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateRepresentativeDebt(invoiceId: number, originalAmount: number, editedAmount: number): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // Get invoice to find representative
         const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
@@ -1707,7 +1682,7 @@ export class DatabaseStorage implements IStorage {
 
   // ====== FINANCIAL TRANSACTIONS (CLOCK CORE MECHANISM) ======
   async createFinancialTransaction(transaction: InsertFinancialTransaction): Promise<FinancialTransaction> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [created] = await db.insert(financialTransactions)
           .values({
@@ -1723,7 +1698,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTransactionStatus(transactionId: string, status: string, actualState?: any): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const updateData: any = { status };
         if (actualState) {
@@ -1745,7 +1720,7 @@ export class DatabaseStorage implements IStorage {
 
 
   async getFinancialTransaction(transactionId: string): Promise<FinancialTransaction | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [transaction] = await db.select()
           .from(financialTransactions)
@@ -1757,7 +1732,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactionsByRepresentative(repId: number): Promise<FinancialTransaction[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select()
         .from(financialTransactions)
         .where(eq(financialTransactions.representativeId, repId))
@@ -1767,7 +1742,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingTransactions(): Promise<FinancialTransaction[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select()
         .from(financialTransactions)
         .where(eq(financialTransactions.status, 'PENDING'))
@@ -1777,7 +1752,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async rollbackTransaction(transactionId: string): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const transaction = await this.getFinancialTransaction(transactionId);
         if (!transaction) {
@@ -1820,7 +1795,7 @@ export class DatabaseStorage implements IStorage {
 
   // ====== DATA INTEGRITY CONSTRAINTS (CLOCK PRECISION) ======
   async createIntegrityConstraint(constraint: InsertDataIntegrityConstraint): Promise<DataIntegrityConstraint> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [created] = await db.insert(dataIntegrityConstraints)
           .values({
@@ -1836,7 +1811,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async validateConstraints(entityType: string, entityId: number): Promise<{ isValid: boolean, violations: any[] }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const constraints = await db.select()
           .from(dataIntegrityConstraints)
@@ -1875,7 +1850,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getConstraintViolations(): Promise<DataIntegrityConstraint[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select()
         .from(dataIntegrityConstraints)
         .where(eq(dataIntegrityConstraints.currentStatus, 'VIOLATED'))
@@ -1885,7 +1860,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async fixConstraintViolation(constraintId: number): Promise<boolean> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [constraint] = await db.select()
           .from(dataIntegrityConstraints)
@@ -1912,7 +1887,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateConstraintStatus(constraintId: number, status: string, details?: any): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const updateData: any = {
           currentStatus: status,
@@ -1934,7 +1909,7 @@ export class DatabaseStorage implements IStorage {
 
   // ====== FINANCIAL RECONCILIATION ======
   async reconcileFinancialData(): Promise<{ success: boolean, message: string }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // Simple reconciliation - check for any pending transactions
         const pendingTransactions = await this.getPendingTransactions();
@@ -1949,7 +1924,7 @@ export class DatabaseStorage implements IStorage {
 
   // ====== FINANCIAL TRANSACTIONS MANAGEMENT ======
   async getFinancialTransactions(): Promise<FinancialTransaction[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(financialTransactions).orderBy(desc(financialTransactions.createdAt)),
       'getFinancialTransactions'
     );
@@ -1970,7 +1945,7 @@ export class DatabaseStorage implements IStorage {
     const uniqueTimestamp = Date.now() + Math.random() * 1000;
     const transactionId = `EDIT-${editData.invoiceId}-${Math.floor(uniqueTimestamp)}-${nanoid(12)}`;
 
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         try {
           // Start transaction
@@ -2179,7 +2154,7 @@ export class DatabaseStorage implements IStorage {
   // فاز ۳: Payment Synchronization and Allocation Methods
 
   async getUnallocatedPayments(representativeId?: number): Promise<Payment[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const query = db
           .select()
@@ -2205,7 +2180,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async allocatePaymentToInvoice(paymentId: number, invoiceId: number): Promise<Payment> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // ✅ SHERLOCK v22.1: Update payment allocation
         const [updatedPayment] = await db
@@ -2270,7 +2245,7 @@ export class DatabaseStorage implements IStorage {
     totalAmount: string;
     details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
   }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         console.log(`🚀 SHERLOCK v34.1: ENHANCED auto-allocation for payment ${paymentId}, representative ${representativeId}`);
 
@@ -2375,7 +2350,7 @@ export class DatabaseStorage implements IStorage {
     message: string;
     transactionId?: string;
   }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         console.log(`🎯 SHERLOCK v34.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
 
@@ -2502,19 +2477,19 @@ export class DatabaseStorage implements IStorage {
     totalPaidAmount: string;
     totalUnallocatedAmount: string;
   }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const allPayments = await db
           .select()
           .from(payments)
           .where(eq(payments.representativeId, representativeId));
 
-        const allocatedPayments = allPayments.filter(p => p.isAllocated);
-        const unallocatedPayments = allPayments.filter(p => !p.isAllocated);
+        const allocatedPayments = allPayments.filter((p: any) => p.isAllocated);
+        const unallocatedPayments = allPayments.filter((p: any) => !p.isAllocated);
 
-        const totalPaidAmount = allocatedPayments.reduce((sum, p) =>
+        const totalPaidAmount = allocatedPayments.reduce((sum: number, p: any) =>
           sum + parseFloat(p.amount), 0);
-        const totalUnallocatedAmount = unallocatedPayments.reduce((sum, p) =>
+        const totalUnallocatedAmount = unallocatedPayments.reduce((sum: number, p: any) =>
           sum + parseFloat(p.amount), 0);
 
         return {
@@ -2541,7 +2516,7 @@ export class DatabaseStorage implements IStorage {
   }> {
     console.warn(`⚠️  DEPRECATED: reconcileRepresentativeFinancials() - Use UNIFIED Financial Engine directly`);
     const { unifiedFinancialEngine } = await import("./services/unified-financial-engine.js");
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const data = await unifiedFinancialEngine.calculateRepresentative(representativeId);
 
@@ -2559,14 +2534,14 @@ export class DatabaseStorage implements IStorage {
 
   // ====== AI CONFIGURATION METHODS ======
   async getAiConfigurations(): Promise<AiConfiguration[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select().from(aiConfiguration).orderBy(desc(aiConfiguration.updatedAt)),
       'getAiConfigurations'
     );
   }
 
   async getAiConfiguration(configName: string): Promise<AiConfiguration | undefined> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [config] = await db
           .select()
@@ -2579,7 +2554,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAiConfigurationsByCategory(category: string): Promise<AiConfiguration[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select()
         .from(aiConfiguration)
         .where(eq(aiConfiguration.configCategory, category))
@@ -2589,7 +2564,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAiConfiguration(config: InsertAiConfiguration): Promise<AiConfiguration> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [newConfig] = await db
           .insert(aiConfiguration)
@@ -2618,7 +2593,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateAiConfiguration(configName: string, config: Partial<AiConfiguration>): Promise<AiConfiguration> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // Create clean object without timestamp fields that cause issues
         const cleanConfig = Object.fromEntries(
@@ -2659,7 +2634,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteAiConfiguration(configName: string): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db
           .delete(aiConfiguration)
@@ -2681,7 +2656,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveAiConfiguration(): Promise<AiConfiguration[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select()
         .from(aiConfiguration)
         .where(eq(aiConfiguration.isActive, true))
@@ -2692,7 +2667,7 @@ export class DatabaseStorage implements IStorage {
 
   // Missing Sales Partners Methods
   async deleteSalesPartner(id: number): Promise<void> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db.delete(salesPartners).where(eq(salesPartners.id, id));
         if (result.rowCount === 0) {
@@ -2711,7 +2686,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSalesPartnersStatistics(): Promise<any> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         // SHERLOCK v12.4: Enhanced statistics with financial coupling
         const result = await db
@@ -2751,7 +2726,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRepresentativesBySalesPartner(partnerId: number): Promise<Representative[]> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       () => db.select()
         .from(representatives)
         .where(eq(representatives.salesPartnerId, partnerId))
@@ -2763,7 +2738,7 @@ export class DatabaseStorage implements IStorage {
 
 
   async getPaymentStatistics(): Promise<any> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const totalPayments = await db.select({ count: sql<number>`count(*)` }).from(payments);
         const totalAmount = await db.select({
@@ -2785,7 +2760,7 @@ export class DatabaseStorage implements IStorage {
 
   // Financial Synchronization Methods Implementation
   async getTotalRevenue(): Promise<string> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db
           .select({
@@ -2801,7 +2776,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTotalDebt(): Promise<string> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db
           .select({
@@ -2816,7 +2791,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveRepresentativesCount(): Promise<number> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db
           .select({ count: sql<number>`count(*)` })
@@ -2830,7 +2805,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUnpaidInvoicesCount(): Promise<number> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db
           .select({ count: sql<number>`count(*)` })
@@ -2844,7 +2819,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOverdueInvoicesCount(): Promise<number> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const result = await db
           .select({ count: sql<number>`count(*)` })
@@ -2859,7 +2834,7 @@ export class DatabaseStorage implements IStorage {
 
   // ✅ SHERLOCK v32.0: Get single invoice by ID with full details
   async getInvoiceById(invoiceId: number): Promise<any | null> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
         return invoice || null;
@@ -2870,7 +2845,7 @@ export class DatabaseStorage implements IStorage {
 
   // SHERLOCK v12.4: Manual Invoices Management Implementation
   async getManualInvoices(options: { page: number; limit: number; search?: string; status?: string }): Promise<{ data: Invoice[]; pagination: any }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         let query = db
           .select({
@@ -2971,7 +2946,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getManualInvoicesStatistics(): Promise<{ totalCount: number; totalAmount: string; unpaidCount: number; paidCount: number; partialCount: number }> {
-    return await withDatabaseRetry(
+    return executeWithRetry(
       async () => {
         const stats = await db
           .select({

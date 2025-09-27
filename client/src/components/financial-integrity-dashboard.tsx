@@ -88,7 +88,7 @@ export function FinancialIntegrityDashboard() {
     );
   }
 
-  const stats = integrityStats?.data?.summary as FinancialIntegrityStats['summary'];
+  const stats = (integrityStats as any)?.data?.summary as FinancialIntegrityStats['summary'] | undefined;
 
   // محاسبه امتیاز کلی سلامت سیستم
   const totalReps = 249; // تعداد کل نمایندگان

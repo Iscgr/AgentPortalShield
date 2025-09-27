@@ -6,7 +6,7 @@
 
 import { db } from '../db.js';
 import { representatives, invoices, payments } from '../../shared/schema.js';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and } from 'drizzle-orm';
 
 export interface AccountingValidationResult {
   isValid: boolean;
@@ -114,7 +114,7 @@ export class RealTimeAccountingValidator {
         difference,
         paymentAllocationRate,
         totalUnallocatedPayments,
-        invoiceStatusBreakdown: invoiceStatusBreakdown.reduce((acc, item) => {
+        invoiceStatusBreakdown: invoiceStatusBreakdown.reduce((acc: Record<string, number>, item: any) => {
           acc[item.status] = item.totalAmount;
           return acc;
         }, {} as Record<string, number>)
@@ -135,7 +135,7 @@ export class RealTimeAccountingValidator {
           totalSales,
           totalAllocatedPayments,
           totalUnallocatedPayments,
-          invoiceStatusBreakdown: invoiceStatusBreakdown.reduce((acc, item) => {
+          invoiceStatusBreakdown: invoiceStatusBreakdown.reduce((acc: Record<string, number>, item: any) => {
             acc[item.status] = item.totalAmount;
             return acc;
           }, {} as Record<string, number>),
@@ -161,7 +161,7 @@ export class RealTimeAccountingValidator {
           paymentAllocationRate: 0
         },
         recommendations: [],
-        errors: [error.message]
+        errors: [error instanceof Error ? error.message : 'Unknown validation error']
       };
     }
   }

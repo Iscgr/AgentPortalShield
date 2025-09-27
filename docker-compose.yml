@@ -1,128 +1,45 @@
-version: '3.8'
-
+# Docker Compose configuration for MarFaNet
 services:
   # PostgreSQL Database
-  database:
-    image: postgres:15-alpine
+  db:
+    image: postgres:14
     container_name: marfanet-db
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME:-marfanet_db}
-      POSTGRES_USER: ${DB_USER:-marfanet}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: marfanet
     ports:
       - "5432:5432"
-    networks:
-      - marfanet-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-marfanet} -d ${DB_NAME:-marfanet_db}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - marfanet-network
 
-  # Redis for Session Storage (Optional)
+  # Redis for session storage
   redis:
-    image: redis:7-alpine
+    image: redis:alpine
     container_name: marfanet-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
     ports:
       - "6379:6379"
-    networks:
-      - marfanet-network
+    volumes:
+      - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 3s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
       retries: 5
-
-  # MarFaNet Application
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: marfanet-app
-    restart: unless-stopped
-    depends_on:
-      database:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-marfanet}:${DB_PASSWORD}@database:5432/${DB_NAME:-marfanet_db}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      APP_URL: https://${DOMAIN_NAME}
-      PORT: 3000
-      SESSION_SECRET: ${SESSION_SECRET}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      DOMAIN_NAME: ${DOMAIN_NAME}
-      BCRYPT_ROUNDS: 12
-      
-      # API Keys
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
-      
-      # SMTP Configuration
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-    volumes:
-      - app_logs:/app/logs
-      - ./uploads:/app/uploads
-    ports:
-      - "3000:3000"
     networks:
       - marfanet-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: marfanet-nginx
-    restart: unless-stopped
-    depends_on:
-      - app
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/ssl/certs:ro
-      - nginx_logs:/var/log/nginx
-    networks:
-      - marfanet-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+volumes:
+  postgres-data:
+  redis-data:
 
 networks:
   marfanet-network:
     driver: bridge
-
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  app_logs:
-    driver: local
-  nginx_logs:
-    driver: local

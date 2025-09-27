@@ -9,7 +9,7 @@ import {
   type ManagerTaskExecution, type InsertManagerTaskExecution,
   type AiTestResult, type InsertAiTestResult
 } from "@shared/schema";
-import { db } from "../db";
+import { db, executeWithRetry } from "../database-manager";
 import { eq, desc, and, or, like, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -17,26 +17,26 @@ export class SettingsStorage {
   // ==================== CRM SETTINGS ====================
   
   async getCrmSettings(category?: string): Promise<CrmSetting[]> {
-    try {
-      const query = db.select().from(crmSettings);
-      if (category) {
-        return await query.where(eq(crmSettings.category, category));
-      }
-      return await query.orderBy(desc(crmSettings.updatedAt));
-    } catch (error) {
-      console.error('Error fetching CRM settings:', error);
-      throw new Error('خطا در دریافت تنظیمات');
-    }
+    return executeWithRetry(
+      async (): Promise<CrmSetting[]> => {
+        const query = db.select().from(crmSettings);
+        if (category) {
+          return await query.where(eq(crmSettings.category, category));
+        }
+        return await query.orderBy(desc(crmSettings.updatedAt));
+      },
+      'getCrmSettings'
+    );
   }
 
   async getCrmSetting(key: string): Promise<CrmSetting | undefined> {
-    try {
-      const result = await db.select().from(crmSettings).where(eq(crmSettings.key, key)).limit(1);
-      return result[0];
-    } catch (error) {
-      console.error(`Error fetching CRM setting ${key}:`, error);
-      throw new Error('خطا در دریافت تنظیم');
-    }
+    return executeWithRetry(
+      async (): Promise<CrmSetting | undefined> => {
+        const result = await db.select().from(crmSettings).where(eq(crmSettings.key, key)).limit(1);
+        return result[0];
+      },
+      `getCrmSetting-${key}`
+    );
   }
 
   async createCrmSetting(setting: InsertCrmSetting): Promise<CrmSetting> {

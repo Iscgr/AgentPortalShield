@@ -116,7 +116,7 @@ export default function DebtVerificationPanel() {
 
   const handleAutoFix = () => {
     setIsFixing(true);
-    autoFixMutation.mutate();
+    autoFixMutation.mutate(undefined);
     setIsFixing(false);
   };
 

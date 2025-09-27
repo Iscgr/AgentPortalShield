@@ -2,7 +2,7 @@
 import { queryClient } from './queryClient';
 
 export const apiRequest = async (url: string, options: RequestInit = {}) => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  const baseUrl = (import.meta as any).env?.VITE_API_BASE_URL || '';
   const fullUrl = `${baseUrl}${url}`;
   
   const response = await fetch(fullUrl, {
@@ -20,3 +20,6 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
 
   return response.json();
 };
+
+// Default export for compatibility
+export default apiRequest;

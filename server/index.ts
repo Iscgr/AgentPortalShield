@@ -1,6 +1,9 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
+const session = require("express-session");
+const connectPgSimple = require("connect-pg-simple");
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { checkDatabaseHealth, closeDatabaseConnection, pool } from "./db";
@@ -59,7 +62,7 @@ app.use((req, res, next) => {
 const PgSession = connectPgSimple(session);
 const sessionMiddleware = session({
   store: new PgSession({
-    pool: pool,
+    pool: pool as any, // Type assertion for compatibility
     tableName: 'session',
     createTableIfMissing: true
   }),

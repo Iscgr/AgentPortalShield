@@ -1,62 +1,59 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
-import * as schema from "@shared/schema";
+/**
+ * 🏗️ MARFANET DATABASE CONNECTION LAYER
+ * 
+ * این فایل به عنوان پل ارتباطی بین سیستم قدیمی و جدید عمل می‌کند
+ * و تمام قابلیت‌های قبلی را با بهبود‌های جدید ارائه می‌دهد
+ * 
+ * ✅ Backward Compatibility Maintained
+ * ✅ Enhanced Error Handling & Monitoring
+ * ✅ Automatic Environment Detection
+ * ✅ Intelligent Connection Management
+ */
 
-// Configure Neon for serverless environment with enhanced error handling
-neonConfig.webSocketConstructor = ws;
-neonConfig.useSecureWebSocket = true;
-neonConfig.pipelineConnect = false;
+// Import from the new intelligent database manager
+import { 
+  db, 
+  pool, 
+  checkDatabaseHealth, 
+  closeDatabaseConnection, 
+  executeWithRetry,
+  getDatabaseStatus,
+  logSlowQuery 
+} from './database-manager';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+// Re-export everything for backward compatibility
+export { 
+  db, 
+  pool, 
+  checkDatabaseHealth, 
+  closeDatabaseConnection,
+  logSlowQuery 
+};
+
+// Enhanced database operations with retry mechanism
+export const withDatabaseRetry = executeWithRetry;
+
+// Additional utilities for monitoring and debugging
+export async function getDatabaseInfo() {
+  const status = getDatabaseStatus();
+  console.log('📊 Database Status:', {
+    environment: status.environment,
+    healthy: status.isHealthy,
+    attempts: status.connectionAttempts,
+    lastCheck: status.lastHealthCheck,
+    uptime: `${Math.round(status.uptime / 1000)}s`
+  });
+  return status;
 }
 
-// Enhanced connection configuration with retry logic and connection pooling
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // SHERLOCK v32.2: Optimized connection pool
-  max: 20, // Maximum pool size
-  idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
-  connectionTimeoutMillis: 5000, // Connection timeout
-  maxUses: 7500, // Retire connections after 7500 uses
-});
-
-// Enhanced database instance with better error handling and performance monitoring
-export const db = drizzle({
-  client: pool,
-  schema,
-  logger: process.env.NODE_ENV === 'development'
-});
-
-// Performance monitoring for slow queries
-export function logSlowQuery(queryName: string, duration: number) {
-  if (duration > 100) {
-    console.warn(`⚠️ Slow query: ${queryName} - ${duration}ms`);
-  }
-}
-
-// Connection health check function
-export async function checkDatabaseHealth(): Promise<boolean> {
+// Graceful shutdown handler with improved logging
+export async function gracefulShutdown() {
+  console.log('🛑 Initiating graceful database shutdown...');
   try {
-    const client = await pool.connect();
-    await client.query('SELECT 1');
-    client.release();
-    return true;
+    await closeDatabaseConnection();
+    console.log('✅ Database shutdown completed successfully');
   } catch (error) {
-    console.error('Database health check failed:', error);
-    return false;
-  }
-}
-
-// Graceful shutdown handler
-export async function closeDatabaseConnection(): Promise<void> {
-  try {
-    await pool.end();
-    console.log('Database connections closed gracefully');
-  } catch (error) {
-    console.error('Error closing database connections:', error);
+    console.error('❌ Error during database shutdown:', error);
+    throw error;
   }
 }

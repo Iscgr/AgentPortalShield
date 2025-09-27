@@ -1,8 +1,10 @@
 
 import { Request, Response, NextFunction } from "express";
 
-// Simplified interfaces
-interface UnifiedSession extends Express.Session {
+// Simplified interfaces  
+interface UnifiedSession {
+  id?: string;
+  cookie?: any;
   authenticated?: boolean;
   userId?: number;
   username?: string;
@@ -18,7 +20,7 @@ interface UnifiedSession extends Express.Session {
   lastActivity?: string;
 }
 
-interface UnifiedAuthRequest extends Request {
+interface UnifiedAuthRequest extends Omit<Request, 'session'> {
   session?: UnifiedSession;
 }
 

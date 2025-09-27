@@ -6,7 +6,7 @@
 import { XAIGrokEngine } from './xai-grok-engine';
 import { db } from '../db.js';
 import { sql } from 'drizzle-orm';
-import * as persianDate from 'persian-date';
+import { createPersianDate } from '../utils/type-helpers';
 
 export interface TaskReport {
   id: string;
@@ -142,10 +142,10 @@ JSON format:
 }
 `;
 
-      const analysisResult = await this.grokEngine.generateCulturalInsights(
-        representative || { id: 1, name: 'نماینده عمومی' },
-        analysisPrompt
-      );
+      const analysisResult = await this.grokEngine.generateCulturalInsights({
+        representative: representative || { id: 1, name: 'نماینده عمومی' },
+        context: analysisPrompt
+      });
 
       // Try to parse as JSON, fallback to basic structure
       try {
@@ -304,7 +304,7 @@ JSON format:
    * دریافت روز کاری بعدی
    */
   private getNextWorkday(): string {
-    const tomorrow = new persianDate().add(1, 'day');
+    const tomorrow = createPersianDate().add(1, 'day');
     return tomorrow.format('YYYY-MM-DD');
   }
 

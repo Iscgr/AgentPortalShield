@@ -9,7 +9,7 @@ import {
   type WorkspaceReminder, type InsertWorkspaceReminder, 
   type RepresentativeSupportLog, type InsertRepresentativeSupportLog
 } from "@shared/schema";
-import { db } from "../db";
+import { db, executeWithRetry } from "../database-manager";
 import { eq, desc, and, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -21,40 +21,40 @@ export class WorkspaceStorage {
   
   // ==================== WORKSPACE TASKS ====================
   
-  async createTask(task: Omit<InsertWorkspaceTask, 'id'>): Promise<WorkspaceTask> {
-    try {
-      const taskId = `TASK-${new Date().toISOString().split('T')[0]}-${nanoid(3).toUpperCase()}`;
-      
-      const result = await db.insert(workspaceTasks).values([{
-        ...task,
-        id: taskId
-      }]).returning();
-      
-      return result[0];
-    } catch (error) {
-      console.error('Error creating workspace task:', error);
-      throw new Error('خطا در ایجاد وظیفه میز کار');
-    }
+  async createTask(task: InsertWorkspaceTask): Promise<WorkspaceTask> {
+    return executeWithRetry(
+      async () => {
+        const taskId = `TASK-${new Date().toISOString().split('T')[0]}-${nanoid(3).toUpperCase()}`;
+        
+        const result = await db.insert(workspaceTasks).values([{
+          ...task,
+          id: taskId
+        }]).returning();
+        
+        return result[0];
+      },
+      'createWorkspaceTask'
+    );
   }
 
   async getTasksByStaff(staffId: number, status?: WorkspaceTask['status']): Promise<WorkspaceTask[]> {
-    try {
-      if (status) {
-        return await db.select().from(workspaceTasks)
-          .where(and(
-            eq(workspaceTasks.staffId, staffId),
-            eq(workspaceTasks.status, status)
-          ))
-          .orderBy(desc(workspaceTasks.createdAt));
-      } else {
-        return await db.select().from(workspaceTasks)
-          .where(eq(workspaceTasks.staffId, staffId))
-          .orderBy(desc(workspaceTasks.createdAt));
-      }
-    } catch (error) {
-      console.error(`Error fetching tasks for staff ${staffId}:`, error);
-      throw new Error('خطا در دریافت وظایف');
-    }
+    return executeWithRetry(
+      async () => {
+        if (status) {
+          return await db.select().from(workspaceTasks)
+            .where(and(
+              eq(workspaceTasks.staffId, staffId),
+              eq(workspaceTasks.status, status)
+            ))
+            .orderBy(desc(workspaceTasks.createdAt));
+        } else {
+          return await db.select().from(workspaceTasks)
+            .where(eq(workspaceTasks.staffId, staffId))
+            .orderBy(desc(workspaceTasks.createdAt));
+        }
+      },
+      `getTasksByStaff-${staffId}`
+    );
   }
 
   async updateTaskStatus(taskId: string, status: WorkspaceTask['status']): Promise<void> {

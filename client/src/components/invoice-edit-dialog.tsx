@@ -14,7 +14,6 @@ import { Edit3, Plus, Trash2, Save, AlertTriangle, History, DollarSign, Clock, U
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useUnifiedAuth } from "@/contexts/unified-auth-context";
-import { useCrmAuth } from "@/hooks/use-crm-auth";
 import { apiRequest } from "@/lib/queryClient";
 
 interface EditableUsageRecord {
@@ -1139,7 +1138,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {editHistory && editHistory.length > 0 ? (
+                {editHistory && Array.isArray(editHistory) && editHistory.length > 0 ? (
                   <div className="space-y-4">
                     {editHistory.map((edit: any, index: number) => (
                       <div key={edit.id} className="border-l-4 border-blue-200 pl-4 py-2">
@@ -1180,7 +1179,7 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {financialTransactions && financialTransactions.length > 0 ? (
+                {financialTransactions && Array.isArray(financialTransactions) && financialTransactions.length > 0 ? (
                   <div className="space-y-4">
                     {financialTransactions.slice(0, 10).map((transaction: any) => (
                       <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
