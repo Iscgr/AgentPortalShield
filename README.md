@@ -4,19 +4,21 @@
 
 ![MarFaNet Logo](https://img.shields.io/badge/MarFaNet-Financial%20Management-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=)
 
-**سیستم مدیریت مالی جامع با هوش مصنوعی**
+**سیستم مدیریت مالی جامع با هوش مصنوعی و قابلیت نصب یک‌مرحله‌ای**
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://postgresql.org/)
 [![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue.svg)](https://typescriptlang.org/)
+[![Ubuntu](https://img.shields.io/badge/Ubuntu-20.04%2B%20%7C%2022.04%2B%20%7C%2024.04%2B-orange.svg)](https://ubuntu.com/)
 
 [🌟 ویژگی‌ها](#-ویژگی‌ها) •
+[🐳 نصب Docker](#-نصب-با-docker-پیشنهادی) •
 [🚀 نصب خودکار](#-نصب-خودکار) •
 [📚 راهنمای کامل](#-راهنمای-کامل) •
-[🔧 تنظیمات](#-تنظیمات) •
-[💻 توسعه](#-توسعه)
+[🔧 تنظیمات](#-تنظیمات)
 
 </div>
 
@@ -25,38 +27,48 @@
 ## 📖 فهرست مطالب
 
 - [معرفی سیستم](#-معرفی-سیستم)
-- [ویژگی‌ها](#-ویژگی‌ها)
+- [ویژگی‌های جدید](#-ویژگی‌های-جدید)
 - [معماری سیستم](#-معماری-سیستم)
-- [پیش‌نیازها](#-پیش‌نیازها)
-- [نصب خودکار](#-نصب-خودکار)
+- [گزینه‌های نصب](#-گزینه‌های-نصب)
+- [نصب با Docker (پیشنهادی)](#-نصب-با-docker-پیشنهادی)
+- [نصب خودکار بهبود یافته](#-نصب-خودکار-بهبود-یافته)
+- [نصب خودکار کلاسیک](#-نصب-خودکار-کلاسیک)
 - [راهنمای تنظیم دامنه](#-راهنمای-تنظیم-دامنه)
-- [راهنمای کلادفلر](#-راهنمای-کلادفلر)
 - [تنظیمات سرور](#-تنظیمات-سرور)
 - [استفاده از سیستم](#-استفاده-از-سیستم)
 - [API و ادغام](#-api-و-ادغام)
 - [نگهداری و پشتیبانی](#-نگهداری-و-پشتیبانی)
 - [عیب‌یابی](#-عیب‌یابی)
 - [توسعه](#-توسعه)
-- [مجوز](#-مجوز)
 
 ---
 
 ## 🎯 معرفی سیستم
 
-**MarFaNet** یک سیستم مدیریت مالی پیشرفته و جامع است که برای مدیریت نمایندگان فروش، فاکتورها، پرداخت‌ها و عملیات مالی در محیط کسب‌وکار فارسی طراحی شده است. این سیستم با استفاده از آخرین تکنولوژی‌های وب و هوش مصنوعی، راهکاری کامل برای مدیریت مالی ارائه می‌دهد.
+**MarFaNet** یک سیستم مدیریت مالی پیشرفته و جامع است که برای مدیریت نمایندگان فروش، فاکتورها، پرداخت‌ها و عملیات مالی در محیط کسب‌وکار فارسی طراحی شده است. این سیستم با استفاده از آخرین تکنولوژی‌های وب، Docker، و هوش مصنوعی، راهکاری کامل و امن برای مدیریت مالی ارائه می‌دهد.
 
 ### 🌟 چرا MarFaNet؟
 
-- **🤖 هوش مصنوعی**: تحلیل مالی هوشمند با Google Gemini AI
+- **🐳 Docker-Ready**: نصب آسان و ایزوله با containerization
 - **🔐 امنیت بالا**: احراز هویت چندمرحله‌ای و رمزگذاری
+- **⚡ نصب یک‌مرحله‌ای**: از صفر تا پروداکشن در یک دستور
+- **🤖 هوش مصنوعی**: تحلیل مالی هوشمند با Google Gemini AI
+- **🛡️ Ubuntu 22/24**: پشتیبانی کامل از آخرین نسخه‌های Ubuntu
+- **🔄 Atomic Deployment**: نصب ایمن با قابلیت rollback
 - **📱 موبایل‌محور**: طراحی ریسپانسیو برای همه دستگاه‌ها
 - **🇮🇷 فارسی‌ساز**: پشتیبانی کامل از زبان فارسی و تقویم شمسی
-- **⚡ سرعت بالا**: معماری مدرن با کارایی بهینه
-- **🔄 بروزرسانی خودکار**: سیستم بروزرسانی و پشتیبان‌گیری خودکار
 
 ---
 
-## ✨ ویژگی‌ها
+## ✨ ویژگی‌های جدید
+
+### 🚀 **نصب و deployment**
+- **🐳 کامل Docker Stack**: PostgreSQL + Redis + Nginx + SSL
+- **🔐 تولید خودکار پسوردها**: هیچ تنظیم دستی لازم نیست
+- **⚡ Zero-Config Installation**: فقط دامنه و ایمیل میپرسد
+- **🔒 Lock Mechanism**: جلوگیری از تداخل در deployments
+- **🛡️ Ubuntu Support**: 20.04 + 22.04 + 24.04 LTS
+- **📦 Atomic Operations**: نصب ایمن با تضمین یکپارچگی
 
 ### 🏢 مدیریت نمایندگان
 - ثبت و مدیریت اطلاعات نمایندگان
@@ -105,14 +117,14 @@ React 18 + TypeScript + Vite
 ├── Pages (Dashboard, Representatives, Invoices)
 ├── Hooks (Custom hooks for state management)
 ├── Services (API communication)
-└── Utils (Helper functions)
+└── Utils (Helper functions + Persian support)
 ```
 
 ### Backend (سرور)
 ```
 Node.js + Express + TypeScript
 ├── Routes (RESTful API endpoints)
-├── Services (Business logic)
+├── Services (Business logic + AI integration)
 ├── Middleware (Auth, Validation, Logging)
 ├── Database (Drizzle ORM + PostgreSQL)
 └── Integrations (AI, Telegram, External APIs)
@@ -129,19 +141,29 @@ PostgreSQL 15+
 └── Sessions (جلسات کاربری)
 ```
 
+### Infrastructure (زیرساخت)
+```
+Docker Containerization
+├── App Container (Node.js application)
+├── Database Container (PostgreSQL + Redis)
+├── Proxy Container (Nginx + SSL)
+└── Monitoring (Health checks + Logging)
+```
+
 ---
 
 ## 🔧 پیش‌نیازها
 
-### سیستم عامل
-- **Ubuntu 20.04+** (پیشنهادی)
-- **Debian 11+** (پشتیبانی شده)
-- **CentOS 8+** (با تغییرات جزئی)
+### سیستم عامل (پشتیبانی کامل)
+- **Ubuntu 20.04 LTS** ✅
+- **Ubuntu 22.04 LTS** ✅
+- **Ubuntu 24.04 LTS** ✅
+- **Debian 11+** ✅
 
 ### سخت‌افزار مینیمم
 - **CPU**: 2 هسته (4 هسته پیشنهادی)
-- **RAM**: 4GB (8GB پیشنهادی)
-- **Storage**: 20GB فضای خالی
+- **RAM**: 4GB (8GB پیشنهادی برای Docker)
+- **Storage**: 15GB فضای خالی (Docker نیاز بیشتری دارد)
 - **Network**: اتصال اینترنت پایدار
 
 ### دامنه و DNS
@@ -157,64 +179,170 @@ PostgreSQL 15+
 
 ---
 
-## 🚀 نصب خودکار
+## 🚀 گزینه‌های نصب
 
-MarFaNet یک اسکریپت نصب خودکار ارائه می‌دهد که تمام مراحل نصب را از صفر تا صد انجام می‌دهد.
+MarFaNet سه روش نصب مختلف ارائه می‌دهد:
 
-### مرحله 1: دانلود و اجرای اسکریپت
+| روش نصب | سطح تکنیکی | زمان نصب | ویژگی‌ها |
+|---------|-------------|----------|----------|
+| 🐳 **Docker** | مبتدی | 10-15 دقیقه | ایزوله، آسان، پایدار |
+| 🔧 **Enhanced Native** | متوسط | 15-20 دقیقه | کنترل بیشتر، monitoring |
+| ⚙️ **Classic Native** | پیشرفته | 20-25 دقیقه | کنترل کامل، سفارشی‌سازی |
+
+---
+
+## 🐳 نصب با Docker (پیشنهادی)
+
+**بهترین روش برای اکثر کاربران** - آسان، سریع، و ایزوله
+
+### ✨ مزایای Docker
+- **🔒 ایزوله کامل** - هیچ تداخلی با سیستم
+- **⚡ نصب سریع** - 10-15 دقیقه
+- **🛡️ امنیت بیشتر** - محیط جداگانه
+- **🔄 مدیریت آسان** - backup، update، rollback
+- **📦 همه‌چیز یکجا** - PostgreSQL + Redis + Nginx + SSL
+
+### 🚀 نصب یک‌دستوری
 
 ```bash
-# دانلود اسکریپت نصب
-wget https://raw.githubusercontent.com/Iscgr/AgentPortalShield/main/deploy.sh
-
-# اجازه اجرا
-chmod +x deploy.sh
-
-# اجرای نصب (به عنوان root)
-sudo ./deploy.sh
+# دانلود و اجرای اسکریپت Docker
+curl -sSL https://raw.githubusercontent.com/Iscgr/AgentPortalShield/main/docker-deploy.sh | sudo bash
 ```
 
-### مرحله 2: وارد کردن اطلاعات
+### 📋 اطلاعات درخواستی
 
-اسکریپت از شما اطلاعات زیر را خواهد پرسید:
+اسکریپت فقط دو چیز از شما می‌پرسد:
 
-#### 🌐 تنظیمات دامنه
-```
-Enter your domain name: your-domain.com
-Enter your email for SSL: your-email@example.com
-```
-
-#### 🗄️ تنظیمات دیتابیس
-```
-PostgreSQL database name [marfanet_db]: 
-PostgreSQL username [marfanet]: 
-PostgreSQL password: [رمز عبور قوی]
+```bash
+🌐 Enter your domain name: your-domain.com
+📧 Enter your email for SSL: your-email@example.com
 ```
 
-#### 👤 تنظیمات مدیر
+**همه پسوردها و تنظیمات خودکار تولید می‌شوند!**
+
+### ⏱️ مراحل نصب (10-15 دقیقه)
+
+1. **تشخیص سیستم عامل** (30 ثانیه)
+2. **بروزرسانی و نصب Docker** (3-5 دقیقه)
+3. **دانلود و ساخت containers** (5-7 دقیقه)
+4. **تنظیم SSL و امنیت** (2-3 دقیقه)
+5. **بررسی نهایی** (30 ثانیه)
+
+### 🎉 نتیجه نصب
+
+پس از نصب موفق، پیام زیر نمایش داده می‌شود:
+
 ```
-Admin username [admin]: 
-Admin password: [رمز عبور قوی]
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        🎉 DEPLOYMENT COMPLETED! 🎉                           ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  🌐 Application URL: https://your-domain.com                                 ║
+║  👨‍💼 Admin Panel: https://your-domain.com/admin                              ║
+║  📊 CRM Panel: https://your-domain.com/crm                                   ║
+║  🔗 Representative Portal: https://your-domain.com/portal/[ID]               ║
+║                                                                              ║
+║  🔐 Auto-Generated Credentials:                                              ║
+║     📧 Admin Username: admin                                                 ║
+║     🔑 Admin Password: [AUTO-GENERATED-PASSWORD]                             ║
+║     🗄️ Database Password: [AUTO-GENERATED-PASSWORD]                          ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
-#### 📦 مخزن پروژه
+### 🔧 مدیریت Docker
+
+```bash
+# مشاهده وضعیت containers
+docker compose -f /opt/marfanet/docker-compose.yml ps
+
+# مشاهده logs
+docker compose -f /opt/marfanet/docker-compose.yml logs -f
+
+# restart سرویس‌ها
+docker compose -f /opt/marfanet/docker-compose.yml restart
+
+# بروزرسانی سیستم
+cd /opt/marfanet && git pull && docker compose up -d --build
+
+# backup دیتابیس
+docker compose -f /opt/marfanet/docker-compose.yml exec database \
+  pg_dump -U marfanet marfanet_db > backup_$(date +%Y%m%d).sql
 ```
-GitHub repository URL [https://github.com/Iscgr/AgentPortalShield.git]: 
+
+---
+
+## 🔧 نصب خودکار بهبود یافته
+
+**برای کاربران پیشرفته** که کنترل بیشتری روی سیستم می‌خواهند
+
+### ✨ ویژگی‌های Enhanced
+- **🔍 File Integrity Verification** - بررسی صحت فایل‌ها
+- **🔒 Advanced Lock Mechanism** - جلوگیری از تداخل
+- **🔄 Atomic Deployment** - نصب ایمن با rollback
+- **📊 Performance Monitoring** - نظارت بر عملکرد
+- **⚡ Enhanced Error Handling** - مدیریت خطاهای پیشرفته
+
+### 🚀 نصب
+
+```bash
+# دانلود و اجرای اسکریپت بهبود یافته
+curl -sSL https://raw.githubusercontent.com/Iscgr/AgentPortalShield/main/enhanced-deploy.sh | sudo bash
 ```
 
-### مرحله 3: صبر برای تکمیل نصب
+### 📋 ویژگی‌های اضافی
 
-اسکریپت طی مراحل زیر کار خود را انجام می‌دهد:
+```bash
+# بررسی سیستم قبل از نصب
+sudo bash enhanced-deploy.sh --check
 
-1. **بروزرسانی سیستم** (2-5 دقیقه)
-2. **نصب Node.js 20** (1-2 دقیقه)
-3. **نصب PostgreSQL** (2-3 دقیقه)
-4. **نصب Nginx** (1 دقیقه)
-5. **کلون و ساخت اپلیکیشن** (3-5 دقیقه)
-6. **تنظیم SSL** (1-2 دقیقه)
+# نمایش راهنما
+sudo bash enhanced-deploy.sh --help
+```
+
+### ⏱️ مراحل نصب (15-20 دقیقه)
+
+1. **بررسی جامع سیستم** (1 دقیقه)
+2. **تولید خودکار تنظیمات** (30 ثانیه)
+3. **بروزرسانی سیستم** (3-5 دقیقه)
+4. **نصب وابستگی‌ها** (5-8 دقیقه)
+5. **deploy اتمیک اپلیکیشن** (3-5 دقیقه)
+6. **تنظیم SSL و امنیت** (2-3 دقیقه)
+
+---
+
+## ⚙️ نصب خودکار کلاسیک
+
+**روش اصلی** برای کاربران حرفه‌ای که کنترل کامل می‌خواهند
+
+### 🚀 نصب
+
+```bash
+# دانلود و اجرای اسکریپت کلاسیک
+curl -sSL https://raw.githubusercontent.com/Iscgr/AgentPortalShield/main/deploy.sh | sudo bash
+```
+
+### 📋 اطلاعات درخواستی
+
+```bash
+🌐 Enter your domain name: your-domain.com
+📧 Enter your email for SSL: your-email@example.com
+🗄️ PostgreSQL database name [marfanet_db]: 
+👤 PostgreSQL username [marfanet]: 
+🔑 PostgreSQL password: [your-password]
+👨‍💼 Admin username [admin]: 
+🔐 Admin password: [your-admin-password]
+```
+
+### ⏱️ مراحل نصب (20-25 دقیقه)
+
+1. **بروزرسانی سیستم** (3-5 دقیقه)
+2. **نصب Node.js 20** (2-3 دقیقه)
+3. **نصب PostgreSQL** (3-5 دقیقه)
+4. **نصب Nginx** (1-2 دقیقه)
+5. **کلون و ساخت اپلیکیشن** (5-8 دقیقه)
+6. **تنظیم SSL** (2-3 دقیقه)
 7. **تنظیم فایروال** (1 دقیقه)
-
-**⏱️ زمان کل نصب: 15-20 دقیقه**
 
 ---
 
@@ -246,7 +374,7 @@ Name: www
 Value: [IP آدرس سرور شما]
 TTL: 300
 
-# CNAME Record - ساب‌دامنه‌های اضافی (اختیاری)
+# CNAME Record - پورتال نمایندگان
 Type: CNAME
 Name: portal
 Value: your-domain.com
@@ -260,7 +388,7 @@ TTL: 300
 nslookup your-domain.com
 dig your-domain.com
 
-# بررسی از چندین مکان
+# بررسی آنلاین
 # https://dnschecker.org
 ```
 
@@ -268,25 +396,15 @@ dig your-domain.com
 
 ---
 
-## ☁️ راهنمای کلادفلر
+## ☁️ راهنمای کلادفلر (اختیاری)
 
-Cloudflare بهترین سرویس برای مدیریت DNS و بهبود عملکرد وب‌سایت است.
-
-### مرحله 1: ثبت‌نام در Cloudflare
+### مرحله 1: ثبت‌نام و اضافه کردن دامنه
 
 1. به [cloudflare.com](https://cloudflare.com) بروید
-2. روی **"Sign Up"** کلیک کنید
-3. اطلاعات خود را وارد کنید
+2. دامنه خود را اضافه کنید
+3. پلن **Free** را انتخاب کنید
 
-### مرحله 2: اضافه کردن دامنه
-
-1. روی **"Add a Site"** کلیک کنید
-2. دامنه خود را وارد کنید (مثل `your-domain.com`)
-3. پلن **Free** را انتخاب کنید (برای شروع کافی است)
-
-### مرحله 3: تنظیم DNS Records
-
-در صفحه DNS:
+### مرحله 2: تنظیم DNS Records
 
 ```dns
 # رکورد اصلی
@@ -301,497 +419,386 @@ Name: www
 IPv4 address: [IP سرور]
 Proxy status: Proxied 🟠
 
-# رکورد پورتال نمایندگان
+# پورتال نمایندگان
 Type: CNAME
 Name: portal
 Target: your-domain.com
 Proxy status: Proxied 🟠
 ```
 
-### مرحله 4: تغییر Nameservers
+### مرحله 3: تنظیمات امنیتی
 
-1. Cloudflare دو nameserver به شما می‌دهد:
-   ```
-   noah.ns.cloudflare.com
-   lola.ns.cloudflare.com
-   ```
-
-2. در پنل مدیریت دامنه خود، nameserver ها را تغییر دهید
-
-3. برگردید به Cloudflare و روی **"Done, check nameservers"** کلیک کنید
-
-### مرحله 5: تنظیمات امنیتی Cloudflare
-
-#### SSL/TLS Settings
 ```
 SSL/TLS encryption mode: Full (strict)
 Always Use HTTPS: On
-Minimum TLS Version: 1.2
-```
-
-#### Security Settings
-```
 Security Level: Medium
-Challenge Passage: 30 minutes
-Browser Integrity Check: On
-```
-
-#### Speed Settings
-```
 Auto Minify: JS, CSS, HTML
 Brotli: On
-Rocket Loader: Off (برای React)
-```
-
-### مرحله 6: تنظیم Page Rules (اختیاری)
-
-برای بهبود عملکرد:
-
-```
-URL: your-domain.com/api/*
-Settings: 
-  - Cache Level: Bypass
-  - Security Level: Medium
-
-URL: your-domain.com/*
-Settings:
-  - Always Use HTTPS: On
-  - Browser Cache TTL: 4 hours
 ```
 
 ---
 
-## 🔧 تنظیمات سرور
+## 📊 تنظیمات سرور
 
-### تنظیم متغیرهای محیطی
+### دسترسی به پنل‌های مدیریت
 
-پس از نصب، فایل `.env` را برای API کلیدها تنظیم کنید:
+پس از نصب موفق:
 
 ```bash
-# ویرایش فایل تنظیمات
-sudo nano /var/www/marfanet/.env
+# پنل مدیریت اصلی
+https://your-domain.com/admin
+
+# پنل CRM
+https://your-domain.com/crm
+
+# پورتال نمایندگان
+https://your-domain.com/portal/[ID]
+
+# API documentation
+https://your-domain.com/api/docs
+```
+
+### مدیریت دیتابیس
+
+```bash
+# اتصال مستقیم به دیتابیس (Docker)
+docker compose -f /opt/marfanet/docker-compose.yml exec database psql -U marfanet marfanet_db
+
+# اتصال مستقیم به دیتابیس (Native)
+sudo -u postgres psql marfanet_db
+
+# backup دیتابیس
+pg_dump -U marfanet marfanet_db > backup_$(date +%Y%m%d).sql
+
+# restore دیتابیس
+psql -U marfanet marfanet_db < backup_file.sql
+```
+
+### مشاهده logs
+
+```bash
+# Docker logs
+docker compose -f /opt/marfanet/docker-compose.yml logs -f app
+
+# Native logs
+journalctl -u marfanet -f
+tail -f /var/log/marfanet.log
+
+# Nginx logs
+tail -f /var/log/nginx/access.log
+tail -f /var/log/nginx/error.log
+```
+
+---
+
+## 🔧 استفاده از سیستم
+
+### ورود اولیه به سیستم
+
+1. **پنل مدیریت**: `https://your-domain.com/admin`
+   - Username: `admin`
+   - Password: `[پسورد تولید شده در نصب]`
+
+2. **پنل CRM**: `https://your-domain.com/crm`
+   - Username: `admin`
+   - Password: `[همان پسورد admin]`
+
+### ایجاد نماینده جدید
+
+1. وارد پنل مدیریت شوید
+2. به بخش "نمایندگان" بروید
+3. روی "افزودن نماینده" کلیک کنید
+4. اطلاعات را تکمیل کنید
+5. ID اختصاصی برای نماینده تولید می‌شود
+
+### دسترسی نماینده به پورتال
+
+```
+https://your-domain.com/portal/[ID]
+```
+
+مثال:
+```
+https://your-domain.com/portal/ABC123
+```
+
+### ثبت فاکتور جدید
+
+1. وارد پنل CRM شوید
+2. نماینده مورد نظر را انتخاب کنید
+3. روی "فاکتور جدید" کلیک کنید
+4. جزئیات فاکتور را وارد کنید
+5. فاکتور ذخیره می‌شود و بدهی محاسبه می‌شود
+
+### ثبت پرداخت
+
+1. وارد پنل CRM شوید
+2. به بخش "پرداخت‌ها" بروید
+3. نماینده و مبلغ را انتخاب کنید
+4. پرداخت بر اساس الگوریتم FIFO تخصیص می‌یابد
+
+---
+
+## 🔗 API و ادغام
+
+### تنظیم API Keys
+
+فایل تنظیمات را ویرایش کنید:
+
+```bash
+# Docker
+nano /opt/marfanet/.env
+
+# Native
+nano /var/www/marfanet/.env
 ```
 
 ```env
-# Database Configuration
-DATABASE_URL=postgresql://marfanet:password@localhost:5432/marfanet_db
+# Telegram Bot Integration
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 
-# Application Configuration
-NODE_ENV=production
-PORT=3000
-APP_URL=https://your-domain.com
-
-# Session Configuration
-SESSION_SECRET=your-generated-secret
-
-# Admin Configuration
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your-admin-password
-
-# ===== API KEYS (اضافه کنید) =====
-# Telegram Bot
-TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-
-# OpenAI API
-OPENAI_API_KEY=your-openai-api-key
+# OpenAI Integration
+OPENAI_API_KEY=your_openai_api_key
 
 # Google Gemini AI
-GOOGLE_GEMINI_API_KEY=your-gemini-api-key
+GOOGLE_GEMINI_API_KEY=your_gemini_api_key
 
-# Email Configuration (اختیاری)
+# SMTP Configuration
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
 ```
 
-### راهنمای دریافت API کلیدها
+### راهنمای دریافت API Keys
 
-#### 🤖 Telegram Bot Token
-
-1. به [@BotFather](https://t.me/BotFather) در تلگرام پیام دهید
-2. دستور `/newbot` را ارسال کنید
+#### Telegram Bot Token
+1. به [@BotFather](https://t.me/botfather) در تلگرام پیام دهید
+2. دستور `/newbot` را بفرستید
 3. نام و username برای ربات انتخاب کنید
-4. Token دریافتی را در `.env` قرار دهید
+4. Token دریافت شده را کپی کنید
 
-#### 🧠 OpenAI API Key
-
+#### OpenAI API Key
 1. به [platform.openai.com](https://platform.openai.com) بروید
-2. حساب کاربری ایجاد یا وارد شوید
-3. به بخش API Keys بروید
+2. وارد حساب کاربری خود شوید
+3. به بخش "API Keys" بروید
 4. یک کلید جدید ایجاد کنید
 
-#### 🔮 Google Gemini API Key
-
-1. به [makersuite.google.com](https://makersuite.google.com) بروید
+#### Google Gemini API Key
+1. به [Google AI Studio](https://makersuite.google.com) بروید
 2. وارد حساب Google خود شوید
 3. یک API key جدید ایجاد کنید
-4. کلید را در `.env` قرار دهید
 
-### راه‌اندازی پورتال نمایندگان
+### Restart پس از تغییرات
 
-برای دسترسی نمایندگان از طریق ID:
-
-#### روش 1: استفاده از Sub-domain
-```nginx
-# تنظیم در Cloudflare
-Type: CNAME
-Name: portal
-Target: your-domain.com
-
-# دسترسی: https://portal.your-domain.com?id=123
-```
-
-#### روش 2: استفاده از Path
-```
-# دسترسی مستقیم: https://your-domain.com/portal/123
-```
-
-#### روش 3: ساب‌دامنه اختصاصی برای هر نماینده
 ```bash
-# اتوماتیک در Nginx تنظیم شده
-# https://your-domain.com/portal/123
-# https://your-domain.com/portal/456
-```
+# Docker
+docker compose -f /opt/marfanet/docker-compose.yml restart
 
----
-
-## 📱 استفاده از سیستم
-
-### ورود به پنل مدیریت
-
-```
-URL: https://your-domain.com/admin
-Username: admin (یا آنچه در نصب وارد کردید)
-Password: [رمز عبور مدیر]
-```
-
-### ورود کاربران CRM
-
-```
-URL: https://your-domain.com/crm
-Username: [کاربر CRM]
-Password: [رمز عبور CRM]
-```
-
-### دسترسی نمایندگان
-
-```
-URL: https://your-domain.com/portal/[ID نماینده]
-مثال: https://your-domain.com/portal/123
-```
-
-### عملیات اصلی سیستم
-
-#### 1. مدیریت نمایندگان
-- ➕ **اضافه کردن نماینده جدید**
-- ✏️ **ویرایش اطلاعات نماینده**
-- 📊 **مشاهده گزارش عملکرد**
-- 🔗 **تولید لینک پورتال اختصاصی**
-
-#### 2. مدیریت فاکتورها
-- 📄 **صدور فاکتور جدید**
-- 📝 **ویرایش فاکتورهای موجود**
-- 🔍 **جستجو و فیلترینگ**
-- 📊 **گزارش‌گیری مالی**
-
-#### 3. مدیریت پرداخت‌ها
-- 💰 **ثبت پرداخت جدید**
-- 🔄 **تسویه خودکار با الگوریتم FIFO**
-- 📈 **ردیابی وضعیت پرداخت‌ها**
-- ⚠️ **هشدارهای سررسید**
-
-#### 4. گزارش‌گیری و تحلیل
-- 📊 **داشبورد مدیریتی**
-- 📈 **نمودارهای مالی**
-- 🤖 **تحلیل هوشمند AI**
-- 📄 **خروجی PDF/Excel**
-
----
-
-## 🔌 API و ادغام
-
-### API Endpoints اصلی
-
-#### Authentication
-```http
-POST /api/auth/login
-POST /api/auth/logout
-GET  /api/auth/profile
-```
-
-#### Representatives
-```http
-GET    /api/representatives
-POST   /api/representatives
-PUT    /api/representatives/:id
-DELETE /api/representatives/:id
-```
-
-#### Invoices
-```http
-GET    /api/invoices
-POST   /api/invoices
-PUT    /api/invoices/:id
-DELETE /api/invoices/:id
-```
-
-#### Payments
-```http
-GET    /api/payments
-POST   /api/payments
-PUT    /api/payments/:id
-```
-
-#### Reports
-```http
-GET /api/reports/financial
-GET /api/reports/representatives
-GET /api/reports/payments
-```
-
-### نمونه کد ادغام
-
-#### JavaScript/Node.js
-```javascript
-const axios = require('axios');
-
-const client = axios.create({
-  baseURL: 'https://your-domain.com/api',
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// ورود
-const login = async (username, password) => {
-  const response = await client.post('/auth/login', {
-    username,
-    password
-  });
-  return response.data;
-};
-
-// دریافت نمایندگان
-const getRepresentatives = async () => {
-  const response = await client.get('/representatives');
-  return response.data;
-};
-```
-
-#### Python
-```python
-import requests
-
-class MarFaNetAPI:
-    def __init__(self, base_url):
-        self.base_url = base_url
-        self.session = requests.Session()
-    
-    def login(self, username, password):
-        response = self.session.post(
-            f"{self.base_url}/auth/login",
-            json={"username": username, "password": password}
-        )
-        return response.json()
-    
-    def get_representatives(self):
-        response = self.session.get(f"{self.base_url}/representatives")
-        return response.json()
-
-# استفاده
-api = MarFaNetAPI("https://your-domain.com/api")
-api.login("admin", "password")
-representatives = api.get_representatives()
+# Native
+sudo systemctl restart marfanet
 ```
 
 ---
 
 ## 🛠️ نگهداری و پشتیبانی
 
-### اسکریپت‌های مدیریت سیستم
+### بروزرسانی سیستم
 
-#### بررسی وضعیت سیستم
+#### Docker
 ```bash
-# بررسی سلامت کلی سیستم
-sudo /var/www/marfanet/scripts/health-check.sh your-domain.com
-
-# مشاهده وضعیت سرویس‌ها
-sudo systemctl status marfanet nginx postgresql
+cd /opt/marfanet
+git pull origin main
+docker compose down
+docker compose up -d --build
 ```
 
-#### پشتیبان‌گیری
+#### Native
 ```bash
-# پشتیبان‌گیری خودکار
-sudo /var/www/marfanet/scripts/backup.sh
-
-# مشاهده پشتیبان‌ها
-ls -la /var/backups/marfanet/
+cd /var/www/marfanet
+git pull origin main
+npm install
+npm run build
+sudo systemctl restart marfanet
 ```
 
-#### بروزرسانی سیستم
-```bash
-# بروزرسانی اپلیکیشن
-sudo /var/www/marfanet/scripts/update.sh
+### پشتیبان‌گیری خودکار
 
-# بروزرسانی با فورس
-sudo /var/www/marfanet/scripts/update.sh --force
+#### تنظیم Cron Job برای backup روزانه
+
+```bash
+# ویرایش crontab
+crontab -e
+
+# اضافه کردن خط زیر برای backup روزانه در ساعت 2 شب
+0 2 * * * /opt/marfanet/scripts/backup.sh
 ```
 
-### مانیتورینگ و لاگ‌ها
+#### اسکریپت backup دستی
 
-#### مشاهده لاگ‌ها
 ```bash
-# لاگ اپلیکیشن
-sudo journalctl -u marfanet -f
+# Docker
+docker compose -f /opt/marfanet/docker-compose.yml exec database \
+  pg_dump -U marfanet marfanet_db > backup_$(date +%Y%m%d_%H%M%S).sql
 
-# لاگ Nginx
-sudo tail -f /var/log/nginx/marfanet.access.log
-sudo tail -f /var/log/nginx/marfanet.error.log
-
-# لاگ PostgreSQL
-sudo tail -f /var/log/postgresql/postgresql-15-main.log
+# Native
+sudo -u postgres pg_dump marfanet_db > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 
-#### نظارت بر منابع سیستم
+### مانیتورینگ سیستم
+
+#### بررسی وضعیت سرویس‌ها
+
 ```bash
-# استفاده CPU و RAM
+# Docker
+docker compose -f /opt/marfanet/docker-compose.yml ps
+
+# Native
+sudo systemctl status marfanet
+sudo systemctl status postgresql
+sudo systemctl status nginx
+```
+
+#### بررسی میزان استفاده منابع
+
+```bash
+# CPU و Memory
 htop
 
 # فضای دیسک
 df -h
 
-# اتصالات شبکه
-netstat -tulpn | grep :3000
+# مانیتورینگ پورت‌ها
+netstat -tlnp | grep :80
+netstat -tlnp | grep :443
+netstat -tlnp | grep :3000
 ```
 
-### برنامه‌ریزی تسک‌های خودکار
+### بررسی سلامت سیستم
 
-سیستم به طور خودکار تسک‌های زیر را انجام می‌دهد:
+```bash
+# تست دسترسی به وب‌سایت
+curl -I https://your-domain.com
 
-```cron
-# پشتیبان‌گیری روزانه در ساعت 2 صبح
-0 2 * * * /var/www/marfanet/scripts/backup.sh
+# تست API
+curl https://your-domain.com/api/health
 
-# تمدید SSL در ساعت 12 ظهر
-0 12 * * * /usr/bin/certbot renew --quiet
+# تست دیتابیس
+# Docker
+docker compose -f /opt/marfanet/docker-compose.yml exec database pg_isready
 
-# بررسی سلامت سیستم هر 30 دقیقه
-*/30 * * * * /var/www/marfanet/scripts/health-check.sh
+# Native
+sudo -u postgres pg_isready
 ```
 
 ---
 
 ## 🐛 عیب‌یابی
 
-### مشکلات رایج و راه‌حل‌ها
+### مشکلات متداول
 
-#### 1. اپلیکیشن در دسترس نیست
+#### 1. سایت باز نمی‌شود
 
-**علائم:**
-- خطای 502 Bad Gateway
-- صفحه لود نمی‌شود
-
-**راه‌حل:**
 ```bash
-# بررسی وضعیت سرویس
-sudo systemctl status marfanet
+# بررسی وضعیت سرویس‌ها
+docker compose -f /opt/marfanet/docker-compose.yml ps  # Docker
+sudo systemctl status marfanet nginx  # Native
 
-# راه‌اندازی مجدد
-sudo systemctl restart marfanet
+# بررسی logs
+docker compose -f /opt/marfanet/docker-compose.yml logs  # Docker
+journalctl -u marfanet -n 50  # Native
 
-# بررسی لاگ خطاها
-sudo journalctl -u marfanet --no-pager -l
+# بررسی فایروال
+sudo ufw status
 ```
 
-#### 2. مشکل دیتابیس
+#### 2. مشکل SSL Certificate
 
-**علائم:**
-- خطای اتصال به دیتابیس
-- صفحات خالی
+```bash
+# بروزرسانی گواهی
+sudo certbot renew --dry-run
 
-**راه‌حل:**
+# بررسی گواهی
+openssl s_client -connect your-domain.com:443
+
+# تجدید گواهی دستی
+sudo certbot certonly --nginx -d your-domain.com -d www.your-domain.com
+```
+
+#### 3. مشکل دیتابیس
+
 ```bash
 # بررسی وضعیت PostgreSQL
+# Docker
+docker compose -f /opt/marfanet/docker-compose.yml exec database pg_isready
+
+# Native
 sudo systemctl status postgresql
+sudo -u postgres psql -c "SELECT version();"
 
-# اتصال به دیتابیس
-sudo -u postgres psql -d marfanet_db
+# بررسی logs دیتابیس
+# Docker
+docker compose -f /opt/marfanet/docker-compose.yml logs database
 
-# اجرای مایگریشن مجدد
-cd /var/www/marfanet && npm run db:push
+# Native
+tail -f /var/log/postgresql/postgresql-*.log
 ```
 
-#### 3. مشکل SSL
+#### 4. مشکل اتصال API
 
-**علائم:**
-- هشدار گواهی نامعتبر
-- عدم امکان دسترسی HTTPS
-
-**راه‌حل:**
 ```bash
-# بررسی وضعیت گواهی
-sudo certbot certificates
+# بررسی متغیرهای محیطی
+cat /opt/marfanet/.env | grep API  # Docker
+cat /var/www/marfanet/.env | grep API  # Native
 
-# تمدید دستی گواهی
-sudo certbot renew --force-renewal
-
-# راه‌اندازی مجدد Nginx
-sudo systemctl restart nginx
+# تست اتصال
+curl -X POST "https://api.openai.com/v1/models" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-#### 4. مشکل عملکرد
+### نظارت بر Performance
 
-**علائم:**
-- سرعت پایین
-- تایم‌اوت درخواست‌ها
-
-**راه‌حل:**
 ```bash
-# بررسی استفاده منابع
-htop
-df -h
-free -h
+# مشاهده آمار real-time
+docker stats  # Docker containers
+sudo iotop  # Disk I/O
+sudo nethogs  # Network usage
 
-# بررسی لاگ عملکرد
-sudo journalctl -u marfanet | grep "PERFORMANCE"
-
-# راه‌اندازی مجدد سرویس‌ها
-sudo systemctl restart marfanet nginx
+# آنالیز logs
+tail -f /var/log/nginx/access.log | grep -E "slow|error"
 ```
 
-### راهنمای تشخیص سریع
+### گزارش مشکل
 
-#### تست‌های اولیه
-```bash
-# تست پاسخ HTTP
-curl -I http://localhost:3000
+اگر مشکلی حل نشد:
 
-# تست پاسخ HTTPS
-curl -I https://your-domain.com
+1. **Logs را جمع‌آوری کنید**:
+   ```bash
+   # ایجاد پکیج logs
+   mkdir problem_report_$(date +%Y%m%d)
+   
+   # Docker
+   docker compose -f /opt/marfanet/docker-compose.yml logs > problem_report/docker.log
+   
+   # System logs
+   journalctl -n 100 > problem_report/system.log
+   sudo nginx -T > problem_report/nginx_config.txt
+   ```
 
-# تست اتصال دیتابیس
-sudo -u postgres psql -d marfanet_db -c "SELECT 1;"
+2. **اطلاعات سیستم**:
+   ```bash
+   uname -a > problem_report/system_info.txt
+   df -h > problem_report/disk_usage.txt
+   free -h > problem_report/memory_usage.txt
+   ```
 
-# تست API
-curl -X GET https://your-domain.com/api/health
-```
-
-#### کدهای خطای رایج
-
-| کد خطا | معنی | راه‌حل |
-|--------|------|--------|
-| 502 | Bad Gateway | بررسی سرویس اپلیکیشن |
-| 503 | Service Unavailable | بررسی بار سرور |
-| 500 | Internal Server Error | بررسی لاگ‌ها |
-| 404 | Not Found | بررسی تنظیمات Nginx |
-| 403 | Forbidden | بررسی مجوزها |
+3. **ارسال گزارش**: فایل‌ها را به تیم پشتیبانی ارسال کنید
 
 ---
 
 ## 💻 توسعه
 
-### راه‌اندازی محیط توسعه
+### محیط توسعه محلی
 
 #### پیش‌نیازها
 ```bash
@@ -806,223 +813,108 @@ sudo apt install postgresql postgresql-contrib
 sudo apt install git
 ```
 
-#### کلون پروژه
+#### راه‌اندازی
+
 ```bash
+# کلون کردن پروژه
 git clone https://github.com/Iscgr/AgentPortalShield.git
 cd AgentPortalShield
-```
 
-#### نصب dependencies
-```bash
+# نصب dependencies
 npm install
-```
 
-#### تنظیم دیتابیس توسعه
-```bash
-# ایجاد دیتابیس
-sudo -u postgres createdb marfanet_dev
+# تنظیم environment
+cp .env.example .env
+nano .env
 
-# تنظیم متغیرهای محیطی
-cp .env.example .env.local
-# ویرایش .env.local
-```
+# راه‌اندازی دیتابیس
+npm run db:push
 
-#### اجرای حالت توسعه
-```bash
+# اجرای حالت توسعه
 npm run dev
 ```
 
 ### ساختار پروژه
 
 ```
-AgentPortalShield/
-├── client/                 # React Frontend
+MarFaNet/
+├── client/                 # Frontend (React + TypeScript)
 │   ├── src/
 │   │   ├── components/     # UI Components
-│   │   ├── pages/         # Pages
+│   │   ├── pages/         # Page Components
 │   │   ├── hooks/         # Custom Hooks
 │   │   ├── lib/           # Utilities
-│   │   └── styles/        # Styles
-├── server/                # Express Backend
+│   │   └── styles/        # Styling
+├── server/                # Backend (Node.js + Express)
 │   ├── routes/           # API Routes
 │   ├── services/         # Business Logic
 │   ├── middleware/       # Express Middleware
 │   └── utils/            # Server Utilities
-├── shared/               # Shared Types & Schema
-│   └── schema.ts         # Database Schema
+├── shared/               # Shared Types & Schemas
 ├── scripts/              # Deployment Scripts
-├── deploy.sh             # Auto Deploy Script
-└── README.md             # This File
+├── docker-compose.yml    # Docker Configuration
+├── Dockerfile           # Docker Build
+└── package.json         # Dependencies
 ```
 
-### دستورات مفید
+### Contributing
 
-```bash
-# Development
-npm run dev          # شروع dev server
-npm run build        # ساخت برای production
-npm run start        # اجرای production build
+1. Fork کنید
+2. Branch جدید بسازید (`git checkout -b feature/amazing-feature`)
+3. تغییرات را commit کنید (`git commit -m 'Add amazing feature'`)
+4. Push کنید (`git push origin feature/amazing-feature`)
+5. Pull Request باز کنید
 
-# Database
-npm run db:push      # اعمال تغییرات schema
-npm run db:studio    # باز کردن Drizzle Studio
+### API Documentation
 
-# Type Checking
-npm run check        # بررسی TypeScript errors
-
-# Linting & Formatting
-npm run lint         # بررسی کیفیت کد
-npm run format       # فرمت کردن کد
+مستندات کامل API در آدرس زیر در دسترس است:
 ```
-
-### ساخت ویژگی‌های جدید
-
-#### 1. اضافه کردن مدل جدید
-```typescript
-// shared/schema.ts
-export const newTable = pgTable('new_table', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  createdAt: timestamp('created_at').defaultNow()
-});
-```
-
-#### 2. ایجاد API endpoint
-```typescript
-// server/routes/newRoute.ts
-import { Router } from 'express';
-
-const router = Router();
-
-router.get('/new-endpoint', async (req, res) => {
-  // Business logic
-  res.json({ success: true });
-});
-
-export default router;
-```
-
-#### 3. ساخت کامپوننت UI
-```tsx
-// client/src/components/NewComponent.tsx
-export function NewComponent() {
-  return (
-    <div className="p-4">
-      <h1>New Component</h1>
-    </div>
-  );
-}
-```
-
-### راهنمای مشارکت
-
-1. **Fork** کردن پروژه
-2. ایجاد **branch** جدید برای ویژگی
-3. **Commit** تغییرات با پیام‌های واضح
-4. **Push** به branch خود
-5. ایجاد **Pull Request**
-
-### استانداردهای کدنویسی
-
-- استفاده از **TypeScript** برای type safety
-- پیروی از **ESLint** rules
-- نوشتن **کامنت** برای کدهای پیچیده
-- **تست** نوشتن برای ویژگی‌های جدید
-- استفاده از **Prettier** برای فرمت کد
-
----
-
-## 🤝 حمایت و پشتیبانی
-
-### گزارش مشکلات
-
-اگر با مشکلی مواجه شدید:
-
-1. **GitHub Issues**: [ایجاد مسئله جدید](https://github.com/Iscgr/AgentPortalShield/issues)
-2. **توضیح دقیق مشکل**: لاگ‌ها، screenshot ها
-3. **اطلاعات محیط**: OS، Node.js version، browser
-
-### درخواست ویژگی‌های جدید
-
-برای پیشنهاد ویژگی جدید:
-
-1. ابتدا [Issues موجود](https://github.com/Iscgr/AgentPortalShield/issues) را بررسی کنید
-2. اگر ویژگی وجود ندارد، یک Issue جدید ایجاد کنید
-3. توضیح کاملی از ویژگی مورد نظر ارائه دهید
-
-### مشارکت در توسعه
-
-ما از مشارکت جامعه استقبال می‌کنیم:
-
-- **Code contribution**: پیاده‌سازی ویژگی‌ها و رفع باگ‌ها
-- **Documentation**: بهبود مستندات
-- **Testing**: تست و گزارش مشکلات
-- **Translation**: ترجمه به زبان‌های دیگر
-
----
-
-## 📜 مجوز
-
-این پروژه تحت مجوز [MIT License](LICENSE) منتشر شده است.
-
-```
-MIT License
-
-Copyright (c) 2024 MarFaNet Development Team
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+https://your-domain.com/api/docs
 ```
 
 ---
 
-## 🌟 ویژگی‌های آینده
+## 📞 پشتیبانی و تماس
 
-### نسخه 2.0 (در دست توسعه)
+### منابع یادگیری
+- **📚 Wiki**: [GitHub Wiki](https://github.com/Iscgr/AgentPortalShield/wiki)
+- **🎥 آموزش‌های ویدئویی**: Coming Soon
+- **📖 مستندات تکنیکی**: [Technical Docs](TECHNICAL_DOCUMENTATION.md)
 
-- **🔄 PWA Support**: تبدیل به Progressive Web App
-- **📱 Mobile App**: اپلیکیشن موبایل native
-- **🔗 API Gateway**: ادغام با سیستم‌های خارجی
-- **📊 Advanced Analytics**: تحلیل‌های پیشرفته‌تر
-- **🤖 Chatbot**: ربات پشتیبانی هوشمند
-- **🔐 2FA**: احراز هویت دو مرحله‌ای
-- **🌍 Multi-language**: پشتیبانی از زبان‌های بیشتر
+### گزارش باگ و درخواست فیچر
+- **🐛 Issues**: [GitHub Issues](https://github.com/Iscgr/AgentPortalShield/issues)
+- **💡 Feature Requests**: [GitHub Discussions](https://github.com/Iscgr/AgentPortalShield/discussions)
 
-### درخواست‌های جامعه
+### راه‌های ارتباطی
+- **📧 Email**: [ایمیل پشتیبانی]
+- **💬 Telegram**: [کانال پشتیبانی]
+- **🌐 Website**: [وب‌سایت رسمی]
 
-بر اساس بازخوردهای کاربران:
+---
 
-- **📈 Dashboard سفارشی**: قابلیت تنظیم داشبورد
-- **📄 Templates**: قالب‌های آماده فاکتور
-- **💱 Multi-currency**: پشتیبانی از ارزهای مختلف
-- **🔔 Smart Notifications**: اعلان‌های هوشمند‌تر
+## 📄 مجوز
+
+این پروژه تحت مجوز MIT منتشر شده است. برای اطلاعات بیشتر فایل [LICENSE](LICENSE) را مطالعه کنید.
+
+---
+
+## 🙏 تشکر و قدردانی
+
+از همه کسانی که در توسعه MarFaNet مشارکت داشته‌اند تشکر می‌کنیم:
+
+- **توسعه‌دهندگان**: تیم MarFaNet
+- **آزمایش‌کنندگان**: کاربران بتا
+- **طراحان**: تیم UI/UX
+- **DevOps**: تیم زیرساخت
 
 ---
 
 <div align="center">
 
-### 🎉 تبریک! MarFaNet شما آماده است!
+**🌟 اگر MarFaNet برایتان مفید بود، لطفاً یک ستاره ⭐ بدهید!**
 
-**برای راهنمایی بیشتر یا پشتیبانی، با ما در تماس باشید.**
+**ساخته شده با ❤️ برای جامعه توسعه‌دهندگان فارسی‌زبان**
 
-[![GitHub](https://img.shields.io/badge/GitHub-MarFaNet-blue?style=for-the-badge&logo=github)](https://github.com/Iscgr/AgentPortalShield)
-[![Website](https://img.shields.io/badge/Website-MarFaNet-green?style=for-the-badge&logo=web)](https://your-domain.com)
-
-**ساخته شده با ❤️ برای جامعه کسب‌وکار ایران**
+[⬆️ برگشت به بالا](#-marfanet-financial-management-system)
 
 </div>
