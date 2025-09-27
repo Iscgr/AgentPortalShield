@@ -95,10 +95,10 @@ export class EnhancedPaymentAllocationEngine {
           allocatedBy: 'SYSTEM'
         });
 
-        // ✅ فوری: تخصیص واقعی در پایگاه داده
+        // ✅ ATOMOS v2.0: تخصیص واقعی فاکتور به پرداخت
         await db.update(payments)
           .set({
-            // invoiceId: invoice.id, // This should not be set here, it's a one-to-many relationship
+            invoiceId: invoice.id, // ✅ اصلاح: ثبت ارتباط payment به invoice
             isAllocated: true,
             updatedAt: new Date()
           })
@@ -480,4 +480,5 @@ export class EnhancedPaymentAllocationEngine {
   }
 }
 
-export const enhancedPaymentAllocationEngine = new EnhancedPaymentAllocationEngine();
+// ✅ ATOMOS v2.0: Export استاتیک برای سازگاری
+export const enhancedPaymentAllocationEngine = EnhancedPaymentAllocationEngine;

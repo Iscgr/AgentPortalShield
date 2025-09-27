@@ -163,8 +163,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SHERLOCK v32.0: Register Batch Rollback Routes for safe invoice deletion
   registerBatchRollbackRoutes(app, authMiddleware);
 
-  // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
+  // ✅ SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
+
+  // ✅ ATOMOS v2.0: Payment Allocation API Endpoints
+  app.post("/api/payments/:id/allocate-auto", authMiddleware, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const rules = req.body.rules || { method: 'FIFO', allowPartialAllocation: true };
+
+      // Dynamically import the enhancedPaymentAllocationEngine
+      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+      const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, rules);
+
+      if (result.success) {
+        // Force cache invalidation for affected representative
+        const payment = await storage.getPayment(paymentId);
+        if (payment) {
+          // Dynamically import the unifiedFinancialEngine
+          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+          unifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, {
+            reason: "payment_allocation",
+            immediate: true
+          });
+        }
+
+        res.json({ success: true, result });
+      } else {
+        res.status(400).json({ success: false, errors: result.errors });
+      }
+    } catch (error) {
+      console.error("ATOMOS v2.0 Auto-allocation error:", error);
+      res.status(500).json({ error: "خطا در تخصیص خودکار پرداخت" });
+    }
+  });
+
+  app.post("/api/payments/:id/allocate-manual", authMiddleware, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const { invoiceId, amount } = req.body;
+      const performedBy = req.session?.user?.username || 'SYSTEM';
+
+      // Dynamically import the enhancedPaymentAllocationEngine
+      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+      const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
+        paymentId, invoiceId, amount, performedBy
+      );
+
+      if (result.success) {
+        // Force cache invalidation for affected representative
+        const payment = await storage.getPayment(paymentId);
+        if (payment) {
+          // Dynamically import the unifiedFinancialEngine
+          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+          unifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, {
+            reason: "manual_payment_allocation",
+            immediate: true
+          });
+        }
+
+        res.json({ success: true, result });
+      } else {
+        res.status(400).json({ success: false, errors: result.errors });
+      }
+    } catch (error) {
+      console.error("ATOMOS v2.0 Manual allocation error:", error);
+      res.status(500).json({ error: "خطا در تخصیص دستی پرداخت" });
+    }
+  });
+
+  app.post("/api/payments/:id/deallocate", authMiddleware, async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const { invoiceId, reason } = req.body;
+      const performedBy = req.session?.user?.username || 'SYSTEM';
+
+      // Dynamically import the enhancedPaymentAllocationEngine
+      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+      const result = await EnhancedPaymentAllocationEngine.deallocatePayment(
+        paymentId, invoiceId, performedBy, reason || 'Manual deallocation'
+      );
+
+      if (result.success) {
+        // Force cache invalidation for affected representative
+        const payment = await storage.getPayment(paymentId);
+        if (payment) {
+          // Dynamically import the unifiedFinancialEngine
+          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+          unifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, {
+            reason: "payment_deallocation",
+            immediate: true
+          });
+        }
+
+        res.json({ success: true, result });
+      } else {
+        res.status(400).json({ success: false, errors: result.errors });
+      }
+    } catch (error) {
+      console.error("ATOMOS v2.0 Deallocation error:", error);
+      res.status(500).json({ error: "خطا در لغو تخصیص پرداخت" });
+    }
+  });
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
@@ -449,12 +549,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 totalRepresentatives: summary.totalRepresentatives?.toString() || repsResult[0]?.total?.toString() || "0",
                 activeRepresentatives: summary.activeRepresentatives?.toString() || repsResult[0]?.active?.toString() || "0",
                 totalSystemSales: summary.totalSystemSales?.toString() || "0",
-                totalSystemPaid: summary.totalSystemPaid?.toString() || "0", 
+                totalSystemPaid: summary.totalSystemPaid?.toString() || "0",
                 totalSystemDebt: summary.totalSystemDebt || 0,
 
                 // Invoice breakdown
                 totalOverdueAmount: summary.totalOverdueAmount?.toString() || "0",
-                totalUnpaidAmount: summary.totalUnpaidAmount?.toString() || "0", 
+                totalUnpaidAmount: summary.totalUnpaidAmount?.toString() || "0",
                 overdueInvoicesCount: summary.overdueInvoicesCount?.toString() || "0",
                 unpaidInvoicesCount: summary.unpaidInvoicesCount?.toString() || invoiceStats[0]?.unpaid?.toString() || "0",
 
@@ -477,7 +577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               invoices: {
                 total: invoiceStats[0]?.total?.toString() || "0",
                 paid: invoiceStats[0]?.paid?.toString() || "0",
-                unpaid: invoiceStats[0]?.unpaid?.toString() || "0", 
+                unpaid: invoiceStats[0]?.unpaid?.toString() || "0",
                 overdue: invoiceStats[0]?.overdue?.toString() || "0"
               },
               payments: {
@@ -531,13 +631,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           summary: {
             totalRepresentatives: "0",
-            activeRepresentatives: "0", 
+            activeRepresentatives: "0",
             totalSystemSales: "0",
             totalSystemPaid: "0",
             totalSystemDebt: 0,
             totalOverdueAmount: "0",
             totalUnpaidAmount: "0",
-            overdueInvoicesCount: "0", 
+            overdueInvoicesCount: "0",
             unpaidInvoicesCount: "0",
             healthyReps: 0,
             moderateReps: 0,
@@ -555,7 +655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         meta: {
           timestamp: new Date().toISOString(),
-          cacheStatus: "ERROR", 
+          cacheStatus: "ERROR",
           queryTimeMs: errorDuration,
           emergencyFallback: true
         }
@@ -831,10 +931,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       } catch (fallbackError) {
         console.error('❌ Fallback also failed:', fallbackError);
-        res.status(500).json({ 
-          error: "خطا در دریافت نمایندگان", 
+        res.status(500).json({
+          error: "خطا در دریافت نمایندگان",
           details: "سیستم موقتاً در دسترس نیست",
-          fallback: true 
+          fallback: true
         });
       }
     }
@@ -1112,7 +1212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })).sort((a, b) => {
           const dateA = new Date(a.paymentDate);
           const dateB = new Date(b.paymentDate);
-          return dateB.getTime() - dateA.getTime();
+          return dateB.getTime() - dateB.getTime(); // Sort descending by payment date
         }),
 
         // ✅ اطلاعات اضافی برای نمایش در پرتال
@@ -1425,7 +1525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`🔄 ATOMOS v1.0: Executing auto-allocation for Representative ${representativeId}`);
 
         try {
-          // Import Enhanced Payment Allocation Engine  
+          // Import Enhanced Payment Allocation Engine
           const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
 
           // Execute auto allocation using enhanced engine
@@ -1570,9 +1670,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
       const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
-        paymentId, 
-        invoiceId, 
-        parseFloat(amount), 
+        paymentId,
+        invoiceId,
+        parseFloat(amount),
         'USER'
       );
 
@@ -1593,7 +1693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error(`❌ ATOMOS v2.0: Manual allocation failed:`, result.errors);
         res.status(400).json({
           success: false,
-          error: "تخصیص دستی ناموفق", 
+          error: "تخصیص دستی ناموفق",
           details: result.errors
         });
       }
@@ -1615,8 +1715,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
       const result = await EnhancedPaymentAllocationEngine.deallocatePayment(
-        paymentId, 
-        invoiceId, 
+        paymentId,
+        invoiceId,
         'USER',
         reason || 'Manual deallocation'
       );
@@ -2559,8 +2659,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // All financial reconciliation now uses the standardized Financial Integrity Engine
   // Available at: /api/financial-integrity/representative/:id/reconcile
 
-
-
   // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use unified statistics endpoints instead
 
   // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use standardized payment processing endpoints
@@ -2847,7 +2945,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize default settings on first run
   // 🛠️ SHERLOCK v12.0: ENHANCED INVOICE EDIT ROUTE WITH DEBUG LOGGING
   app.post("/api/invoices/edit", authMiddleware, async (req, res) => {
     const debug = {

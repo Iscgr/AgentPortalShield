@@ -543,9 +543,7 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Payment input fields and buttons will be here */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Example: Amount input */}
             <div>
               <label htmlFor="paymentAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 مبلغ پرداخت
@@ -558,28 +556,84 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Example: Invoice selection dropdown */}
             <div>
-              <label htmlFor="invoiceSelect" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                انتخاب فاکتور
+              <label htmlFor="representativeSelect" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                انتخاب نماینده
               </label>
               <select
-                id="invoiceSelect"
+                id="representativeSelect"
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600"
               >
-                <option>فاکتور 1001</option>
-                <option>فاکتور 1002</option>
-                <option>فاکتور 1003</option>
+                <option value="">انتخاب نماینده...</option>
+                {dashboardData?.representatives && (
+                  <option value="8phone">8phone</option>
+                )}
               </select>
             </div>
           </div>
 
-          {/* Buttons for allocation */}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => console.log("Auto Allocate FIFO")}>
+            <Button 
+              variant="outline" 
+              onClick={async () => {
+                const amount = (document.getElementById('paymentAmount') as HTMLInputElement)?.value;
+                const repCode = (document.getElementById('representativeSelect') as HTMLSelectElement)?.value;
+                
+                if (!amount || !repCode) {
+                  alert('لطفاً مبلغ و نماینده را انتخاب کنید');
+                  return;
+                }
+
+                try {
+                  // First create payment
+                  const paymentResponse = await fetch('/api/payments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      representativeCode: repCode,
+                      amount: amount,
+                      paymentDate: new Date().toISOString().split('T')[0],
+                      description: 'پرداخت با تخصیص خودکار FIFO'
+                    })
+                  });
+
+                  if (paymentResponse.ok) {
+                    const payment = await paymentResponse.json();
+                    
+                    // Then auto-allocate using FIFO
+                    const allocateResponse = await fetch(`/api/payments/${payment.id}/allocate-auto`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({
+                        rules: { method: 'FIFO', allowPartialAllocation: true }
+                      })
+                    });
+
+                    if (allocateResponse.ok) {
+                      alert('✅ پرداخت ثبت و تخصیص خودکار FIFO انجام شد');
+                      window.location.reload();
+                    } else {
+                      alert('❌ خطا در تخصیص خودکار');
+                    }
+                  } else {
+                    alert('❌ خطا در ثبت پرداخت');
+                  }
+                } catch (error) {
+                  console.error('Payment error:', error);
+                  alert('❌ خطا در عملیات');
+                }
+              }}
+            >
               تخصیص خودکار (FIFO)
             </Button>
-            <Button onClick={() => console.log("Manual Allocate")}>
+            <Button 
+              onClick={() => {
+                alert('برای تخصیص دستی، به صفحه نمایندگان مراجعه کنید');
+                window.location.href = '/representatives';
+              }}
+            >
               تخصیص دستی
             </Button>
           </div>
