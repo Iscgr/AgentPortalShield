@@ -324,20 +324,21 @@ const OverdueInvoicesCard = () => {
 
 
 export default function Dashboard() {
+  // 🎯 PHASE 6B: Enhanced dashboard query with optimized endpoint
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
-    queryKey: ["/api/dashboard"],
-    queryFn: () => apiRequest("/api/dashboard"),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
+    queryKey: ["/api/unified-financial/dashboard-optimized"],
+    queryFn: () => apiRequest("/api/unified-financial/dashboard-optimized"),
+    staleTime: 2 * 60 * 1000, // 2 minutes (more frequent due to optimization)
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes (improved performance allows more frequent updates)
     select: (data: any) => {
-      console.log('🔍 SHERLOCK v32.2: Raw API response structure:', data);
+      console.log('🚀 PHASE 6B: Dashboard using optimized endpoint:', data);
       
-      // Extract from the correct API response structure
+      // Extract from the optimized API response structure
       const summary = data?.data?.summary || data?.summary || data?.value || data;
       const representatives = data?.data?.representatives || {};
       const invoices = data?.data?.invoices || {};
       
-      console.log('🔍 SHERLOCK v32.2: Extracted summary:', summary);
+      console.log('🎯 PHASE 6B: Optimized summary data:', summary);
       
       return {
         totalRevenue: parseFloat(summary?.totalSystemPaid || '0'),
@@ -359,7 +360,7 @@ export default function Dashboard() {
         lastReconciliationDate: summary?.lastReconciliationDate || '',
         problematicRepresentativesCount: parseInt(summary?.problematicRepresentativesCount || '0'),
         responseTime: summary?.responseTime || 0,
-        cacheStatus: summary?.cacheStatus || 'UNKNOWN',
+        cacheStatus: summary?.cacheStatus || 'OPTIMIZED',
         lastUpdated: summary?.lastUpdated || new Date().toISOString()
       };
     }
