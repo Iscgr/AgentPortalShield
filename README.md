@@ -1,369 +1,625 @@
-# MarFaNet Financial Management System
 
-## 🏛️ Enterprise Architecture Overview
+# راهنمای کامل نصب و راه‌اندازی MarFaNet
 
-MarFaNet is a comprehensive financial management system designed for enterprise-level invoice processing, representative management, and financial operations. Built with a modern full-stack architecture, it provides advanced features like AI-powered financial analysis, Telegram integration, bulk JSON processing, and multi-platform portal access.
+## 🌟 مقدمه
 
-## 🚀 Quick Start
+MarFaNet سیستم مدیریت مالی پیشرفته‌ای است که برای مدیریت فاکتورها، نمایندگان فروش، و عملیات مالی طراحی شده است. این راهنما شامل تمام مراحل نصب از صفر تا صد برای افراد مبتدی است.
 
-### Prerequisites
-- **Node.js**: v18+ (recommended: v20+)
-- **PostgreSQL**: v14+ (Neon serverless recommended)
-- **API Keys**: Google Gemini AI, Telegram Bot (optional)
+## 🎯 روش‌های نصب
 
-### Installation & Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd marfanet-financial-system
-
-# Install dependencies
-npm install
-
-# Environment configuration
-cp .env.example .env
-# Configure DATABASE_URL and GEMINI_API_KEY in .env
-
-# Database setup
-npm run db:push
-
-# Start development server
-npm run dev
-```
-
-The application will be available at `http://localhost:5000`
-
-**Default Admin Credentials:**
-- Username: `mgr`
-- Password: `8679`
-
-## 🏗️ System Architecture
-
-### Technology Stack
-
-#### Frontend
-- **React 18** with TypeScript and Vite
-- **UI Framework**: Shadcn/UI components with Radix UI primitives
-- **Styling**: Tailwind CSS with RTL support for Persian
-- **State Management**: TanStack React Query v5
-- **Routing**: Wouter (lightweight client-side routing)
-- **Form Management**: React Hook Form with Zod validation
-
-#### Backend
-- **Express.js** with TypeScript
-- **Database**: PostgreSQL with Drizzle ORM
-- **Session Management**: PostgreSQL-backed sessions with connect-pg-simple
-- **File Processing**: Multer for JSON upload handling
-- **Authentication**: bcrypt + session-based auth
-
-#### External Integrations
-- **AI Analysis**: Google Gemini API
-- **Messaging**: Telegram Bot API
-- **Database Provider**: Neon serverless PostgreSQL
-
-### Database Schema
-
-```sql
--- Core entities
-- representatives: Sales representatives with financial tracking
-- invoices: Billing documents with usage data and Persian dates
-- payments: Payment tracking with invoice allocation
-- sales_partners: Commission-based referral partners
-- activity_logs: Comprehensive system activity tracking
-- settings: Configurable system parameters
-- admin_users: Administrative user management
-```
-
-### API Architecture
-
-#### Admin Panel Routes (Protected)
-```
-GET    /api/dashboard          # Financial overview
-GET    /api/representatives    # Representative management
-GET    /api/invoices          # Invoice operations
-POST   /api/invoices/generate # Bulk JSON processing
-GET    /api/payments          # Payment tracking
-GET    /api/settings/*        # System configuration
-```
-
-#### Public Portal Routes (Unprotected)
-```
-GET    /api/portal/:publicId  # Representative portal access
-GET    /portal/:publicId      # Public portal interface
-```
-
-## 📊 Key Features
-
-### 1. Advanced JSON Processing Engine
-- **Multi-format Support**: PHPMyAdmin exports, direct arrays, nested objects
-- **Sequential Processing**: Alphabetical representative ordering (A-Z)
-- **Large File Handling**: 780KB+ files with 200+ representatives
-- **Error Recovery**: Comprehensive validation and graceful failure handling
-- **Progress Tracking**: Real-time processing feedback with Persian timestamps
-
-### 2. Representative Portal System
-- **Public Access**: Secure portal links without authentication
-- **Mobile Optimization**: Android/iOS browser compatibility
-- **Usage Details**: Expandable invoice records with detailed usage data
-- **Financial Overview**: Debt tracking, payment history, account status
-- **Persian UI**: Complete RTL support with Persian number formatting
-
-### 3. Enterprise Authentication
-- **Dual Security Model**: 
-  - Admin panel requires authentication
-  - Public portals remain accessible
-- **Session Management**: PostgreSQL-backed sessions with 24-hour expiration
-- **Security Headers**: Conditional headers for admin vs portal routes
-- **Mobile Compatibility**: Android browser-specific optimizations
-
-### 4. AI-Powered Financial Analysis
-- **Google Gemini Integration**: Advanced financial insights
-- **Data Aggregation**: Real-time financial metrics processing
-- **Persian Language Support**: Localized AI responses
-- **Comprehensive Analytics**: Debt analysis, payment patterns, trends
-
-### 5. Telegram Integration
-- **Automated Notifications**: Invoice delivery via Telegram
-- **Bulk Operations**: Send to single/multiple/all representatives
-- **Template System**: Customizable message templates
-- **Settings Panel**: Bot configuration and message customization
-
-## 🔧 Development Guide
-
-### Project Structure
-```
-├── client/                 # React frontend
-│   ├── src/
-│   │   ├── pages/         # Application pages
-│   │   ├── components/    # Reusable UI components
-│   │   ├── lib/          # Utility functions
-│   │   └── contexts/     # React contexts
-├── server/                # Express backend
-│   ├── index.ts          # Server entry point
-│   ├── routes.ts         # API routes
-│   ├── storage.ts        # Database operations
-│   ├── db.ts            # Database connection
-│   └── services/        # Business logic
-├── shared/               # Shared TypeScript schemas
-└── dist/                # Production build output
-```
-
-### Development Commands
-
-```bash
-# Development server (frontend + backend)
-npm run dev
-
-# Database operations
-npm run db:push          # Push schema changes
-npm run db:studio        # Open Drizzle Studio
-
-# Production build
-npm run build            # Build for production
-npm start               # Start production server
-
-# Type checking
-npm run type-check      # TypeScript validation
-```
-
-### Environment Variables
-
-```env
-# Database
-DATABASE_URL="postgresql://user:pass@host/db"
-
-# AI Integration
-GEMINI_API_KEY="your-gemini-api-key"
-
-# Session Security
-SESSION_SECRET="your-session-secret"
-
-# Telegram (Optional)
-TELEGRAM_BOT_TOKEN="your-bot-token"
-TELEGRAM_CHAT_ID="your-chat-id"
-```
-
-## 🚀 Production Deployment
-
-### Replit Deployment (Recommended)
-
-1. **Environment Setup**:
-   ```bash
-   # Required environment variables
-   DATABASE_URL=<neon-postgresql-url>
-   GEMINI_API_KEY=<google-ai-key>
-   SESSION_SECRET=<random-secure-string>
-   ```
-
-2. **Build Process**:
-   ```bash
-   npm run build
-   ```
-
-3. **Production Start**:
-   ```bash
-   npm start
-   ```
-
-### Manual Deployment
-
-1. **Server Requirements**:
-   - Node.js 18+
-   - PostgreSQL 14+
-   - 512MB+ RAM
-   - SSL certificate (recommended)
-
-2. **Build & Deploy**:
-   ```bash
-   # Build application
-   npm run build
-   
-   # Start with PM2 (recommended)
-   pm2 start dist/server/index.js --name marfanet
-   
-   # Or direct start
-   NODE_ENV=production node dist/server/index.js
-   ```
-
-## 🔐 Security Features
-
-### Authentication & Authorization
-- **Admin Panel**: Session-based authentication with bcrypt password hashing
-- **Public Portals**: Secure publicId-based access without authentication
-- **Session Security**: HTTP-only cookies with CSRF protection
-
-### Security Headers
-- **Conditional Headers**: Different policies for admin vs portal routes
-- **CORS Configuration**: Comprehensive cross-origin resource sharing
-- **Content Security Policy**: XSS protection with Android compatibility
-- **Frame Options**: Controlled iframe embedding permissions
-
-### Data Protection
-- **Input Validation**: Zod schemas for all API endpoints
-- **SQL Injection Prevention**: Parameterized queries with Drizzle ORM
-- **File Upload Security**: Validated JSON processing with size limits
-- **Error Handling**: Sanitized error responses
-
-## 📱 Mobile Compatibility
-
-### Android Browser Support
-- **Enhanced Headers**: Android-specific compatibility headers
-- **Session Optimization**: Conditional session middleware for portals
-- **Retry Logic**: Exponential backoff for network resilience
-- **Cache Strategy**: Optimized caching for mobile performance
-
-### iOS Browser Support
-- **Safari Compatibility**: Tested and verified on iOS Safari
-- **PWA Ready**: Progressive Web App capabilities
-- **Touch Optimization**: Mobile-first responsive design
-
-## ⚡ Performance Optimizations
-
-### Database
-- **Connection Pooling**: Optimized PostgreSQL connections (max: 5)
-- **Query Optimization**: Indexed queries with efficient joins
-- **Retry Logic**: Exponential backoff for database operations
-- **Health Monitoring**: Startup database health checks
-
-### Frontend
-- **Code Splitting**: Vite-based lazy loading
-- **Asset Optimization**: Minimized bundle sizes
-- **Caching Strategy**: React Query with intelligent cache invalidation
-- **Persian Date Handling**: Optimized Persian calendar utilities
-
-### File Processing
-- **Large File Support**: 780KB+ JSON files with progress tracking
-- **Memory Management**: Strategic garbage collection during processing
-- **Timeout Handling**: Extended timeouts for bulk operations (10 minutes)
-- **Sequential Processing**: Efficient representative-by-representative handling
-
-## 🔧 Troubleshooting
-
-### Common Issues & Solutions
-
-#### Database Connection Issues
-```bash
-# Check database status
-npm run db:studio
-
-# Verify environment variables
-echo $DATABASE_URL
-
-# Test connection
-node -e "const { checkDatabaseHealth } = require('./dist/server/db'); checkDatabaseHealth()"
-```
-
-#### Portal Access Issues
-- Verify publicId format in URL
-- Check security headers in browser dev tools
-- Test on different browsers/devices
-- Confirm representative exists in database
-
-#### JSON Processing Failures
-- Validate JSON format with online validators
-- Check file size limits (<50MB)
-- Verify admin_username fields exist
-- Review processing logs for specific errors
-
-#### Authentication Problems
-- Clear browser cookies and sessions
-- Verify admin credentials (mgr/8679)
-- Check session configuration in database
-- Confirm trust proxy settings
-
-## 📈 Monitoring & Analytics
-
-### System Monitoring
-- **Health Endpoints**: `/health` and `/ready` for load balancers
-- **Activity Logging**: Comprehensive system activity tracking
-- **Performance Metrics**: Response time monitoring
-- **Error Tracking**: Structured error logging with stack traces
-
-### Business Intelligence
-- **Financial Dashboard**: Real-time debt and payment tracking
-- **Representative Analytics**: Sales performance and activity metrics
-- **Invoice Processing**: Bulk operation success rates
-- **AI Insights**: Gemini-powered financial recommendations
-
-## 🤝 Contributing
-
-### Development Workflow
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Make changes and test thoroughly
-4. Commit with conventional commits: `git commit -m 'feat: add amazing feature'`
-5. Push to branch: `git push origin feature/amazing-feature`
-6. Create Pull Request
-
-### Code Style
-- **TypeScript**: Strict mode enabled
-- **ESLint**: Airbnb configuration
-- **Prettier**: Automated code formatting
-- **Persian Support**: RTL-first design principles
-
-### Testing
-- **Unit Tests**: Jest for utility functions
-- **Integration Tests**: API endpoint testing
-- **E2E Tests**: Portal functionality testing
-- **Load Testing**: JSON processing performance
-
-## 📄 License
-
-This project is proprietary software developed for MarFaNet financial operations.
-
-## 🆘 Support
-
-For technical support or deployment assistance:
-- Review troubleshooting section above
-- Check system logs and error messages
-- Verify all environment variables
-- Ensure database connectivity
-- Test with minimal representative data first
+### 1️⃣ نصب خودکار روی Ubuntu (توصیه شده)
+### 2️⃣ نصب دستی روی Ubuntu
+### 3️⃣ استقرار روی Replit
 
 ---
 
-**System Status**: ✅ Production Ready  
-**Last Updated**: January 2025  
-**Version**: 2.0.0  
-**Architecture**: Full-stack TypeScript with PostgreSQL
+## 🚀 روش اول: نصب خودکار Ubuntu (پیشنهادی)
+
+### مرحله 1: آماده‌سازی سرور
+
+**الف) خرید و راه‌اندازی سرور Ubuntu:**
+- حداقل مشخصات: 2GB RAM, 20GB Storage, Ubuntu 20.04+
+- کلودهای پیشنهادی: DigitalOcean, Linode, Vultr, Hetzner
+
+**ب) اتصال به سرور:**
+```bash
+# اتصال از طریق SSH
+ssh root@YOUR_SERVER_IP
+
+# ایجاد کاربر جدید (اختیاری اما توصیه شده)
+adduser marfanet
+usermod -aG sudo marfanet
+su - marfanet
+```
+
+### مرحله 2: دانلود و اجرای اسکریپت خودکار
+
+```bash
+# دانلود اسکریپت
+wget https://raw.githubusercontent.com/your-repo/marfanet/main/deploy-ubuntu.sh
+
+# اجازه اجرا
+chmod +x deploy-ubuntu.sh
+
+# اجرای اسکریپت
+./deploy-ubuntu.sh
+```
+
+**اسکریپت به صورت خودکار موارد زیر را انجام می‌دهد:**
+- ✅ بروزرسانی سیستم عامل
+- ✅ نصب Node.js 20 LTS
+- ✅ نصب و پیکربندی PostgreSQL
+- ✅ کلون و ساخت اپلیکیشن
+- ✅ تنظیم متغیرهای محیطی
+- ✅ ایجاد سرویس سیستمی
+- ✅ پیکربندی Nginx
+- ✅ نصب SSL Certificate
+- ✅ راه‌اندازی مانیتورینگ
+- ✅ تست نهایی سیستم
+
+### مرحله 3: اطلاعات مورد نیاز در حین نصب
+
+اسکریپت موارد زیر را از شما می‌پرسد:
+
+```
+رمز عبور PostgreSQL: [رمز قوی وارد کنید]
+نام کاربری مدیر اپلیکیشن: mgr
+رمز عبور مدیر اپلیکیشن: 8679
+نام دامنه شما: example.com
+کلید API Google Gemini: [اختیاری]
+توکن ربات تلگرام: [اختیاری]
+Chat ID تلگرام: [اختیاری]
+آدرس Git Repository: [اختیاری]
+```
+
+---
+
+## 🌐 تنظیم دامنه در Cloudflare
+
+### مرحله 1: خرید دامنه
+1. از سایت‌های Namecheap، GoDaddy یا مشابه دامنه بخرید
+2. دامنه را به Cloudflare انتقال دهید
+
+### مرحله 2: تنظیم DNS در Cloudflare
+
+**ورود به Cloudflare:**
+1. وارد [Cloudflare.com](https://cloudflare.com) شوید
+2. روی دامنه خود کلیک کنید
+3. به تب DNS بروید
+
+**اضافه کردن A Record:**
+```
+Type: A
+Name: @ (یا root domain)
+IPv4 Address: YOUR_SERVER_IP
+Proxy Status: DNS Only (خاکستری، نه نارنجی)
+TTL: Auto
+```
+
+**اضافه کردن CNAME برای www:**
+```
+Type: CNAME
+Name: www
+Target: your-domain.com
+Proxy Status: DNS Only
+TTL: Auto
+```
+
+**اضافه کردن A Record برای subdomains (اختیاری):**
+```
+Type: A
+Name: api
+IPv4 Address: YOUR_SERVER_IP
+Proxy Status: DNS Only
+
+Type: A  
+Name: portal
+IPv4 Address: YOUR_SERVER_IP
+Proxy Status: DNS Only
+```
+
+### مرحله 3: تنظیمات SSL در Cloudflare
+
+1. **SSL/TLS Tab > Overview:**
+   - SSL/TLS encryption mode: `Full (strict)`
+
+2. **SSL/TLS Tab > Edge Certificates:**
+   - Always Use HTTPS: `On`
+   - HTTP Strict Transport Security (HSTS): `Enable`
+   - Minimum TLS Version: `1.2`
+
+3. **Security Tab:**
+   - Security Level: `Medium`
+   - Bot Fight Mode: `On`
+
+### مرحله 4: تست DNS
+
+```bash
+# تست DNS resolution
+nslookup your-domain.com
+dig your-domain.com
+
+# تست از سایت
+https://dnschecker.org
+```
+
+---
+
+## 👥 مدیریت نمایندگان و Portal Links
+
+### مرحله 1: اضافه کردن نمایندگان
+
+پس از نصب موفق:
+
+1. **وارد پنل مدیریت شوید:**
+   ```
+   آدرس: https://your-domain.com
+   کاربری: mgr
+   رمز: 8679
+   ```
+
+2. **به بخش نمایندگان بروید:**
+   - کلیک روی "نمایندگان" در منو
+   - کلیک روی "نماینده جدید"
+
+3. **اطلاعات نماینده را وارد کنید:**
+   ```
+   نام: فروشگاه ABC
+   کد: ABC123
+   تلفن: 09123456789
+   آدرس: ...
+   ```
+
+### مرحله 2: دریافت Portal Link
+
+پس از ایجاد نماینده:
+
+1. **Public ID خودکار ایجاد می‌شود**
+2. **Portal Link:** `https://your-domain.com/portal/PUBLIC_ID`
+
+**مثال:**
+- نماینده: فروشگاه ABC
+- Public ID: abc-123-xyz
+- Portal Link: `https://your-domain.com/portal/abc-123-xyz`
+
+### مرحله 3: ارسال Link به نمایندگان
+
+**روش 1: دستی**
+```
+Portal Link شما:
+https://your-domain.com/portal/abc-123-xyz
+
+از این لینک برای دسترسی به پنل مالی خود استفاده کنید.
+```
+
+**روش 2: از طریق تلگرام (اگر ربات تنظیم شده باشد)**
+- در پنل مدیریت به بخش "ارسال پیام" بروید
+- نماینده مورد نظر را انتخاب کنید
+- "ارسال لینک پورتال" را کلیک کنید
+
+---
+
+## 🔧 روش دوم: نصب دستی Ubuntu
+
+### مرحله 1: آماده‌سازی سیستم
+
+```bash
+# بروزرسانی
+sudo apt update && sudo apt upgrade -y
+
+# نصب ابزارهای ضروری
+sudo apt install -y curl wget gnupg2 software-properties-common git
+```
+
+### مرحله 2: نصب Node.js
+
+```bash
+# اضافه کردن repository
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+
+# نصب Node.js
+sudo apt install -y nodejs
+
+# نصب PM2
+sudo npm install -g pm2
+
+# تست
+node --version
+npm --version
+```
+
+### مرحله 3: نصب PostgreSQL
+
+```bash
+# نصب PostgreSQL
+sudo apt install -y postgresql postgresql-contrib
+
+# شروع سرویس
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# ایجاد کاربر و دیتابیس
+sudo -u postgres psql << EOF
+CREATE USER marfanet WITH PASSWORD 'your_strong_password';
+CREATE DATABASE marfanet_db OWNER marfanet;
+GRANT ALL PRIVILEGES ON DATABASE marfanet_db TO marfanet;
+\q
+EOF
+```
+
+### مرحله 4: دانلود و نصب اپلیکیشن
+
+```bash
+# ایجاد دایرکتوری
+sudo mkdir -p /opt/marfanet
+sudo chown $USER:$USER /opt/marfanet
+cd /opt/marfanet
+
+# کلون کردن (یا آپلود فایل‌ها)
+# git clone YOUR_REPO_URL .
+
+# نصب وابستگی‌ها
+npm install --production
+
+# ساخت اپلیکیشن
+npm run build
+```
+
+### مرحله 5: تنظیم متغیرهای محیطی
+
+```bash
+# ایجاد فایل .env
+cat > .env << EOF
+NODE_ENV=production
+PORT=5000
+DATABASE_URL=postgresql://marfanet:your_password@localhost:5432/marfanet_db
+SESSION_SECRET=$(openssl rand -base64 32)
+ADMIN_USERNAME=mgr
+ADMIN_PASSWORD=8679
+GEMINI_API_KEY=your_gemini_key
+TELEGRAM_BOT_TOKEN=your_telegram_token
+REPLIT_DOMAIN=your-domain.com
+EOF
+
+chmod 600 .env
+```
+
+### مرحله 6: ایجاد سرویس سیستمی
+
+```bash
+sudo cat > /etc/systemd/system/marfanet.service << EOF
+[Unit]
+Description=MarFaNet Financial CRM
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=/opt/marfanet
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node dist/server/index.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable marfanet
+sudo systemctl start marfanet
+```
+
+### مرحله 7: نصب و پیکربندی Nginx
+
+```bash
+# نصب Nginx
+sudo apt install -y nginx
+
+# ایجاد پیکربندی
+sudo cat > /etc/nginx/sites-available/marfanet << EOF
+server {
+    listen 80;
+    server_name your-domain.com www.your-domain.com;
+
+    location /portal/ {
+        add_header X-Frame-Options "ALLOWALL" always;
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+
+    location / {
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+}
+EOF
+
+# فعال‌سازی
+sudo ln -s /etc/nginx/sites-available/marfanet /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### مرحله 8: نصب SSL
+
+```bash
+# نصب Certbot
+sudo apt install -y certbot python3-certbot-nginx
+
+# دریافت certificate
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+
+# تنظیم تمدید خودکار
+echo "0 12 * * * /usr/bin/certbot renew --quiet" | sudo crontab -
+```
+
+---
+
+## 🌟 روش سوم: استقرار روی Replit
+
+### مرحله 1: ایجاد پروژه در Replit
+
+1. وارد [Replit.com](https://replit.com) شوید
+2. کلیک روی "Create Repl"
+3. "Import from GitHub" را انتخاب کنید
+4. آدرس repository را وارد کنید
+
+### مرحله 2: تنظیم Environment Variables
+
+در پنل Secrets تنظیم کنید:
+```
+DATABASE_URL=your_neon_postgresql_url
+GEMINI_API_KEY=your_gemini_key
+SESSION_SECRET=random_secret_key
+TELEGRAM_BOT_TOKEN=your_telegram_token
+ADMIN_USERNAME=mgr
+ADMIN_PASSWORD=8679
+```
+
+### مرحله 3: اجرا و Deploy
+
+```bash
+# نصب وابستگی‌ها
+npm install
+
+# ساخت پروژه
+npm run build
+
+# اجرا
+npm start
+```
+
+### مرحله 4: تنظیم Custom Domain
+
+1. در پنل Deployments کلیک کنید
+2. "Link a domain" را انتخاب کنید
+3. دامنه خود را وارد کنید
+4. DNS records ارائه شده را در Cloudflare تنظیم کنید
+
+---
+
+## 🔧 تنظیمات پیشرفته
+
+### تنظیم ربات تلگرام
+
+1. **ایجاد ربات:**
+   - به [@BotFather](https://t.me/botfather) پیام دهید
+   - دستور `/newbot` را ارسال کنید
+   - نام و username ربات را تعیین کنید
+   - Token دریافتی را کپی کنید
+
+2. **دریافت Chat ID:**
+   - به [@userinfobot](https://t.me/userinfobot) پیام دهید
+   - Chat ID خود را کپی کنید
+
+3. **تنظیم در اپلیکیشن:**
+   - وارد پنل مدیریت شوید
+   - به بخش "تنظیمات" > "تلگرام" بروید
+   - Token و Chat ID را وارد کنید
+
+### تنظیم Google Gemini
+
+1. **دریافت API Key:**
+   - وارد [Google AI Studio](https://makersuite.google.com/app/apikey) شوید
+   - "Create API Key" کلیک کنید
+   - API Key را کپی کنید
+
+2. **تنظیم در اپلیکیشن:**
+   - در فایل `.env` یا Secrets قرار دهید
+   - یا از پنل تنظیمات استفاده کنید
+
+---
+
+## 🔍 عیب‌یابی
+
+### مشکلات رایج و راه‌حل
+
+#### 1. سرویس راه‌اندازی نمی‌شود
+```bash
+# بررسی وضعیت
+sudo systemctl status marfanet
+
+# مشاهده لاگ‌ها
+sudo journalctl -u marfanet -f
+
+# ری‌استارت
+sudo systemctl restart marfanet
+```
+
+#### 2. خطای اتصال به دیتابیس
+```bash
+# تست اتصال
+PGPASSWORD=your_password psql -h localhost -U marfanet -d marfanet_db
+
+# بررسی وضعیت PostgreSQL
+sudo systemctl status postgresql
+
+# ری‌استارت PostgreSQL
+sudo systemctl restart postgresql
+```
+
+#### 3. مشکل SSL
+```bash
+# تست certificate
+sudo certbot certificates
+
+# تمدید دستی
+sudo certbot renew
+
+# تست Nginx
+sudo nginx -t
+```
+
+#### 4. مشکل DNS
+```bash
+# تست DNS
+nslookup your-domain.com
+dig your-domain.com
+
+# پاک کردن cache DNS محلی
+sudo systemd-resolve --flush-caches
+```
+
+### لاگ‌های مهم
+
+```bash
+# لاگ اپلیکیشن
+sudo journalctl -u marfanet -f
+
+# لاگ Nginx
+sudo tail -f /var/log/nginx/error.log
+sudo tail -f /var/log/nginx/access.log
+
+# لاگ PostgreSQL
+sudo tail -f /var/log/postgresql/postgresql-*.log
+
+# لاگ مانیتورینگ
+sudo tail -f /var/log/marfanet-monitor.log
+```
+
+---
+
+## 📊 مدیریت و نگهداری
+
+### بکاپ گیری
+
+**بکاپ دیتابیس:**
+```bash
+# ایجاد بکاپ
+PGPASSWORD=your_password pg_dump -h localhost -U marfanet marfanet_db > backup_$(date +%Y%m%d).sql
+
+# بازیابی
+PGPASSWORD=your_password psql -h localhost -U marfanet marfanet_db < backup_file.sql
+```
+
+**بکاپ فایل‌های اپلیکیشن:**
+```bash
+# ایجاد آرشیو
+tar -czf marfanet_backup_$(date +%Y%m%d).tar.gz /opt/marfanet
+
+# استخراج
+tar -xzf marfanet_backup.tar.gz
+```
+
+### بروزرسانی اپلیکیشن
+
+```bash
+cd /opt/marfanet
+
+# بکاپ گیری
+cp -r /opt/marfanet /opt/marfanet.backup
+
+# دانلود نسخه جدید
+git pull origin main
+
+# نصب وابستگی‌های جدید
+npm install --production
+
+# ساخت مجدد
+npm run build
+
+# ری‌استارت
+sudo systemctl restart marfanet
+```
+
+### مانیتورینگ سیستم
+
+```bash
+# بررسی سلامت سیستم
+curl http://localhost:5000/health
+
+# بررسی مصرف منابع
+htop
+df -h
+free -m
+
+# بررسی اتصالات شبکه
+netstat -tlnp
+```
+
+---
+
+## 🎯 مزایا و ویژگی‌ها
+
+### ویژگی‌های کلیدی
+- ✅ مدیریت کامل فاکتورها و پرداخت‌ها
+- ✅ سیستم نمایندگی با Portal اختصاصی
+- ✅ پردازش خودکار فایل‌های JSON
+- ✅ یکپارچه‌سازی با تلگرام
+- ✅ تحلیل مالی با هوش مصنوعی
+- ✅ پشتیبانی کامل از زبان فارسی
+- ✅ سازگار با موبایل و تبلت
+- ✅ سیستم امنیتی پیشرفته
+
+### مزایای نصب خودکار
+- 🚀 نصب در کمتر از 30 دقیقه
+- 🔧 پیکربندی خودکار تمام سرویس‌ها
+- 🛡️ تنظیمات امنیتی بهینه
+- 📊 مانیتورینگ خودکار
+- 🔄 بازیابی خودکار در صورت خرابی
+- 📝 مستندسازی کامل
+
+---
+
+## 🆘 پشتیبانی
+
+### اطلاعات تماس
+- 📧 Email: support@marfanet.com
+- 💬 Telegram: @MarFaNetSupport
+- 🌐 Website: https://marfanet.com
+
+### مستندات بیشتر
+- 📖 راهنمای کاربری: `/docs/user-guide.md`
+- 🔧 راهنمای توسعه‌دهندگان: `/docs/developer-guide.md`
+- 🐛 گزارش باگ: GitHub Issues
+- 💡 درخواست ویژگی: Feature Requests
+
+### جامعه کاربران
+- 👥 گروه تلگرام: @MarFaNetCommunity
+- 💬 انجمن: https://community.marfanet.com
+- 📚 پایگاه دانش: https://kb.marfanet.com
+
+---
+
+## 📄 لایسنس و حقوق
+
+این نرم‌افزار تحت لایسنس اختصاصی MarFaNet توسعه یافته و تمام حقوق محفوظ است.
+
+**نسخه:** 2.0.0  
+**آخرین بروزرسانی:** ژانویه 2025  
+**سازگاری:** Ubuntu 20.04+, Node.js 20+, PostgreSQL 14+  
+
+---
+
+**🎉 موفقیت در راه‌اندازی MarFaNet! 🎉**
