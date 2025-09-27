@@ -12,8 +12,8 @@ import { db } from '../db.js';
 import { representatives } from '../../shared/schema.js';
 import { sql } from 'drizzle-orm';
 import { eq, desc } from 'drizzle-orm'; // ✅ SHERLOCK v32.0: Added desc import
-import { invoices } from '../../shared/schema.js'; // Assuming invoices schema is available
-import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
+import { invoices as invoicesTable } from '../../shared/schema.js'; // Assuming invoices schema is available
+import { payments as paymentsTable } from '../../shared/schema.js'; // Assuming payments schema is available
 import { storage } from '../storage.js';
 // Assuming UnifiedFinancialEngine class exists
 import { isFeatureEnabled } from '../utils/featureFlags.js'; // Assuming feature flag utility exists
@@ -510,11 +510,11 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
     // Method 3: Direct database calculation
     const [totalInvoices] = await db.select({
       total: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`
-    }).from(invoices);
+    }).from(invoicesTable);
 
     const [totalAllocatedPayments] = await db.select({
       total: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
-    }).from(payments);
+    }).from(paymentsTable);
 
     const directDbCalculation = Math.max(0, totalInvoices.total - totalAllocatedPayments.total);
 
@@ -1452,20 +1452,20 @@ router.get('/overdue-analysis', requireAuth, async (req, res) => {
 
     // Calculate overdue by status and representative
     const overdueAnalysis = await db.select({
-      representativeId: invoices.representativeId,
+      representativeId: invoicesTable.representativeId,
       representativeName: representatives.name,
       representativeCode: representatives.code,
-      overdueAmount: sql<number>`COALESCE(SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
-      unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
-      invoiceCount: sql<number>`COUNT(CASE WHEN invoices.status = 'overdue' THEN 1 END)`,
-      oldestOverdue: sql<string>`MIN(CASE WHEN invoices.status = 'overdue' THEN invoices.created_at END)`
+      overdueAmount: sql<number>`COALESCE(SUM(CASE WHEN ${invoicesTable.status} = 'overdue' THEN CAST(${invoicesTable.amount} as DECIMAL) ELSE 0 END), 0)`,
+      unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN ${invoicesTable.status} IN ('unpaid', 'overdue') THEN CAST(${invoicesTable.amount} as DECIMAL) ELSE 0 END), 0)`,
+      invoiceCount: sql<number>`COUNT(CASE WHEN ${invoicesTable.status} = 'overdue' THEN 1 END)`,
+      oldestOverdue: sql<string>`MIN(CASE WHEN ${invoicesTable.status} = 'overdue' THEN ${invoicesTable.created_at} END)`
     })
-    .from(invoices)
-    .leftJoin(representatives, eq(invoices.representativeId, representatives.id))
-    .where(sql`invoices.status IN ('unpaid', 'overdue')`)
-    .groupBy(invoices.representativeId, representatives.name, representatives.code)
-    .having(sql`SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END) > 0`)
-    .orderBy(sql`SUM(CASE WHEN invoices.status = 'overdue' THEN CAST(invoices.amount as DECIMAL) ELSE 0 END) DESC`);
+    .from(invoicesTable)
+    .leftJoin(representatives, eq(invoicesTable.representativeId, representatives.id))
+    .where(sql`${invoicesTable.status} IN ('unpaid', 'overdue')`)
+    .groupBy(invoicesTable.representativeId, representatives.name, representatives.code)
+    .having(sql`SUM(CASE WHEN ${invoicesTable.status} = 'overdue' THEN CAST(${invoicesTable.amount} as DECIMAL) ELSE 0 END) > 0`)
+    .orderBy(sql`SUM(CASE WHEN ${invoicesTable.status} = 'overdue' THEN CAST(${invoicesTable.amount} as DECIMAL) ELSE 0 END) DESC`);
 
     // Calculate totals
     const [totals] = await db.select({
@@ -1473,7 +1473,7 @@ router.get('/overdue-analysis', requireAuth, async (req, res) => {
       totalUnpaid: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
       overdueCount: sql<number>`COUNT(CASE WHEN status = 'overdue' THEN 1 END)`,
       unpaidCount: sql<number>`COUNT(CASE WHEN status IN ('unpaid', 'overdue') THEN 1 END)`
-    }).from(invoices);
+    }).from(invoicesTable);
 
     console.log(`📊 SHERLOCK v28.0: Found ${overdueAnalysis.length} representatives with overdue amount: ${totals.totalOverdue.toLocaleString()} تومان`);
 
@@ -1523,11 +1523,11 @@ router.get('/verify-invoice-amount/:invoiceId', requireAuth, async (req, res) =>
 
     // Get invoice from database
     const [invoice] = await db.select({
-      id: invoices.id,
-      amount: invoices.amount,
-      usageData: invoices.usageData,
-      representativeId: invoices.representativeId
-    }).from(invoices).where(eq(invoices.id, invoiceId));
+      id: invoicesTable.id,
+      amount: invoicesTable.amount,
+      usageData: invoicesTable.usageData,
+      representativeId: invoicesTable.representativeId
+    }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
 
     if (!invoice) {
       return res.status(404).json({
@@ -1634,6 +1634,94 @@ router.get('/health', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'خطا در دریافت آمار سلامت سیستم اصلاح شده'
+    });
+  }
+});
+
+
+// Added by ATOMOS PHASE 7C: OPTIMIZED INVOICE ROUTE - NO N+1 QUERIES
+// This route replaces the previous one that suffered from N+1 query issues.
+router.get('/invoices/with-batch-info', requireAuth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 30;
+    const offset = (page - 1) * limit;
+
+    console.log(`🎯 ATOMOS PHASE 7C: OPTIMIZED invoice loading - Page ${page}, Limit ${limit}`);
+    const startTime = performance.now();
+
+    // ✅ SINGLE OPTIMIZED QUERY WITH LEFT JOIN - NO N+1 PATTERN
+    const invoicesWithPayments = await db.select({
+      id: invoicesTable.id,
+      invoiceId: invoicesTable.invoiceId,
+      representativeId: invoicesTable.representativeId,
+      amount: invoicesTable.amount,
+      status: invoicesTable.status,
+      createdAt: invoicesTable.createdAt,
+      dueDate: invoicesTable.dueDate,
+      usageData: invoicesTable.usageData,
+      // Payment aggregations in single query
+      totalPayments: sql<number>`COALESCE(SUM(CAST(${paymentsTable.amount} as DECIMAL)), 0)`,
+      paymentCount: sql<number>`COUNT(${paymentsTable.id})`,
+      isFullyPaid: sql<boolean>`COALESCE(SUM(CAST(${paymentsTable.amount} as DECIMAL)), 0) >= CAST(${invoicesTable.amount} as DECIMAL)`
+    })
+    .from(invoicesTable)
+    .leftJoin(paymentsTable, eq(paymentsTable.invoiceId, invoicesTable.id))
+    .groupBy(
+      invoicesTable.id,
+      invoicesTable.invoiceId, 
+      invoicesTable.representativeId,
+      invoicesTable.amount,
+      invoicesTable.status,
+      invoicesTable.createdAt,
+      invoicesTable.dueDate,
+      invoicesTable.usageData
+    )
+    .orderBy(desc(invoicesTable.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+    // Get total count efficiently
+    const [totalCount] = await db.select({
+      count: sql<number>`COUNT(*)`
+    }).from(invoicesTable);
+
+    const totalPages = Math.ceil(totalCount.count / limit);
+    const endTime = performance.now();
+    const duration = Math.round(endTime - startTime);
+
+    console.log(`✅ ATOMOS PHASE 7C: OPTIMIZED invoice loading completed in ${duration}ms - NO N+1 QUERIES`);
+    console.log(`📊 صفحه ${page}: ${invoicesWithPayments.length} فاکتور از ${totalCount.count} فاکتور کل (${totalPages} صفحه)`);
+
+    // Performance warning for slow queries
+    if (duration > 1000) {
+      console.warn(`⚠️ ATOMOS PHASE 7C: Slow query detected: ${duration}ms - Consider database indexing`);
+    } else {
+      console.log(`🚀 ATOMOS PHASE 7C: EXCELLENT PERFORMANCE: ${duration}ms`);
+    }
+
+    res.json({
+      success: true,
+      data: invoicesWithPayments,
+      meta: {
+        page,
+        limit,
+        totalCount: totalCount.count,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        queryTimeMs: duration,
+        optimized: true,
+        queryPattern: "SINGLE_JOIN_NO_N+1"
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ ATOMOS PHASE 7C: Optimized invoice route error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'خطا در بارگیری فاکتورها',
+      details: error.message
     });
   }
 });

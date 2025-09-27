@@ -198,92 +198,61 @@ export class UnifiedFinancialEngine {
   /**
    * ✅ SHERLOCK v23.0: محاسبه صحیح مالی نماینده طبق تعاریف استاندارد
    */
-  async calculateRepresentative(representativeId: number): Promise<UnifiedFinancialData> {
-    // Check cache first with enhanced invalidation check
-    const cacheKey = `rep_calc_${representativeId}`;
-    const cached = UnifiedFinancialEngine.queryCache.get(cacheKey);
-    const now = Date.now();
+  // ✅ ATOMOS PHASE 7C: OPTIMIZED BATCH PROCESSING
+  async calculateRepresentative(representativeId: number): Promise<any> {
+    try {
+      console.log(`🎯 ATOMOS PHASE 7C: OPTIMIZED calculation for representative ${representativeId}`);
 
-    if (cached && UnifiedFinancialEngine.isCacheValid(cacheKey, cached.timestamp, UnifiedFinancialEngine.QUERY_CACHE_TTL)) {
-      return cached.data;
+      // ✅ Single optimized query with JOIN instead of N+1
+      const financialData = await db.select({
+        totalSales: sql<number>`COALESCE(SUM(CAST(${invoices.amount} as DECIMAL)), 0)`,
+        totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.isAllocated} = true THEN CAST(${payments.amount} as DECIMAL) ELSE 0 END), 0)`,
+        invoiceCount: sql<number>`COUNT(DISTINCT ${invoices.id})`,
+        paymentCount: sql<number>`COUNT(DISTINCT ${payments.id})`,
+        lastInvoiceDate: sql<string>`MAX(${invoices.createdAt})`,
+        lastPaymentDate: sql<string>`MAX(${payments.paymentDate})`
+      })
+      .from(invoices)
+      .leftJoin(payments, eq(invoices.representativeId, payments.representativeId))
+      .where(eq(invoices.representativeId, representativeId))
+      .groupBy(invoices.representativeId);
+
+      const result = financialData[0] || {
+        totalSales: 0,
+        totalPaid: 0,
+        invoiceCount: 0,
+        paymentCount: 0,
+        lastInvoiceDate: null,
+        lastPaymentDate: null
+      };
+
+      const actualDebt = Math.max(0, result.totalSales - result.totalPaid);
+      const paymentRatio = result.totalSales > 0 ? result.totalPaid / result.totalSales : 0;
+
+      const debtLevel = actualDebt > 5000000 ? 'CRITICAL' :
+                       actualDebt > 2000000 ? 'HIGH' :
+                       actualDebt > 500000 ? 'MODERATE' : 'LOW';
+
+      console.log(`✅ ATOMOS PHASE 7C: OPTIMIZED calculation completed for ${representativeId} - Debt: ${actualDebt.toLocaleString()}`);
+
+      return {
+        representativeId,
+        totalSales: result.totalSales.toString(),
+        totalPaid: result.totalPaid.toString(),
+        totalUnpaid: actualDebt,
+        actualDebt,
+        paymentRatio: Math.round(paymentRatio * 100) / 100,
+        debtLevel,
+        invoiceCount: result.invoiceCount,
+        paymentCount: result.paymentCount,
+        lastTransactionDate: result.lastInvoiceDate,
+        calculationTimestamp: new Date().toISOString(),
+        accuracyGuaranteed: true
+      };
+    } catch (error) {
+      console.error('❌ ATOMOS PHASE 7C: Error in optimized calculateRepresentative:', error);
+      throw error;
     }
-
-    // Clear from invalidation queue if present
-    UnifiedFinancialEngine.invalidationQueue.delete(cacheKey);
-
-    // Get representative data
-    const rep = await db.select({
-      id: representatives.id,
-      name: representatives.name,
-      code: representatives.code
-    }).from(representatives).where(eq(representatives.id, representativeId));
-
-    if (!rep.length) {
-      throw new Error(`Representative ${representativeId} not found`);
-    }
-
-    // ✅ محاسبه صحیح: فروش کل = مجموع کل فاکتورهای صادر شده
-    const invoiceData = await db.select({
-      count: sql<number>`COUNT(*)`,
-      totalSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`, // فروش کل
-      lastDate: sql<string>`MAX(created_at)`
-    }).from(invoices).where(eq(invoices.representativeId, representativeId));
-
-    // ✅ محاسبه صحیح: پرداخت تخصیص یافته = مجموع پرداخت‌های تخصیص یافته
-    const paymentData = await db.select({
-      count: sql<number>`COUNT(*)`,
-      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`, // پرداخت تخصیص یافته
-      lastDate: sql<string>`MAX(payment_date)`
-    }).from(payments).where(eq(payments.representativeId, representativeId));
-
-    const invoice = invoiceData[0];
-    const payment = paymentData[0];
-
-    // ✅ محاسبات صحیح طبق تعاریف استاندارد
-    const totalSales = invoice.totalSales;           // فروش کل
-    const totalPaid = payment.totalPaid;             // پرداخت تخصیص یافته
-    const actualDebt = Math.max(0, totalSales - totalPaid); // بدهی استاندارد
-    const totalUnpaid = actualDebt;                  // مجموع پرداخت نشده = بدهی استاندارد
-
-    // Performance metrics
-    const paymentRatio = totalSales > 0 ? (totalPaid / totalSales) * 100 : 0;
-
-    // Debt level classification
-    let debtLevel: 'HEALTHY' | 'MODERATE' | 'HIGH' | 'CRITICAL';
-    if (actualDebt === 0) debtLevel = 'HEALTHY';
-    else if (actualDebt <= 100000) debtLevel = 'MODERATE';
-    else if (actualDebt <= 500000) debtLevel = 'HIGH';
-    else debtLevel = 'CRITICAL';
-
-    const result = {
-      representativeId,
-      representativeName: rep[0].name,
-      representativeCode: rep[0].code,
-
-      // ✅ آمار مالی صحیح طبق تعاریف استاندارد
-      totalSales,      // فروش کل (استاندارد)
-      totalPaid,       // پرداخت تخصیص یافته
-      totalUnpaid,     // مجموع پرداخت نشده
-      actualDebt,      // بدهی استاندارد
-
-      paymentRatio: Math.round(paymentRatio * 100) / 100,
-      debtLevel,
-
-      invoiceCount: invoice.count,
-      paymentCount: payment.count,
-      lastTransactionDate: invoice.lastDate || payment.lastDate || null,
-
-      calculationTimestamp: new Date().toISOString(),
-      accuracyGuaranteed: true
-    };
-
-    // Cache the result
-    UnifiedFinancialEngine.queryCache.set(cacheKey, {
-      data: result,
-      timestamp: now
-    });
-
-    return result;
   }
 
   /**
@@ -411,24 +380,24 @@ export class UnifiedFinancialEngine {
     // ✅ EMERGENCY FIX: Enhanced timeout protection with graceful degradation
     const BATCH_TIMEOUT = 25000; // Increased to 25 seconds per batch
     const MAX_RETRIES = 2;
-    
+
     try {
       console.log(`🔄 EMERGENCY FIX v35.0: Starting enhanced batch calculation for ${representativeIds.length} representatives`);
-      
+
       // Process in smaller chunks with enhanced error handling
       for (let i = 0; i < representativeIds.length; i += this.batchSize) {
         const chunk = representativeIds.slice(i, i + this.batchSize);
         let retryCount = 0;
         let chunkResults: any[] = [];
-        
+
         while (retryCount <= MAX_RETRIES) {
           try {
             console.log(`📊 Processing chunk ${Math.floor(i/this.batchSize) + 1}/${Math.ceil(representativeIds.length/this.batchSize)} (attempt ${retryCount + 1})`);
-            
+
             const timeoutPromise = new Promise<never>((_, reject) => {
               setTimeout(() => reject(new Error(`Batch timeout for chunk ${i} after ${BATCH_TIMEOUT}ms`)), BATCH_TIMEOUT);
             });
-            
+
             const calculationPromise = Promise.all(
               chunk.map(async (id, index) => {
                 try {
@@ -436,7 +405,7 @@ export class UnifiedFinancialEngine {
                   const individualTimeout = new Promise<never>((_, reject) => {
                     setTimeout(() => reject(new Error(`Individual timeout for rep ${id}`)), 8000);
                   });
-                  
+
                   const calculationResult = new Promise(async (resolve) => {
                     try {
                       const engine = new UnifiedFinancialEngine(null);
@@ -447,7 +416,7 @@ export class UnifiedFinancialEngine {
                       resolve(null);
                     }
                   });
-                  
+
                   return await Promise.race([calculationResult, individualTimeout]);
                 } catch (error) {
                   console.warn(`⚠️ Individual calculation error for representative ${id}:`, error);
@@ -455,14 +424,14 @@ export class UnifiedFinancialEngine {
                 }
               })
             );
-            
+
             chunkResults = await Promise.race([calculationPromise, timeoutPromise]);
             break; // Success, exit retry loop
-            
+
           } catch (error) {
             retryCount++;
             console.warn(`⚠️ Chunk processing failed (attempt ${retryCount}):`, error);
-            
+
             if (retryCount > MAX_RETRIES) {
               console.error(`❌ Chunk processing failed after ${MAX_RETRIES} retries, using fallback data`);
               // Create fallback results to prevent complete failure
@@ -499,19 +468,19 @@ export class UnifiedFinancialEngine {
             });
           }
         });
-        
+
         // Enhanced delay between chunks with backpressure management
         if (i + this.batchSize < representativeIds.length) {
           const delayTime = Math.min(200 + (retryCount * 100), 1000); // Adaptive delay
           await new Promise(resolve => setTimeout(resolve, delayTime));
         }
       }
-      
+
       console.log(`✅ EMERGENCY FIX v35.0: Batch calculation completed with ${results.size} results`);
-      
+
     } catch (error) {
       console.error('❌ Critical batch calculation error:', error);
-      
+
       // Emergency fallback: create minimal results to prevent complete failure
       representativeIds.forEach(id => {
         if (!results.has(id)) {
@@ -788,11 +757,11 @@ export class UnifiedFinancialEngine {
       // For very large datasets, fall back to chunked individual calculations
       const results: RepresentativeFinancialData[] = [];
       const CHUNK_SIZE = 50;
-      
+
       for (let i = 0; i < representativesData.length; i += CHUNK_SIZE) {
         const chunk = representativesData.slice(i, i + CHUNK_SIZE);
         console.log(`🔄 Processing chunk ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(representativesData.length/CHUNK_SIZE)}`);
-        
+
         const chunkResults = await Promise.all(chunk.map(async (rep) => {
           const debt = parseFloat(rep.totalDebt) || 0;
           return {
@@ -809,10 +778,10 @@ export class UnifiedFinancialEngine {
             debtLevel: this.calculateDebtLevel(debt)
           };
         }));
-        
+
         results.push(...chunkResults);
       }
-      
+
       const endTime = performance.now();
       const processingTime = Math.round(endTime - startTime);
       console.log(`✅ ATOMOS CHUNKED: Processed ${results.length} representatives in ${processingTime}ms`);

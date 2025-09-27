@@ -24,12 +24,49 @@ export const pool = new Pool({
   maxUses: 7500, // Retire connections after 7500 uses
 });
 
-// Enhanced database instance with better error handling and performance monitoring
+// ✅ ATOMOS PHASE 7C: Enhanced database with query optimization
 export const db = drizzle({
   client: pool,
   schema,
   logger: process.env.NODE_ENV === 'development'
 });
+
+// ✅ ATOMOS PHASE 7C: Database Performance Optimization
+export async function optimizeDatabase(): Promise<void> {
+  try {
+    console.log('🎯 ATOMOS PHASE 7C: Starting database optimization...');
+    
+    // Create essential indexes to prevent N+1 queries
+    await pool.query(`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_invoice_id_optimized 
+      ON payments(invoice_id) 
+      WHERE amount IS NOT NULL;
+    `);
+    
+    await pool.query(`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_representative_allocated
+      ON payments(representative_id, is_allocated, amount) 
+      WHERE is_allocated = true;
+    `);
+    
+    await pool.query(`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_invoices_representative_created 
+      ON invoices(representative_id, created_at DESC);
+    `);
+    
+    console.log('✅ ATOMOS PHASE 7C: Database indexes optimized successfully');
+    
+    // Analyze tables for query planner
+    await pool.query('ANALYZE invoices;');
+    await pool.query('ANALYZE payments;');
+    await pool.query('ANALYZE representatives;');
+    
+    console.log('✅ ATOMOS PHASE 7C: Database statistics updated');
+  } catch (error) {
+    console.warn('⚠️ ATOMOS PHASE 7C: Database optimization warning:', error.message);
+    // Don't throw error - optimization is optional
+  }
+}
 
 // Performance monitoring for slow queries
 export function logSlowQuery(queryName: string, duration: number) {

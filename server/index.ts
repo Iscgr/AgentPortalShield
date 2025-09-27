@@ -157,7 +157,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Database health check before starting server
+  // ✅ ATOMOS PHASE 7C: Enhanced database initialization
   log('Checking database connection...');
   const dbHealthy = await checkDatabaseHealth();
   if (!dbHealthy) {
@@ -165,6 +165,15 @@ app.use((req, res, next) => {
     // Continue starting server - will retry connections as needed
   } else {
     log('Database connection successful', 'database');
+    
+    // ✅ ATOMOS PHASE 7C: Initialize database optimization
+    try {
+      const { optimizeDatabase } = await import('./db.js');
+      await optimizeDatabase();
+      log('✅ ATOMOS PHASE 7C: Database optimization completed', 'database');
+    } catch (error) {
+      log(`⚠️ ATOMOS PHASE 7C: Database optimization warning: ${error.message}`, 'database');
+    }
   }
 
   const server = await registerRoutes(app);
