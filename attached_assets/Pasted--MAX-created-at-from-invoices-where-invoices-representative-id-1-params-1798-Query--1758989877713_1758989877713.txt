@@ -1,0 +1,165 @@
+ MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1798]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1796]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1793]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1794]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1797]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1792]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1795]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1798]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1796]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1793]
+✅ SHERLOCK v32.1: Batch calculation complete: 7/7 successful, 0 errors
+✅ POST /batch-calculate [BATCH: 7 items] 200 in 74ms
+4:17:32 PM [express] POST /api/unified-financial/batch-calculate 200 in 99ms :: {"success":true,"dat…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2133]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2133]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2133]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1815  200 in 0ms
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1812  200 in 0ms
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1792  200 in 1ms
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2090]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1805  200 in 1ms
+✅ GET /representative/2133  200 in 74ms
+4:17:32 PM [express] GET /api/unified-financial/representative/1815 200 in 25ms :: {"success":true,"…
+4:17:32 PM [express] GET /api/unified-financial/representative/1812 200 in 26ms :: {"success":true,"…
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2090]
+4:17:32 PM [express] GET /api/unified-financial/representative/1805 200 in 24ms :: {"success":true,"…
+4:17:32 PM [express] GET /api/unified-financial/representative/1792 200 in 28ms :: {"success":true,"…
+4:17:32 PM [express] GET /api/unified-financial/representative/2133 200 in 98ms :: {"success":true,"…
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2090]
+✅ GET /representative/2090  200 in 70ms
+4:17:32 PM [express] GET /api/unified-financial/representative/2090 200 in 94ms :: {"success":true,"…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2092]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2091]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2038]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [1999]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2048]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2092]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2091]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2038]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [1999]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2048]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2092]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2091]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2038]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [1999]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2048]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1799  200 in 0ms
+✅ GET /representative/2092  200 in 67ms
+✅ GET /representative/2038  200 in 69ms
+✅ GET /representative/2091  200 in 70ms
+✅ GET /representative/1999  200 in 67ms
+✅ GET /representative/2048  200 in 70ms
+4:17:33 PM [express] GET /api/unified-financial/representative/1799 200 in 25ms :: {"success":true,"…
+4:17:33 PM [express] GET /api/unified-financial/representative/2092 200 in 91ms :: {"success":true,"…
+4:17:33 PM [express] GET /api/unified-financial/representative/2038 200 in 92ms :: {"success":true,"…
+4:17:33 PM [express] GET /api/unified-financial/representative/2091 200 in 95ms :: {"success":true,"…
+4:17:33 PM [express] GET /api/unified-financial/representative/1999 200 in 91ms :: {"success":true,"…
+4:17:33 PM [express] GET /api/unified-financial/representative/2048 200 in 94ms :: {"success":true,"…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1800  200 in 0ms
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2121]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2000]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2001]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1807  200 in 0ms
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2121]
+4:17:33 PM [express] GET /api/unified-financial/representative/1800 200 in 25ms :: {"success":true,"…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2002]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2000]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2001]
+4:17:33 PM [express] GET /api/unified-financial/representative/1807 200 in 23ms :: {"success":true,"…
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2121]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2002]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2000]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2001]
+✅ GET /representative/2121  200 in 70ms
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2002]
+✅ GET /representative/2000  200 in 67ms
+✅ GET /representative/2001  200 in 70ms
+4:17:33 PM [express] GET /api/unified-financial/representative/2121 200 in 94ms :: {"success":true,"…
+✅ GET /representative/2002  200 in 70ms
+4:17:33 PM [express] GET /api/unified-financial/representative/2000 200 in 91ms :: {"success":true,"…
+4:17:33 PM [express] GET /api/unified-financial/representative/2001 200 in 94ms :: {"success":true,"…
+4:17:33 PM [express] GET /api/unified-financial/representative/2002 200 in 95ms :: {"success":true,"…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2049]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2049]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2049]
+✅ GET /representative/2049  200 in 71ms
+4:17:33 PM [express] GET /api/unified-financial/representative/2049 200 in 96ms :: {"success":true,"…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2005]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1813  200 in 0ms
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2050]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1810  200 in 0ms
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2003]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2005]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2050]
+4:17:34 PM [express] GET /api/unified-financial/representative/1813 200 in 25ms :: {"success":true,"…
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2003]
+4:17:34 PM [express] GET /api/unified-financial/representative/1810 200 in 24ms :: {"success":true,"…
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2050]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2005]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2003]
+✅ GET /representative/2003  200 in 67ms
+✅ GET /representative/2005  200 in 73ms
+✅ GET /representative/2050  200 in 74ms
+4:17:34 PM [express] GET /api/unified-financial/representative/2003 200 in 91ms :: {"success":true,"…
+4:17:34 PM [express] GET /api/unified-financial/representative/2005 200 in 98ms :: {"success":true,"…
+4:17:34 PM [express] GET /api/unified-financial/representative/2050 200 in 97ms :: {"success":true,"…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2137]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2137]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1819  200 in 0ms
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2137]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+✅ GET /representative/1821  200 in 0ms
+4:17:34 PM [express] GET /api/unified-financial/representative/1819 200 in 25ms :: {"success":true,"…
+✅ GET /representative/2137  200 in 68ms
+4:17:34 PM [express] GET /api/unified-financial/representative/1821 200 in 23ms :: {"success":true,"…
+4:17:34 PM [express] GET /api/unified-financial/representative/2137 200 in 92ms :: {"success":true,"…
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2039]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2051]
+🔓 SHERLOCK v26.0: No-validation middleware - allowing all requests
+Query: select "id", "name", "code" from "representatives" where "representatives"."id" = $1 -- params: [2007]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2039]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2051]
+Query: select COUNT(*), COALESCE(SUM(CAST(amount as DECIMAL)), 0), MAX(created_at) from "invoices" where "invoices"."representative_id" = $1 -- params: [2007]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2039]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2051]
+Query: select COUNT(*), COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0), MAX(payment_date) from "payments" where "payments"."representative_id" = $1 -- params: [2007]
+✅ GET /representative/2051  200 in 68ms
+✅ GET /representative/2039  200 in 76ms
+✅ GET /representative/2007  200 in 89ms
+4:17:34 PM [express] GET /api/unified-financial/representative/2051 200 in 92ms :: {"success":true,"…
+4:17:34 PM [express] GET /api/unified-financial/representative/2039 200 in 100ms :: {"success":true,…
+4:17:34 PM [express] GET /api/unified-financial/representative/2007 200 in 113ms :: {"success":true,…
+Memory usage: { rss: 276.29, heapTotal: 145.85, heapUsed: 131.41, external: 11.04 }
+Unhandled Rejection: Error: Request timeout
+    at Timeout._onTimeout (/home/runner/workspace/server/routes.ts:585:33)
+    at listOnTimeout (node:internal/timers:581:17)
+    at process.processTimers (node:internal/timers:519:7)
