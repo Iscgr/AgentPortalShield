@@ -287,249 +287,28 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * 🎯 PHASE 6B: OPTIMIZED BATCH CALCULATION - ELIMINATES N+1 PATTERN
-   * Implements Repository Pattern with Batch Loading for 2.78x performance improvement
-   */
-  static async calculateAllRepresentativesOptimized(): Promise<RepresentativeFinancialData[]> {
-    const startTime = performance.now();
-    console.log('🚀 PHASE 6B: Starting optimized batch calculation - Repository Pattern');
-
-    try {
-      // STEP 1: Get all active representatives in single query
-      const representativesData = await db.select({
-        id: representatives.id,
-        name: representatives.name,
-        code: representatives.code
-      }).from(representatives)
-      .where(eq(representatives.isActive, true))
-      .orderBy(representatives.name);
-
-      if (representativesData.length === 0) {
-        console.log('ℹ️ PHASE 6B: No active representatives found');
-        return [];
-      }
-
-      const repIds = representativesData.map(rep => rep.id);
-      console.log(`🔄 PHASE 6B: Processing ${representativesData.length} representatives with batch queries`);
-
-      // STEP 2: Execute optimized batch queries (3 queries total instead of N+1)
-      const [invoiceResults, paymentResults, debtResults] = await Promise.all([
-        // Batch invoice aggregation
-        db.select({
-          representativeId: invoices.representativeId,
-          count: sql<number>`COUNT(*)`,
-          totalSales: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
-          lastDate: sql<string>`MAX(created_at)`
-        }).from(invoices)
-        .where(sql`${invoices.representativeId} = ANY(${repIds})`)
-        .groupBy(invoices.representativeId),
-
-        // Batch payment aggregation
-        db.select({
-          representativeId: payments.representativeId,
-          count: sql<number>`COUNT(*)`,
-          totalPaid: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
-          lastDate: sql<string>`MAX(payment_date)`
-        }).from(payments)
-        .where(sql`${payments.representativeId} = ANY(${repIds})`)
-        .groupBy(payments.representativeId),
-
-        // Batch debt data (from representatives table)
-        db.select({
-          id: representatives.id,
-          totalDebt: sql<number>`CAST(total_debt as DECIMAL)`
-        }).from(representatives)
-        .where(sql`${representatives.id} = ANY(${repIds})`)
-      ]);
-
-      console.log(`✅ PHASE 6B: Batch queries complete - Invoices: ${invoiceResults.length}, Payments: ${paymentResults.length}, Debts: ${debtResults.length}`);
-      console.log(`🎯 PHASE 6B: N+1 ELIMINATED - Using 3 batch queries instead of ${representativesData.length * 4 + 1} individual queries`);
-
-      // STEP 3: Create efficient lookup maps
-      const invoiceMap = new Map(invoiceResults.map(inv => [inv.representativeId, inv]));
-      const paymentMap = new Map(paymentResults.map(pay => [pay.representativeId, pay]));
-      const debtMap = new Map(debtResults.map(debt => [debt.id, debt]));
-
-      // STEP 4: Process results in memory (no additional DB calls)
-      const results: RepresentativeFinancialData[] = representativesData.map(rep => {
-        const invoiceData = invoiceMap.get(rep.id);
-        const paymentData = paymentMap.get(rep.id);
-        const debtData = debtMap.get(rep.id);
-
-        const totalSales = Number(invoiceData?.totalSales || 0);
-        const totalPaid = Number(paymentData?.totalPaid || 0);
-        const totalDebt = Number(debtData?.totalDebt || 0);
-
-        return {
-          id: rep.id,
-          name: rep.name,
-          code: rep.code,
-          totalSales,
-          totalPaid,
-          totalDebt,
-          invoiceCount: invoiceData?.count || 0,
-          paymentCount: paymentData?.count || 0,
-          lastInvoiceDate: invoiceData?.lastDate || null,
-          lastPaymentDate: paymentData?.lastDate || null,
-          debtLevel: this.calculateDebtLevel(totalDebt),
-          paymentRatio: totalSales > 0 ? Math.round((totalPaid / totalSales) * 100) / 100 : 0,
-          calculationTimestamp: new Date().toISOString(),
-          accuracyGuaranteed: true
-        };
-      });
-
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      console.log(`🎯 PHASE 6B: Optimized calculation complete in ${duration.toFixed(2)}ms`);
-      console.log(`📊 PHASE 6B: Performance improvement: ~${(1391 / duration).toFixed(1)}x faster than baseline`);
-
-      return results;
-
-    } catch (error) {
-      console.error('❌ PHASE 6B: Batch calculation error:', error);
-      throw new Error(`Optimized batch calculation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * ✅ EMERGENCY FIX v35.0: Enhanced batch processing with robust timeout management
+   * ✅ SHERLOCK v33.0: Enhanced batch processing with intelligent caching
    */
   private static batchCache = new Map<string, { data: any; timestamp: number }>();
   private static readonly BATCH_CACHE_TTL = 60 * 1000; // 1 minute for batch results
-  private static batchSize = 15; // Reduced batch size for stability
+  private static batchSize = 20;
 
   // ✅ ADMIN PANEL OPTIMIZATION: Debt query cache to reduce repeated queries
-  private static debtQueryCache = new Map<number, { debt: any; timestamp: number }>();
+  private static debtQueryCache = new Map<number, { debt: any; timestamp: number }>(); // Changed 'any' to 'UnifiedFinancialData[]' for clarity
   private static readonly DEBT_CACHE_TTL = 30 * 1000; // 30 seconds for debt queries
 
   static async calculateBatch(representativeIds: number[]): Promise<Map<number, any>> {
     const results = new Map();
 
-    // ✅ EMERGENCY FIX: Enhanced timeout protection with graceful degradation
-    const BATCH_TIMEOUT = 25000; // Increased to 25 seconds per batch
-    const MAX_RETRIES = 2;
-    
-    try {
-      console.log(`🔄 EMERGENCY FIX v35.0: Starting enhanced batch calculation for ${representativeIds.length} representatives`);
-      
-      // Process in smaller chunks with enhanced error handling
-      for (let i = 0; i < representativeIds.length; i += this.batchSize) {
-        const chunk = representativeIds.slice(i, i + this.batchSize);
-        let retryCount = 0;
-        let chunkResults: any[] = [];
-        
-        while (retryCount <= MAX_RETRIES) {
-          try {
-            console.log(`📊 Processing chunk ${Math.floor(i/this.batchSize) + 1}/${Math.ceil(representativeIds.length/this.batchSize)} (attempt ${retryCount + 1})`);
-            
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error(`Batch timeout for chunk ${i} after ${BATCH_TIMEOUT}ms`)), BATCH_TIMEOUT);
-            });
-            
-            const calculationPromise = Promise.all(
-              chunk.map(async (id, index) => {
-                try {
-                  // Add individual timeout for each calculation
-                  const individualTimeout = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error(`Individual timeout for rep ${id}`)), 8000);
-                  });
-                  
-                  const calculationResult = new Promise(async (resolve) => {
-                    try {
-                      const engine = new UnifiedFinancialEngine(null);
-                      const result = await engine.calculateRepresentative(id);
-                      resolve(result);
-                    } catch (error) {
-                      console.warn(`⚠️ Calculation failed for representative ${id}:`, error);
-                      resolve(null);
-                    }
-                  });
-                  
-                  return await Promise.race([calculationResult, individualTimeout]);
-                } catch (error) {
-                  console.warn(`⚠️ Individual calculation error for representative ${id}:`, error);
-                  return null;
-                }
-              })
-            );
-            
-            chunkResults = await Promise.race([calculationPromise, timeoutPromise]);
-            break; // Success, exit retry loop
-            
-          } catch (error) {
-            retryCount++;
-            console.warn(`⚠️ Chunk processing failed (attempt ${retryCount}):`, error);
-            
-            if (retryCount > MAX_RETRIES) {
-              console.error(`❌ Chunk processing failed after ${MAX_RETRIES} retries, using fallback data`);
-              // Create fallback results to prevent complete failure
-              chunkResults = chunk.map(() => null);
-            } else {
-              // Wait before retry
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-            }
-          }
-        }
+    // Process in chunks to avoid overwhelming the database
+    for (let i = 0; i < representativeIds.length; i += this.batchSize) {
+      const chunk = representativeIds.slice(i, i + this.batchSize);
+      const chunkResults = await Promise.all(
+        chunk.map(id => this.calculateRepresentative(id))
+      );
 
-        // Process results with null safety
-        chunk.forEach((id, index) => {
-          if (chunkResults[index]) {
-            results.set(id, chunkResults[index]);
-          } else {
-            // Create fallback financial data
-            console.warn(`⚠️ Using fallback data for representative ${id}`);
-            results.set(id, {
-              representativeId: id,
-              representativeName: `Representative ${id}`,
-              representativeCode: `REP${id}`,
-              totalSales: 0,
-              totalPaid: 0,
-              totalUnpaid: 0,
-              actualDebt: 0,
-              paymentRatio: 0,
-              debtLevel: 'MODERATE',
-              invoiceCount: 0,
-              paymentCount: 0,
-              lastTransactionDate: null,
-              calculationTimestamp: new Date().toISOString(),
-              accuracyGuaranteed: false
-            });
-          }
-        });
-        
-        // Enhanced delay between chunks with backpressure management
-        if (i + this.batchSize < representativeIds.length) {
-          const delayTime = Math.min(200 + (retryCount * 100), 1000); // Adaptive delay
-          await new Promise(resolve => setTimeout(resolve, delayTime));
-        }
-      }
-      
-      console.log(`✅ EMERGENCY FIX v35.0: Batch calculation completed with ${results.size} results`);
-      
-    } catch (error) {
-      console.error('❌ Critical batch calculation error:', error);
-      
-      // Emergency fallback: create minimal results to prevent complete failure
-      representativeIds.forEach(id => {
-        if (!results.has(id)) {
-          results.set(id, {
-            representativeId: id,
-            representativeName: `Representative ${id}`,
-            representativeCode: `REP${id}`,
-            totalSales: 0,
-            totalPaid: 0,
-            totalUnpaid: 0,
-            actualDebt: 0,
-            paymentRatio: 0,
-            debtLevel: 'MODERATE',
-            invoiceCount: 0,
-            paymentCount: 0,
-            lastTransactionDate: null,
-            calculationTimestamp: new Date().toISOString(),
-            accuracyGuaranteed: false
-          });
-        }
+      chunk.forEach((id, index) => {
+        results.set(id, chunkResults[index]);
       });
     }
 

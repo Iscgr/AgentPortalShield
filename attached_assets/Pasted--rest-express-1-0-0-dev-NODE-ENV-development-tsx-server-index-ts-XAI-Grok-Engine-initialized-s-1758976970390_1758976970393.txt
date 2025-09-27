@@ -1,0 +1,37 @@
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+✅ XAI Grok Engine initialized successfully
+✅ PHASE 9: Integration health routes registered
+🚩 ATOMOS Feature Flag Manager v1.0 initialized with safe defaults
+12:42:23 PM [express] Checking database connection...
+12:42:23 PM [database] Database connection successful
+Query: select "id", "username", "password_hash", "role", "permissions", "is_active", "last_login_at", "created_at" from "admin_users" where "admin_users"."username" = $1 limit $2 -- params: ["mgr", 1]
+Query: update "admin_users" set "password_hash" = $1, "role" = $2, "is_active" = $3 where "admin_users"."username" = $4 -- params: ["$2b$12$JpuEIY7A2qtZNZCbkpBU2.Mux7wFc1V9xCI0KVDDB1.OQ9lKlWWRy", "SUPER_ADMIN", true, "mgr"]
+🔄 Admin user 'mgr' password reset successfully
+✅ Settings routes registered successfully
+✅ Standardized Invoice Routes Registered
+✅ Maintenance routes registered successfully
+✅ Integration health routes registered for Phase 9
+✅ Batch Rollback Routes Registered
+✅ SHERLOCK v32.0: Enhanced Telegram Management Routes Registered
+Query: select "id", "key", "value", "description", "updated_at" from "settings" where "settings"."key" = $1 -- params: ["telegram_bot_token"]
+Re-optimizing dependencies because lockfile has changed
+🔍 Checking telegram bot token: { hasToken: true, tokenLength: 46, serviceExists: false }
+🤖 Initializing Telegram service with saved token...
+🤖 PHASE 8C: Enhanced Telegram Service initialized for @Dsyrhshnmdbot
+🔧 PHASE 8C: Multi-group support enabled (max 5 groups)
+✅ Telegram service initialized successfully
+Query: select "id", "key", "value", "description", "updated_at" from "settings" where "settings"."key" = $1 -- params: ["XAI_API_KEY"]
+Starting server on port 5000
+❌ Server error: Error: listen EADDRINUSE: address already in use 0.0.0.0:5000
+    at Server.setupListenHandle [as _listen2] (node:net:1908:16)
+    at listenInCluster (node:net:1965:12)
+    at doListen (node:net:2139:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:83:21) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '0.0.0.0',
+  port: 5000
+}

@@ -27,6 +27,7 @@ import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import UnifiedAuth from "@/pages/unified-auth";
 import FinancialIntegrityPage from "@/pages/financial-integrity";
+import AllocationManagement from "@/pages/allocation-management";
 
 
 

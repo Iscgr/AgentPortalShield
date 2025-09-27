@@ -351,37 +351,6 @@ router.get('/total-debt', requireAuth, async (req, res) => {
 });
 
 /**
- * 🎯 PHASE 6B: OPTIMIZED ENDPOINT - Uses Service Layer with Repository Pattern
- */
-router.get('/all-representatives-optimized', requireAuth, async (req, res) => {
-  try {
-    console.log('🚀 PHASE 6B: Optimized all-representatives endpoint called');
-    
-    const representativeFinancialService = new (await import('../services/representative-financial-service.js')).RepresentativeFinancialService();
-    const representatives = await representativeFinancialService.getAllRepresentativesWithFinancialSummary();
-    
-    res.json({
-      success: true,
-      data: representatives,
-      meta: {
-        source: 'PHASE 6B OPTIMIZED SERVICE LAYER',
-        timestamp: new Date().toISOString(),
-        count: representatives.length,
-        optimized: true
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ PHASE 6B: Optimized endpoint error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to load optimized representatives data',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-/**
  * ✅ PHASE 9C2.4: Fallback individual calculation method
  * Used when optimization flag is disabled
  */

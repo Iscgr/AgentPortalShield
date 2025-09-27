@@ -1,16 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  TrendingUp,
-  AlertTriangle,
-  Users,
+import { 
+  TrendingUp, 
+  AlertTriangle, 
+  Users, 
   FileText,
   Upload,
   Bot,
   DollarSign,
-  CreditCard,
-  RefreshCw
+  CreditCard
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import InvoiceUpload from "@/components/invoice-upload";
@@ -106,13 +105,13 @@ function UnifiedStatCard({ title, statKey, endpoint, icon, formatter, color }: {
 }
 
 
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
+function StatCard({ 
+  title, 
+  value, 
+  subtitle, 
+  icon: Icon, 
   colorClass = "text-primary",
-  onClick
+  onClick 
 }: {
   title: string;
   value: string;
@@ -122,7 +121,7 @@ function StatCard({
   onClick?: () => void;
 }) {
   return (
-    <Card
+    <Card 
       className={`stat-card ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
     >
@@ -222,9 +221,9 @@ const OverdueInvoicesCard = () => {
         <CardContent>
           <div className="text-2xl font-bold text-red-600">خطا</div>
           <p className="text-xs text-red-500">عدم دسترسی به اطلاعات</p>
-          <Button
-            variant="outline"
-            size="sm"
+          <Button 
+            variant="outline" 
+            size="sm" 
             onClick={() => window.location.reload()}
             className="mt-2"
           >
@@ -246,7 +245,7 @@ const OverdueInvoicesCard = () => {
   const totalOverdueAmount = overdueData?.totals?.totalOverdueAmount || 0;
   const overdueInvoicesCount = overdueData?.totals?.overdueInvoicesCount || 0;
 
-  const criticalDebtors = overdueRepresentatives.filter(rep =>
+  const criticalDebtors = overdueRepresentatives.filter(rep => 
     rep.overdueAmount > 10000000
   );
 
@@ -262,15 +261,15 @@ const OverdueInvoicesCard = () => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">مطالبات معوق</CardTitle>
         <AlertTriangle className={`h-4 w-4 ${
-          criticalDebtors.length > 0 ? 'text-red-500' :
-          overdueRepresentatives.length > 5 ? 'text-orange-500' :
+          criticalDebtors.length > 0 ? 'text-red-500' : 
+          overdueRepresentatives.length > 5 ? 'text-orange-500' : 
           'text-muted-foreground'
         }`} />
       </CardHeader>
       <CardContent>
         <div className={`text-2xl font-bold ${
-          criticalDebtors.length > 0 ? 'text-red-600' :
-          overdueRepresentatives.length > 5 ? 'text-orange-600' :
+          criticalDebtors.length > 0 ? 'text-red-600' : 
+          overdueRepresentatives.length > 5 ? 'text-orange-600' : 
           overdueRepresentatives.length > 0 ? 'text-yellow-600' : 'text-green-600'
         }`}>
           {toPersianDigits(overdueInvoicesCount.toString())}
@@ -325,94 +324,44 @@ const OverdueInvoicesCard = () => {
 
 
 export default function Dashboard() {
-  // ✅ EMERGENCY FIX v35.0: Enhanced dashboard query with robust error handling
-  const { data: dashboardData, isLoading, error, refetch } = useQuery<DashboardData>({
+  const { data: dashboardData, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
-    queryFn: async () => {
-      console.log('🔍 EMERGENCY FIX v35.0: Fetching dashboard data...');
-      try {
-        const response = await apiRequest("/api/dashboard");
-        console.log('✅ Dashboard API response received:', response?.success ? 'Success' : 'Error');
-        return response;
-      } catch (error) {
-        console.error('❌ Dashboard API error:', error);
-        throw error;
-      }
-    },
-    staleTime: 3 * 60 * 1000, // 3 minutes
-    refetchInterval: 10 * 60 * 1000, // 10 minutes
-    retry: 3, // Retry failed requests
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    queryFn: () => apiRequest("/api/dashboard"),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
     select: (data: any) => {
-      try {
-        console.log('🔍 EMERGENCY FIX v35.0: Processing dashboard data...', data?.success);
-
-        // Handle both success and error responses gracefully
-        if (!data?.success && data?.data) {
-          console.warn('⚠️ Dashboard returned error but has fallback data');
-        }
-
-        // Extract from the API response structure with multiple fallbacks
-        const summary = data?.data?.summary || data?.summary || data?.fallbackData || {};
-        const representatives = data?.data?.representatives || {};
-        const invoices = data?.data?.invoices || {};
-
-        console.log('🔍 EMERGENCY FIX v35.0: Extracted summary data:', {
-          hasSystemDebt: !!summary?.totalSystemDebt,
-          hasRepresentatives: !!summary?.totalRepresentatives,
-          summaryKeys: Object.keys(summary)
-        });
-
-        return {
-          totalRevenue: parseFloat(summary?.totalSystemPaid || summary?.totalRevenue || '0'),
-          totalDebt: parseFloat(summary?.totalSystemDebt || summary?.totalDebt || '0'),
-          totalCredit: parseFloat(summary?.totalCredit || '0'),
-          totalOutstanding: parseFloat(summary?.totalOutstanding || '0'),
-          totalRepresentatives: parseInt(summary?.totalRepresentatives || representatives?.total || '0'),
-          activeRepresentatives: parseInt(summary?.activeRepresentatives || representatives?.active || '0'),
-          inactiveRepresentatives: parseInt(summary?.inactiveRepresentatives || representatives?.inactive || '0'),
-          riskRepresentatives: parseInt(summary?.riskRepresentatives || summary?.criticalReps || '0'),
-          totalInvoices: parseInt(summary?.totalInvoices || invoices?.total || '0'),
-          paidInvoices: parseInt(summary?.paidInvoices || invoices?.paid || '0'),
-          unpaidInvoices: parseInt(summary?.unpaidInvoices || invoices?.unpaid || '0'),
-          overdueInvoices: parseInt(summary?.overdueInvoices || invoices?.overdue || '0'),
-          unsentTelegramInvoices: parseInt(summary?.unsentTelegramInvoices || '0'),
-          totalSalesPartners: parseInt(summary?.totalSalesPartners || '0'),
-          activeSalesPartners: parseInt(summary?.activeSalesPartners || '0'),
-          systemIntegrityScore: parseInt(summary?.systemIntegrityScore || summary?.systemAccuracy || '0'),
-          lastReconciliationDate: summary?.lastReconciliationDate || summary?.lastCalculationTime || '',
-          problematicRepresentativesCount: parseInt(summary?.problematicRepresentativesCount || summary?.criticalReps || '0'),
-          responseTime: summary?.responseTime || 0,
-          cacheStatus: summary?.cacheStatus || data?.meta?.cacheStatus || 'UNKNOWN',
-          lastUpdated: summary?.lastUpdated || summary?.lastCalculationTime || new Date().toISOString()
-        };
-      } catch (selectError) {
-        console.error('❌ Error processing dashboard data:', selectError);
-        // Return safe fallback data
-        return {
-          totalRevenue: 0,
-          totalDebt: 0,
-          totalCredit: 0,
-          totalOutstanding: 0,
-          totalRepresentatives: 0,
-          activeRepresentatives: 0,
-          inactiveRepresentatives: 0,
-          riskRepresentatives: 0,
-          totalInvoices: 0,
-          paidInvoices: 0,
-          unpaidInvoices: 0,
-          overdueInvoices: 0,
-          unsentTelegramInvoices: 0,
-          totalSalesPartners: 0,
-          activeSalesPartners: 0,
-          systemIntegrityScore: 0,
-          lastReconciliationDate: '',
-          problematicRepresentativesCount: 0,
-          responseTime: 0,
-          cacheStatus: 'ERROR',
-          lastUpdated: new Date().toISOString()
-        };
-      }
+      console.log('🔍 SHERLOCK v32.2: Raw API response structure:', data);
+      
+      // Extract from the correct API response structure
+      const summary = data?.data?.summary || data?.summary || data?.value || data;
+      const representatives = data?.data?.representatives || {};
+      const invoices = data?.data?.invoices || {};
+      
+      console.log('🔍 SHERLOCK v32.2: Extracted summary:', summary);
+      
+      return {
+        totalRevenue: parseFloat(summary?.totalSystemPaid || '0'),
+        totalDebt: parseFloat(summary?.totalSystemDebt || summary?.totalDebt || '0'),
+        totalCredit: parseFloat(summary?.totalCredit || '0'),
+        totalOutstanding: parseFloat(summary?.totalOutstanding || '0'),
+        totalRepresentatives: parseInt(summary?.totalRepresentatives || representatives?.total || '0'),
+        activeRepresentatives: parseInt(summary?.activeRepresentatives || representatives?.active || '0'),
+        inactiveRepresentatives: parseInt(summary?.inactiveRepresentatives || representatives?.inactive || '0'),
+        riskRepresentatives: parseInt(summary?.riskRepresentatives || '0'),
+        totalInvoices: parseInt(summary?.totalInvoices || invoices?.total || '0'),
+        paidInvoices: parseInt(summary?.paidInvoices || invoices?.paid || '0'),
+        unpaidInvoices: parseInt(summary?.unpaidInvoices || invoices?.unpaid || '0'),
+        overdueInvoices: parseInt(summary?.overdueInvoices || invoices?.overdue || '0'),
+        unsentTelegramInvoices: parseInt(summary?.unsentTelegramInvoices || '0'),
+        totalSalesPartners: parseInt(summary?.totalSalesPartners || '0'),
+        activeSalesPartners: parseInt(summary?.activeSalesPartners || '0'),
+        systemIntegrityScore: parseInt(summary?.systemIntegrityScore || '0'),
+        lastReconciliationDate: summary?.lastReconciliationDate || '',
+        problematicRepresentativesCount: parseInt(summary?.problematicRepresentativesCount || '0'),
+        responseTime: summary?.responseTime || 0,
+        cacheStatus: summary?.cacheStatus || 'UNKNOWN',
+        lastUpdated: summary?.lastUpdated || new Date().toISOString()
+      };
     }
   });
 
@@ -421,20 +370,12 @@ export default function Dashboard() {
     select: (data: any) => data?.value || null
   });
 
+  
 
 
-
-  // ✅ EMERGENCY FIX v35.0: Enhanced loading and error states
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex justify-center items-center py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">در حال بارگذاری اطلاعات داشبورد...</p>
-            <p className="text-xs text-gray-400 mt-2">ممکن است تا 45 ثانیه طول بکشد</p>
-          </div>
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -450,68 +391,10 @@ export default function Dashboard() {
     );
   }
 
-  // Enhanced error handling with retry functionality
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-6">
-            <div className="text-center">
-              <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-              <h3 className="text-lg font-medium text-red-900 mb-2">
-                خطا در بارگذاری داشبورد
-              </h3>
-              <p className="text-red-700 mb-4">
-                {error instanceof Error ? error.message : 'خطای ناشناخته در سیستم'}
-              </p>
-              <div className="space-x-4">
-                <Button
-                  onClick={() => refetch()}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  <RefreshCw className="w-4 h-4 ml-2" />
-                  تلاش مجدد
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => window.location.reload()}
-                >
-                  بروزرسانی صفحه
-                </Button>
-              </div>
-              <p className="text-xs text-red-600 mt-4">
-                اگر مشکل ادامه دارد، لطفاً با پشتیبانی تماس بگیرید
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (!dashboardData) {
     return (
-      <div className="space-y-6">
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-6">
-            <div className="text-center">
-              <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-              <h3 className="text-lg font-medium text-yellow-900 mb-2">
-                اطلاعات داشبورد در دسترس نیست
-              </h3>
-              <p className="text-yellow-700 mb-4">
-                سیستم موقتاً قادر به بارگذاری اطلاعات نیست
-              </p>
-              <Button
-                onClick={() => refetch()}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white"
-              >
-                <RefreshCw className="w-4 h-4 ml-2" />
-                تلاش مجدد
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="text-center py-12">
+        <p className="text-gray-500">خطا در بارگذاری اطلاعات داشبورد</p>
       </div>
     );
   }
@@ -530,64 +413,6 @@ export default function Dashboard() {
       <div className="max-w-4xl mx-auto">
         <InvoiceUpload />
       </div>
-
-      {/* Payment Section - ATOMOS Enhanced */}
-      <Card className="col-span-1">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5" />
-            ثبت پرداخت سریع - ATOMOS Enhanced
-          </CardTitle>
-          <CardDescription>
-            ✅ تخصیص خودکار FIFO یا دستی به فاکتور مشخص
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Payment input fields and buttons will be here */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Example: Amount input */}
-            <div>
-              <label htmlFor="paymentAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                مبلغ پرداخت
-              </label>
-              <input
-                type="text"
-                id="paymentAmount"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                placeholder="ریال"
-              />
-            </div>
-
-            {/* Example: Invoice selection dropdown */}
-            <div>
-              <label htmlFor="invoiceSelect" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                انتخاب فاکتور
-              </label>
-              <select
-                id="invoiceSelect"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600"
-              >
-                <option>فاکتور 1001</option>
-                <option>فاکتور 1002</option>
-                <option>فاکتور 1003</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Buttons for allocation */}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => console.log("Auto Allocate FIFO")}>
-              تخصیص خودکار (FIFO)
-            </Button>
-            <Button onClick={() => console.log("Manual Allocate")}>
-              تخصیص دستی
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Other dashboard components can be added here */}
-      {/* <OverdueInvoicesCard /> */}
     </div>
   );
 }
