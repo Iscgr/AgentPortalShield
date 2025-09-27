@@ -300,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth status check endpoint
   app.get("/api/auth/status", (req, res) => {
     const session = req.session as any;
-    
+
     if (session && session.authenticated && session.user) {
       res.json({
         authenticated: true,
@@ -365,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let dbHealthy = false;
           let dbRetries = 0;
           const maxDbRetries = 3;
-          
+
           while (!dbHealthy && dbRetries < maxDbRetries) {
             try {
               await db.execute(sql`SELECT 1 as test`);
@@ -451,19 +451,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 totalSystemSales: summary.totalSystemSales?.toString() || "0",
                 totalSystemPaid: summary.totalSystemPaid?.toString() || "0", 
                 totalSystemDebt: summary.totalSystemDebt || 0,
-                
+
                 // Invoice breakdown
                 totalOverdueAmount: summary.totalOverdueAmount?.toString() || "0",
                 totalUnpaidAmount: summary.totalUnpaidAmount?.toString() || "0", 
                 overdueInvoicesCount: summary.overdueInvoicesCount?.toString() || "0",
                 unpaidInvoicesCount: summary.unpaidInvoicesCount?.toString() || invoiceStats[0]?.unpaid?.toString() || "0",
-                
+
                 // Representative health distribution
                 healthyReps: summary.healthyReps || 0,
                 moderateReps: summary.moderateReps || 0,
                 highRiskReps: summary.highRiskReps || 0,
                 criticalReps: summary.criticalReps || 0,
-                
+
                 // System health indicators
                 systemAccuracy: summary.systemAccuracy || 100,
                 lastCalculationTime: summary.lastCalculationTime || new Date().toISOString(),
@@ -511,7 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set performance headers
       res.header('X-Response-Time', (Date.now() - startTime).toString());
       res.header('X-Emergency-Fix', 'v35.0');
-      
+
       res.json(dashboardData);
 
     } catch (error) {
@@ -644,7 +644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const startTime = Date.now();
     const REQUEST_TIMEOUT = 45000; // Increased to 45 seconds
     const MAX_REPRESENTATIVES = 500; // Limit for safety
-    
+
     try {
       console.log('🔍 EMERGENCY FIX v35.0: Fetching representatives data with enhanced stability');
 
@@ -657,16 +657,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get base representatives data with limit
         console.log('📊 Fetching base representatives data...');
         let representatives;
-        
+
         try {
           representatives = await storage.getRepresentatives();
-          
+
           // Limit the number of representatives for stability
           if (representatives.length > MAX_REPRESENTATIVES) {
             console.warn(`⚠️ Large dataset detected: ${representatives.length} representatives, limiting to ${MAX_REPRESENTATIVES}`);
             representatives = representatives.slice(0, MAX_REPRESENTATIVES);
           }
-          
+
           console.log(`✅ Base representatives data loaded: ${representatives.length} items`);
         } catch (storageError) {
           console.error('❌ Storage error:', storageError);
@@ -677,16 +677,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const BATCH_SIZE = 25; // Smaller batches for stability
         const enhancedRepresentatives = [];
         let processedCount = 0;
-        
+
         console.log(`🔄 Starting financial data enhancement in batches of ${BATCH_SIZE}`);
-        
+
         for (let i = 0; i < representatives.length; i += BATCH_SIZE) {
           const batch = representatives.slice(i, i + BATCH_SIZE);
           const batchStartTime = Date.now();
-          
+
           try {
             console.log(`📊 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(representatives.length/BATCH_SIZE)} (${batch.length} items)`);
-            
+
             const batchResults = await Promise.allSettled(
               batch.map(async (rep) => {
                 try {
@@ -694,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const repTimeout = new Promise<never>((_, reject) => {
                     setTimeout(() => reject(new Error(`Rep ${rep.id} calculation timeout`)), 10000);
                   });
-                  
+
                   const repCalculation = unifiedFinancialEngine.calculateRepresentative(rep.id);
                   const financialData = await Promise.race([repCalculation, repTimeout]);
 
@@ -736,10 +736,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.warn('❌ Batch item processing failed:', result.reason);
               }
             });
-            
+
             const batchDuration = Date.now() - batchStartTime;
             console.log(`✅ Batch completed in ${batchDuration}ms (${processedCount}/${representatives.length} processed)`);
-            
+
             // Adaptive delay based on batch performance
             if (batchDuration > 5000) {
               console.log('⏱️ Slow batch detected, adding recovery delay...');
@@ -748,10 +748,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Small delay between batches
               await new Promise(resolve => setTimeout(resolve, 100));
             }
-            
+
           } catch (batchError) {
             console.error(`❌ Batch processing error:`, batchError);
-            
+
             // Add batch items without enhancement as fallback
             batch.forEach(rep => {
               enhancedRepresentatives.push({
@@ -766,12 +766,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               processedCount++;
             });
           }
-          
+
           // Check if we're running out of time
           const elapsedTime = Date.now() - startTime;
           if (elapsedTime > REQUEST_TIMEOUT * 0.8) { // 80% of timeout
             console.warn(`⚠️ Approaching timeout (${elapsedTime}ms), completing with current data`);
-            
+
             // Add remaining representatives without enhancement
             const remaining = representatives.slice(processedCount);
             remaining.forEach(rep => {
@@ -785,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               });
             });
-            
+
             break;
           }
         }
@@ -795,14 +795,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })();
 
       const representatives = await Promise.race([representativesPromise, timeoutPromise]);
-      
+
       // Set response headers for monitoring
       res.header('X-Response-Time', (Date.now() - startTime).toString());
       res.header('X-Representatives-Count', representatives.length.toString());
       res.header('X-Emergency-Fix', 'v35.0');
-      
+
       res.json(representatives);
-      
+
     } catch (error) {
       const errorDuration = Date.now() - startTime;
       console.error('❌ EMERGENCY FIX v35.0: Critical representatives endpoint error:', {
@@ -816,9 +816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Try to get basic representatives data without enhancement
         const basicRepresentatives = await storage.getRepresentatives();
         const limitedReps = basicRepresentatives.slice(0, 100); // Limit for safety
-        
+
         console.log(`⚠️ Returning basic representatives data (${limitedReps.length} items) as fallback`);
-        
+
         res.status(200).json(limitedReps.map(rep => ({
           ...rep,
           financialData: {
@@ -828,7 +828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastSync: new Date().toISOString()
           }
         })));
-        
+
       } catch (fallbackError) {
         console.error('❌ Fallback also failed:', fallbackError);
         res.status(500).json({ 
@@ -1394,7 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Import Enhanced Payment Allocation Engine
           const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-          
+
           // Execute manual allocation using enhanced engine
           const allocationResult = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
             newPayment.id,
@@ -1405,13 +1405,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (allocationResult.success) {
             console.log(`✅ ATOMOS v1.0: Manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
-            
+
             // Update payment status to reflect allocation
             finalPaymentStatus = await storage.updatePayment(newPayment.id, {
               isAllocated: true,
               invoiceId: parseInt(selectedInvoiceId)
             });
-            
+
             console.log(`📊 ATOMOS v1.0: Payment ${newPayment.id} updated - isAllocated: true, invoiceId: ${selectedInvoiceId}`);
           } else {
             console.error(`❌ ATOMOS v1.0: Manual allocation failed:`, allocationResult.errors);
@@ -1427,7 +1427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Import Enhanced Payment Allocation Engine  
           const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-          
+
           // Execute auto allocation using enhanced engine
           const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(
             newPayment.id,
@@ -1441,16 +1441,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (allocationResult.success && allocationResult.allocatedAmount > 0) {
             console.log(`✅ ATOMOS v1.0: Auto-allocation successful - ${allocationResult.allocatedAmount} allocated to ${allocationResult.allocations.length} invoices`);
-            
+
             // Find the first allocated invoice for payment update
             if (allocationResult.allocations.length > 0) {
               const firstAllocation = allocationResult.allocations[0];
-              
+
               finalPaymentStatus = await storage.updatePayment(newPayment.id, {
                 isAllocated: true,
                 invoiceId: firstAllocation.invoiceId
               });
-              
+
               console.log(`📊 ATOMOS v1.0: Payment ${newPayment.id} auto-allocated to invoice ${firstAllocation.invoiceId}`);
             }
           } else {
@@ -1464,36 +1464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ✅ CRITICAL: Update payment record to reflect final allocation status
       if (finalPaymentStatus.id === newPayment.id) {
-        finalPaymentStatus = await storage.getPayment(newPayment.id) || finalPaymentStatusent(newPayment.id, {
-            isAllocated: true,
-            invoiceId: parseInt(selectedInvoiceId)
-          });
-
-          // Update invoice status after allocation
-          const calculatedStatus = await storage.calculateInvoicePaymentStatus(parseInt(selectedInvoiceId));
-          await storage.updateInvoice(parseInt(selectedInvoiceId), { status: calculatedStatus });
-
-          console.log(`✅ SHERLOCK v33.2: Payment ${newPayment.id} successfully allocated to Invoice ${selectedInvoiceId}, status: ${calculatedStatus}`);
-        } catch (allocationError) {
-          console.error(`❌ SHERLOCK v33.2: Manual allocation failed for Payment ${newPayment.id}:`, allocationError);
-          // Ensure payment remains unallocated on failure
-          finalPaymentStatus = await storage.updatePayment(newPayment.id, { isAllocated: false, invoiceId: null });
-        }
-      }
-      // Auto-allocate if requested
-      else if (selectedInvoiceId === "auto") {
-        console.log(`🔄 SHERLOCK v33.2: Executing auto-allocation - Payment ${newPayment.id} for Representative ${representativeId}`);
-        try {
-          await storage.autoAllocatePaymentToInvoices(newPayment.id, representativeId);
-          // Get updated payment status after auto-allocation
-          finalPaymentStatus = await storage.getPayment(newPayment.id);
-        } catch (autoAllocationError) {
-          console.error(`❌ SHERLOCK v33.2: Auto-allocation failed for Payment ${newPayment.id}:`, autoAllocationError);
-        }
-      }
-      // If no allocation specified, payment remains unallocated
-      else {
-        console.log(`📝 SHERLOCK v33.2: Payment ${newPayment.id} created without allocation (manual later)`);
+        finalPaymentStatus = await storage.getPayment(newPayment.id) || finalPaymentStatus;
       }
 
       // ✅ SHERLOCK v33.2: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
@@ -2420,7 +2391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           results.processed++;
         } catch (invoiceError) {
-          console.warn(`Error processing invoice ${invoiceId}:`, invoiceError);
+          console.warn('Error processing invoice ${invoiceId}:', invoiceError);
         }
       }
 
