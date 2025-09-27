@@ -327,15 +327,16 @@ const OverdueInvoicesCard = () => {
 export default function Dashboard() {
   // ✅ EMERGENCY FIX v35.0: Enhanced dashboard query with robust error handling
   const { data: dashboardData, isLoading, error, refetch } = useQuery<DashboardData>({
-    queryKey: ["/api/dashboard"],
+    queryKey: ["/api/unified-financial/dashboard-optimized"],
     queryFn: async () => {
-      console.log('🔍 EMERGENCY FIX v35.0: Fetching dashboard data...');
+      console.log('🎯 PHASE 6B: Fetching optimized dashboard data via service layer...');
       try {
-        const response = await apiRequest("/api/dashboard");
-        console.log('✅ Dashboard API response received:', response?.success ? 'Success' : 'Error');
+        // Use service layer endpoint instead of direct storage calls
+        const response = await apiRequest("/api/unified-financial/dashboard-optimized");
+        console.log('✅ PHASE 6B: Service layer response received:', response?.success ? 'Success' : 'Error');
         return response;
       } catch (error) {
-        console.error('❌ Dashboard API error:', error);
+        console.error('❌ PHASE 6B: Service layer error:', error);
         throw error;
       }
     },

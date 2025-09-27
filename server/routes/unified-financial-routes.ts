@@ -5,7 +5,9 @@
  */
 
 import { Router } from 'express';
-import { unifiedFinancialEngine } from '../services/unified-financial-engine.js';
+import { performance } from 'perf_hooks';
+import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js';
+import { RepresentativeFinancialService } from '../services/representative-financial-service.js';
 import { db } from '../db.js';
 import { representatives } from '../../shared/schema.js';
 import { sql } from 'drizzle-orm';
@@ -13,8 +15,7 @@ import { eq, desc } from 'drizzle-orm'; // ✅ SHERLOCK v32.0: Added desc import
 import { invoices } from '../../shared/schema.js'; // Assuming invoices schema is available
 import { payments } from '../../shared/schema.js'; // Assuming payments schema is available
 import { storage } from '../storage.js';
-import { UnifiedFinancialEngine } from '../services/unified-financial-engine.js'; // Assuming UnifiedFinancialEngine class exists
-import { performance } from 'perf_hooks'; // Import performance for timing
+// Assuming UnifiedFinancialEngine class exists
 import { isFeatureEnabled } from '../utils/featureFlags.js'; // Assuming feature flag utility exists
 import { featureFlagManager } from '../services/feature-flag-manager.js'; // Added for Phase 8B
 
@@ -356,10 +357,10 @@ router.get('/total-debt', requireAuth, async (req, res) => {
 router.get('/all-representatives-optimized', requireAuth, async (req, res) => {
   try {
     console.log('🚀 PHASE 6B: Optimized all-representatives endpoint called');
-    
-    const representativeFinancialService = new (await import('../services/representative-financial-service.js')).RepresentativeFinancialService();
+
+    const representativeFinancialService = new RepresentativeFinancialService();
     const representatives = await representativeFinancialService.getAllRepresentativesWithFinancialSummary();
-    
+
     res.json({
       success: true,
       data: representatives,
@@ -370,7 +371,7 @@ router.get('/all-representatives-optimized', requireAuth, async (req, res) => {
         optimized: true
       }
     });
-    
+
   } catch (error) {
     console.error('❌ PHASE 6B: Optimized endpoint error:', error);
     res.status(500).json({

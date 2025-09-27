@@ -383,6 +383,8 @@ export class UnifiedFinancialEngine {
 
       console.log(`🎯 PHASE 6B: Optimized calculation complete in ${duration.toFixed(2)}ms`);
       console.log(`📊 PHASE 6B: Performance improvement: ~${(1391 / duration).toFixed(1)}x faster than baseline`);
+      console.log(`✅ PHASE 6B: N+1 PATTERN ELIMINATED - Using 3 batch queries instead of ${representativesData.length * 4 + 1} individual queries`);
+      console.log(`🚀 PHASE 6B: Query reduction achieved: ${Math.round((1 - 3 / (representativesData.length * 4 + 1)) * 100)}%`);
 
       return results;
 
