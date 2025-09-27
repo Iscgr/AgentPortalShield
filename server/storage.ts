@@ -25,6 +25,10 @@ import { db, checkDatabaseHealth } from "./db";
 import { eq, desc, sql, and, or, ilike, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
+import { performance } from 'perf_hooks';
+
+// Import the unified financial engine, which is now required for optimized calculations
+import { UnifiedFinancialEngine } from "./services/unified-financial-engine";
 
 // Database operation wrapper with retry logic and error handling
 async function withDatabaseRetry<T>(
@@ -168,15 +172,8 @@ export interface IStorage {
   }>;
 
   // Dashboard data
-  getDashboardData(): Promise<{
-    totalRevenue: string;
-    totalDebt: string;
-    activeRepresentatives: number;
-    pendingInvoices: number;
-    overdueInvoices: number;
-    totalSalesPartners: number;
-    recentActivities: ActivityLog[];
-  }>;
+  getDashboardData(): Promise<any>; // Original method
+  getDashboardDataOptimized(): Promise<any>; // New optimized method
 
   // SHERLOCK v10.0: Debtor representatives
   getDebtorRepresentatives(): Promise<Array<{
@@ -240,6 +237,70 @@ export interface IStorage {
   updateAiConfiguration(configName: string, config: Partial<AiConfiguration>): Promise<AiConfiguration>;
   deleteAiConfiguration(configName: string): Promise<void>;
   getActiveAiConfiguration(): Promise<AiConfiguration[]>;
+
+  // Payment Allocation Methods
+  getUnallocatedPayments(representativeId?: number): Promise<Payment[]>;
+  allocatePaymentToInvoice(paymentId: number, invoiceId: number): Promise<Payment>;
+  autoAllocatePayments(representativeId: number): Promise<{
+    allocated: number;
+    totalAmount: string;
+    details: Array<{ paymentId: number; invoiceId: number; amount: string }>;
+  }>;
+  updatePayment(paymentId: number, updates: Partial<{
+    isAllocated: boolean;
+    invoiceId: number;
+    amount: string;
+    description: string;
+  }>): Promise<Payment>;
+  getPaymentAllocationSummary(representativeId: number): Promise<{
+    totalPayments: number;
+    allocatedPayments: number;
+    unallocatedPayments: number;
+    totalPaidAmount: string;
+    totalUnallocatedAmount: string;
+  }>;
+  reconcileRepresentativeFinancials(representativeId: number): Promise<{
+    previousDebt: string;
+    newDebt: string;
+    totalSales: string;
+    totalPayments: string;
+    difference: string;
+  }>;
+
+  // Financial Reconciliation
+  reconcileFinancialData(): Promise<{ success: boolean, message: string }>;
+
+  // Financial Transactions Management
+  getFinancialTransactions(): Promise<FinancialTransaction[]>;
+
+  // Atomic Operations
+  executeAtomicInvoiceEdit(editData: {
+    invoiceId: number;
+    editedUsageData: any;
+    editReason: string;
+    editedBy: string;
+    originalAmount: number;
+    editedAmount: number;
+    completeUsageDataReplacement?: any; // Added for full replacement scenario
+  }): Promise<{transactionId: string, editId: number, success: boolean}>;
+
+  // AI Configuration Methods
+  getAiConfigurations(): Promise<AiConfiguration[]>;
+  getAiConfiguration(configName: string): Promise<AiConfiguration | undefined>;
+  getAiConfigurationsByCategory(category: string): Promise<AiConfiguration[]>;
+  createAiConfiguration(config: InsertAiConfiguration): Promise<AiConfiguration>;
+  updateAiConfiguration(configName: string, config: Partial<AiConfiguration>): Promise<AiConfiguration>;
+  deleteAiConfiguration(configName: string): Promise<void>;
+  getActiveAiConfiguration(): Promise<AiConfiguration[]>;
+
+  // Missing Sales Partners Methods
+  deleteSalesPartner(id: number): Promise<void>;
+  getSalesPartnersStatistics(): Promise<any>;
+  getRepresentativesBySalesPartner(partnerId: number): Promise<Representative[]>;
+
+  // Payment Statistics
+  getPaymentStatistics(): Promise<any>;
+  autoAllocatePaymentToInvoices(paymentId: number, representativeId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1055,40 +1116,20 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDashboardData() {
+  // Original getDashboardData method
+  async getDashboardData(): Promise<any> {
     return await withDatabaseRetry(async () => {
-      // SHERLOCK v17.8 FINANCIAL INTEGRITY: Use standardized calculations
-      const { unifiedFinancialEngine } = await import("./services/unified-financial-engine.js");
+      console.log('🔍 EMERGENCY FIX v35.0: Getting dashboard data with enhanced error handling...');
+      const startTime = performance.now();
 
-      // Calculate standardized total revenue = Sum of ALLOCATED payments only
-      const [totalRevenueResult] = await db
-        .select({
-          totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
-        })
-        .from(payments);
+      // Use the existing engine to calculate global summary
+      const { unifiedFinancialEngine: engine } = await import("./services/unified-financial-engine.js");
 
-      // SHERLOCK v17.8 INTEGRITY: Standardized debt calculation = unpaid/overdue invoices - allocated payments
-      const remainingDebtQuery = await db
-        .select({
-          representativeId: representatives.id,
-          totalInvoices: sql<string>`COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0)`,
-          allocatedPayments: sql<string>`COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0)`,
-          remainingDebt: sql<string>`GREATEST(0, COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid', 'overdue') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END), 0))`
-        })
-        .from(representatives)
-        .leftJoin(invoices, eq(representatives.id, invoices.representativeId))
-        .leftJoin(payments, eq(representatives.id, payments.representativeId))
-        .groupBy(representatives.id);
-
-      // Calculate total remaining debt using INTEGRITY ENGINE standard (only positive debts)
-      const totalRemainingDebt = remainingDebtQuery
-        .reduce((sum, rep) => {
-          const debt = parseFloat(rep.remainingDebt) || 0;
-          return sum + (debt > 0 ? debt : 0);
-        }, 0);
+      // Get financial summary with enhanced error handling
+      console.log('💰 EMERGENCY FIX v35.0: Calculating financial summary...');
+      const globalSummary = await engine.calculateGlobalSummary();
 
       // SHERLOCK v10.0 LARGEST-BATCH: Active Representatives = Largest significant batch in last 30 days
-      // Find the batch with most representatives (>=10) within the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -1146,8 +1187,6 @@ export class DatabaseStorage implements IStorage {
         .where(eq(salesPartners.isActive, true));
 
       // SHERLOCK v10.0 FIX: Get recent activities (limited to last 30 days)
-      // Reuse thirtyDaysAgo variable from above batch calculation
-
       const recentActivities = await db
         .select()
         .from(activityLogs)
@@ -1161,9 +1200,12 @@ export class DatabaseStorage implements IStorage {
         .from(invoices)
         .where(eq(invoices.sentToTelegram, false));
 
+      const endTime = performance.now();
+      console.log(`🚀 EMERGENCY FIX v35.0: Dashboard data retrieved in ${(endTime - startTime).toFixed(2)}ms`);
+
       return {
-        totalRevenue: totalRevenueResult.totalRevenue || "0",
-        totalDebt: totalRemainingDebt.toString(),
+        totalRevenue: globalSummary.totalRevenue || "0",
+        totalDebt: globalSummary.totalDebt || "0",
         activeRepresentatives: batchActiveReps.count || 0,
         pendingInvoices: pendingInvs.count,
         overdueInvoices: overdueInvs.count,
@@ -1174,51 +1216,151 @@ export class DatabaseStorage implements IStorage {
     }, 'getDashboardData');
   }
 
-  // SHERLOCK v11.0: Unified Batch-Based Active Representatives Calculation
-  async getBatchBasedActiveRepresentatives(): Promise<number> {
-    return await withDatabaseRetry(async () => {
-      // Find the batch with most representatives (>=10) within the last 30 days
+  // NEW: Optimized dashboard data method
+  async getDashboardDataOptimized(): Promise<any> {
+    try {
+      console.log('🎯 ATOMOS PHASE 7C: Getting dashboard data with BATCH OPTIMIZATION...');
+      const startTime = performance.now();
+
+      // ✅ ATOMOS PHASE 7C: Fetch all necessary data in a single, optimized query
+      const dashboardData = await db.query.representatives.findMany({
+        with: {
+          invoices: {
+            columns: {
+              id: true,
+              amount: true,
+              status: true,
+              issueDate: true,
+              createdAt: true
+            },
+            where: (invoices, {sql}) => sql`invoices.created_at >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}`, // Last 30 days
+            with: {
+              payments: {
+                columns: {
+                  amount: true,
+                  isAllocated: true
+                }
+              }
+            }
+          },
+          payments: {
+            columns: {
+              amount: true,
+              isAllocated: true,
+              paymentDate: true,
+              createdAt: true
+            },
+            where: (payments, {sql}) => sql`payments.created_at >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}`, // Last 30 days
+          }
+        },
+        columns: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          createdAt: true,
+          totalDebt: true
+        },
+        // Filter for active representatives and those with recent activity
+        where: (representatives, {sql}) => sql`representatives.isActive = true OR EXISTS (
+          SELECT 1 FROM invoices WHERE invoices.representative_id = representatives.id AND invoices.created_at >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}
+        ) OR EXISTS (
+          SELECT 1 FROM payments WHERE payments.representative_id = representatives.id AND payments.created_at >= ${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}
+        )`
+      });
+
+
+      // ✅ ATOMOS PHASE 7C: Process the fetched data to derive dashboard metrics
+      let totalRevenue = 0;
+      let totalDebt = 0;
+      let activeRepresentativesCount = 0;
+      let pendingInvoicesCount = 0;
+      let overdueInvoicesCount = 0;
+      let unsentInvoicesCount = 0;
+      const recentActivities: ActivityLog[] = []; // Placeholder for now, needs separate fetching if required
+
+      // Iterate through representatives and their related data
+      for (const rep of dashboardData) {
+        if (rep.isActive) {
+          activeRepresentativesCount++;
+        }
+
+        // Process invoices for this representative
+        for (const invoice of rep.invoices) {
+          const invoiceAmount = parseFloat(invoice.amount);
+
+          // Calculate total revenue from paid invoices
+          if (invoice.status === 'paid') {
+            totalRevenue += invoiceAmount;
+          }
+
+          // Count pending and overdue invoices
+          if (invoice.status === 'unpaid') {
+            pendingInvoicesCount++;
+          } else if (invoice.status === 'overdue') {
+            overdueInvoicesCount++;
+          }
+
+          if (!invoice.sentToTelegram) {
+            unsentInvoicesCount++;
+          }
+        }
+
+        // Add representative's total debt
+        totalDebt += parseFloat(rep.totalDebt || '0');
+      }
+
+      // Fetch total sales partners and recent activities separately as they are not directly linked in the main query
+      const [totalSalesPartnersResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(salesPartners)
+        .where(eq(salesPartners.isActive, true));
+      const totalSalesPartners = totalSalesPartnersResult?.count || 0;
+
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const recentActivitiesResult = await db
+        .select()
+        .from(activityLogs)
+        .where(sql`activity_logs.created_at >= ${thirtyDaysAgo.toISOString()}`)
+        .orderBy(sql`activity_logs.created_at DESC`)
+        .limit(10);
 
-      const significantBatches = await db
-        .select({
-          uploadDate: sql<string>`DATE(invoices.created_at)`,
-          repCount: sql<number>`COUNT(DISTINCT invoices.representative_id)`,
-          invoiceCount: sql<number>`COUNT(*)`,
-          minTime: sql<string>`MIN(invoices.created_at)`,
-          maxTime: sql<string>`MAX(invoices.created_at)`
-        })
-        .from(invoices)
-        .innerJoin(representatives, eq(invoices.representativeId, representatives.id))
-        .where(
-          sql`invoices.created_at >= ${thirtyDaysAgo.toISOString()}`
-        )
-        .groupBy(sql`DATE(invoices.created_at)`)
-        .having(sql`COUNT(DISTINCT invoices.representative_id) >= 10`)
-        .orderBy(sql`COUNT(DISTINCT invoices.representative_id) DESC`)
-        .limit(1);
 
-      if (significantBatches.length > 0) {
-        const largestBatch = significantBatches[0];
-        console.log(`🎯 SHERLOCK v11.0 BATCH-SYNC: Found ${largestBatch.repCount} active representatives in largest batch (${largestBatch.uploadDate})`);
-        return largestBatch.repCount;
-      } else {
-        // Fallback: Use any recent activity if no significant batch exists
-        const [fallbackResult] = await db
-          .select({ count: sql<number>`COUNT(DISTINCT invoices.representative_id)` })
-          .from(invoices)
-          .where(
-            sql`invoices.created_at >= ${thirtyDaysAgo.toISOString()}`
-          );
+      // ✅ ATOMOS PHASE 7C: Use optimized batch calculation for representatives
+      console.log('⚡ ATOMOS PHASE 7C: Using OPTIMIZED BATCH calculation...');
 
-        console.log(`🎯 SHERLOCK v11.0 BATCH-SYNC: No significant batch found, using recent activity count: ${fallbackResult.count}`);
-        return fallbackResult.count || 0;
-      }
-    }, 'getBatchBasedActiveRepresentatives');
+      // Use the optimized batch calculation method
+      const optimizedRepresentatives = await UnifiedFinancialEngine.calculateAllRepresentativesOptimized();
+      console.log(`✅ ATOMOS PHASE 7C: Optimized calculation completed for ${optimizedRepresentatives.length} representatives`);
+
+      // Calculate global summary from optimized data
+      const globalSummary = await engine.calculateGlobalSummary();
+
+
+      const endTime = performance.now();
+      console.log(`🚀 ATOMOS PHASE 7C: Optimized dashboard data retrieved in ${(endTime - startTime).toFixed(2)}ms`);
+
+      return {
+        totalRevenue: totalRevenue.toFixed(2),
+        totalDebt: totalDebt.toFixed(2),
+        activeRepresentatives: activeRepresentativesCount, // This is now derived from the main query
+        pendingInvoices: pendingInvoicesCount,
+        overdueInvoices: overdueInvoicesCount,
+        totalSalesPartners: totalSalesPartners,
+        unsentInvoices: unsentInvoicesCount,
+        recentActivities: recentActivitiesResult
+      };
+    } catch (error) {
+      console.error('❌ ATOMOS PHASE 7C: Error fetching optimized dashboard data:', error);
+      // Fallback to the original method if optimization fails
+      console.log('🔄 Falling back to original getDashboardData method...');
+      return await this.getDashboardData();
+    }
   }
 
-  // SHERLOCK v17.8 - UPGRADED: Financial Integrity Engine - Standardized Debt Calculation
+
+  // SHERLOCK v10.0: Debtor representatives
   async getDebtorRepresentatives(): Promise<Array<{
     id: number;
     name: string;
@@ -2351,7 +2493,7 @@ export class DatabaseStorage implements IStorage {
     return await withDatabaseRetry(
       async () => {
         console.log(`🔄 ATOMOS v1.0: Updating payment ${paymentId} with:`, updates);
-        
+
         const [updatedPayment] = await db
           .update(payments)
           .set({

@@ -208,21 +208,21 @@ router.get('/debtors', requireAuth, async (req, res) => {
 });
 
 /**
- * ✅ SHERLOCK v33.0: Optimized آمار تمام نمایندگان
+ * ✅ ATOMOS PHASE 7C: PRECISION EXECUTION - Batch Optimization Active
  * جایگزین /api/representatives و سایر endpoints
  */
 router.get('/all-representatives', requireAuth, async (req, res) => {
   const requestStart = performance.now();
   try {
-    console.log('📊 ATOMOS-MONITOR: Dashboard request initiated');
+    console.log('🎯 ATOMOS PHASE 7C: PRECISION EXECUTION - Dashboard request initiated');
 
-    // ✅ ATOMOS PHASE 7: Force enable batch optimization
-    console.log('🚀 ATOMOS PHASE 7: Batch optimization FORCE ENABLED');
+    // ✅ ATOMOS PHASE 7C: FORCE ENABLE BATCH OPTIMIZATION
+    console.log('⚡ ATOMOS PHASE 7C: BATCH OPTIMIZATION FORCE ACTIVATED');
 
-    // Use optimized batch calculation directly
-    const allData = await unifiedFinancialEngine.calculateAllRepresentativesCached();
+    // Use the optimized batch calculation method directly
+    const allData = await UnifiedFinancialEngine.calculateAllRepresentativesOptimized();
     const optimizationUsed = true;
-    console.log('⚡ ATOMOS PHASE 7: Using BATCH OPTIMIZATION for dashboard');
+    console.log('✅ ATOMOS PHASE 7C: BATCH OPTIMIZATION SUCCESSFULLY EXECUTED');
 
     const requestEnd = performance.now();
     const totalTime = Math.round(requestEnd - requestStart);
