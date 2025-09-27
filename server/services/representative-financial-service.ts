@@ -24,8 +24,6 @@ export class RepresentativeFinancialService {
    * Replaces direct calculateAllRepresentatives() calls with service layer abstraction
    */
   async getAllRepresentativesWithFinancialSummary(): Promise<DashboardRepresentativeDTO[]> {
-    const startTime = Date.now();
-    
     try {
       console.log('🔄 PHASE 6B: Loading representatives via service layer...');
       
@@ -35,10 +33,7 @@ export class RepresentativeFinancialService {
       // Transform to DTO format for presentation layer
       const dtoData = this.transformToDTO(representatives);
       
-      const duration = Date.now() - startTime;
-      console.log(`✅ PHASE 6B: Service layer loaded ${dtoData.length} representatives in ${duration}ms`);
-      console.log(`🎯 PHASE 6B: Performance achieved - Target: <500ms, Actual: ${duration}ms`);
-      
+      console.log(`✅ PHASE 6B: Service layer loaded ${dtoData.length} representatives`);
       return dtoData;
       
     } catch (error) {

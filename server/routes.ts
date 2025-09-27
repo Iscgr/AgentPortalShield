@@ -163,108 +163,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SHERLOCK v32.0: Register Batch Rollback Routes for safe invoice deletion
   registerBatchRollbackRoutes(app, authMiddleware);
 
-  // ✅ SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
+  // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
-
-  // ✅ ATOMOS v2.0: Payment Allocation API Endpoints
-  app.post("/api/payments/:id/allocate-auto", authMiddleware, async (req, res) => {
-    try {
-      const paymentId = parseInt(req.params.id);
-      const rules = req.body.rules || { method: 'FIFO', allowPartialAllocation: true };
-
-      // Dynamically import the enhancedPaymentAllocationEngine
-      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-      const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId, rules);
-
-      if (result.success) {
-        // Force cache invalidation for affected representative
-        const payment = await storage.getPayment(paymentId);
-        if (payment) {
-          // Dynamically import the unifiedFinancialEngine
-          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-          unifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, {
-            reason: "payment_allocation",
-            immediate: true
-          });
-        }
-
-        res.json({ success: true, result });
-      } else {
-        res.status(400).json({ success: false, errors: result.errors });
-      }
-    } catch (error) {
-      console.error("ATOMOS v2.0 Auto-allocation error:", error);
-      res.status(500).json({ error: "خطا در تخصیص خودکار پرداخت" });
-    }
-  });
-
-  app.post("/api/payments/:id/allocate-manual", authMiddleware, async (req, res) => {
-    try {
-      const paymentId = parseInt(req.params.id);
-      const { invoiceId, amount } = req.body;
-      const performedBy = req.session?.user?.username || 'SYSTEM';
-
-      // Dynamically import the enhancedPaymentAllocationEngine
-      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-      const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
-        paymentId, invoiceId, amount, performedBy
-      );
-
-      if (result.success) {
-        // Force cache invalidation for affected representative
-        const payment = await storage.getPayment(paymentId);
-        if (payment) {
-          // Dynamically import the unifiedFinancialEngine
-          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-          unifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, {
-            reason: "manual_payment_allocation",
-            immediate: true
-          });
-        }
-
-        res.json({ success: true, result });
-      } else {
-        res.status(400).json({ success: false, errors: result.errors });
-      }
-    } catch (error) {
-      console.error("ATOMOS v2.0 Manual allocation error:", error);
-      res.status(500).json({ error: "خطا در تخصیص دستی پرداخت" });
-    }
-  });
-
-  app.post("/api/payments/:id/deallocate", authMiddleware, async (req, res) => {
-    try {
-      const paymentId = parseInt(req.params.id);
-      const { invoiceId, reason } = req.body;
-      const performedBy = req.session?.user?.username || 'SYSTEM';
-
-      // Dynamically import the enhancedPaymentAllocationEngine
-      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-      const result = await EnhancedPaymentAllocationEngine.deallocatePayment(
-        paymentId, invoiceId, performedBy, reason || 'Manual deallocation'
-      );
-
-      if (result.success) {
-        // Force cache invalidation for affected representative
-        const payment = await storage.getPayment(paymentId);
-        if (payment) {
-          // Dynamically import the unifiedFinancialEngine
-          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-          unifiedFinancialEngine.forceInvalidateRepresentative(payment.representativeId, {
-            reason: "payment_deallocation",
-            immediate: true
-          });
-        }
-
-        res.json({ success: true, result });
-      } else {
-        res.status(400).json({ success: false, errors: result.errors });
-      }
-    } catch (error) {
-      console.error("ATOMOS v2.0 Deallocation error:", error);
-      res.status(500).json({ error: "خطا در لغو تخصیص پرداخت" });
-    }
-  });
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
@@ -400,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth status check endpoint
   app.get("/api/auth/status", (req, res) => {
     const session = req.session as any;
-
+    
     if (session && session.authenticated && session.user) {
       res.json({
         authenticated: true,
@@ -465,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let dbHealthy = false;
           let dbRetries = 0;
           const maxDbRetries = 3;
-
+          
           while (!dbHealthy && dbRetries < maxDbRetries) {
             try {
               await db.execute(sql`SELECT 1 as test`);
@@ -549,21 +449,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 totalRepresentatives: summary.totalRepresentatives?.toString() || repsResult[0]?.total?.toString() || "0",
                 activeRepresentatives: summary.activeRepresentatives?.toString() || repsResult[0]?.active?.toString() || "0",
                 totalSystemSales: summary.totalSystemSales?.toString() || "0",
-                totalSystemPaid: summary.totalSystemPaid?.toString() || "0",
+                totalSystemPaid: summary.totalSystemPaid?.toString() || "0", 
                 totalSystemDebt: summary.totalSystemDebt || 0,
-
+                
                 // Invoice breakdown
                 totalOverdueAmount: summary.totalOverdueAmount?.toString() || "0",
-                totalUnpaidAmount: summary.totalUnpaidAmount?.toString() || "0",
+                totalUnpaidAmount: summary.totalUnpaidAmount?.toString() || "0", 
                 overdueInvoicesCount: summary.overdueInvoicesCount?.toString() || "0",
                 unpaidInvoicesCount: summary.unpaidInvoicesCount?.toString() || invoiceStats[0]?.unpaid?.toString() || "0",
-
+                
                 // Representative health distribution
                 healthyReps: summary.healthyReps || 0,
                 moderateReps: summary.moderateReps || 0,
                 highRiskReps: summary.highRiskReps || 0,
                 criticalReps: summary.criticalReps || 0,
-
+                
                 // System health indicators
                 systemAccuracy: summary.systemAccuracy || 100,
                 lastCalculationTime: summary.lastCalculationTime || new Date().toISOString(),
@@ -577,7 +477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               invoices: {
                 total: invoiceStats[0]?.total?.toString() || "0",
                 paid: invoiceStats[0]?.paid?.toString() || "0",
-                unpaid: invoiceStats[0]?.unpaid?.toString() || "0",
+                unpaid: invoiceStats[0]?.unpaid?.toString() || "0", 
                 overdue: invoiceStats[0]?.overdue?.toString() || "0"
               },
               payments: {
@@ -611,7 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set performance headers
       res.header('X-Response-Time', (Date.now() - startTime).toString());
       res.header('X-Emergency-Fix', 'v35.0');
-
+      
       res.json(dashboardData);
 
     } catch (error) {
@@ -631,13 +531,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           summary: {
             totalRepresentatives: "0",
-            activeRepresentatives: "0",
+            activeRepresentatives: "0", 
             totalSystemSales: "0",
             totalSystemPaid: "0",
             totalSystemDebt: 0,
             totalOverdueAmount: "0",
             totalUnpaidAmount: "0",
-            overdueInvoicesCount: "0",
+            overdueInvoicesCount: "0", 
             unpaidInvoicesCount: "0",
             healthyReps: 0,
             moderateReps: 0,
@@ -655,7 +555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         meta: {
           timestamp: new Date().toISOString(),
-          cacheStatus: "ERROR",
+          cacheStatus: "ERROR", 
           queryTimeMs: errorDuration,
           emergencyFallback: true
         }
@@ -744,7 +644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const startTime = Date.now();
     const REQUEST_TIMEOUT = 45000; // Increased to 45 seconds
     const MAX_REPRESENTATIVES = 500; // Limit for safety
-
+    
     try {
       console.log('🔍 EMERGENCY FIX v35.0: Fetching representatives data with enhanced stability');
 
@@ -757,16 +657,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get base representatives data with limit
         console.log('📊 Fetching base representatives data...');
         let representatives;
-
+        
         try {
           representatives = await storage.getRepresentatives();
-
+          
           // Limit the number of representatives for stability
           if (representatives.length > MAX_REPRESENTATIVES) {
             console.warn(`⚠️ Large dataset detected: ${representatives.length} representatives, limiting to ${MAX_REPRESENTATIVES}`);
             representatives = representatives.slice(0, MAX_REPRESENTATIVES);
           }
-
+          
           console.log(`✅ Base representatives data loaded: ${representatives.length} items`);
         } catch (storageError) {
           console.error('❌ Storage error:', storageError);
@@ -777,16 +677,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const BATCH_SIZE = 25; // Smaller batches for stability
         const enhancedRepresentatives = [];
         let processedCount = 0;
-
+        
         console.log(`🔄 Starting financial data enhancement in batches of ${BATCH_SIZE}`);
-
+        
         for (let i = 0; i < representatives.length; i += BATCH_SIZE) {
           const batch = representatives.slice(i, i + BATCH_SIZE);
           const batchStartTime = Date.now();
-
+          
           try {
             console.log(`📊 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(representatives.length/BATCH_SIZE)} (${batch.length} items)`);
-
+            
             const batchResults = await Promise.allSettled(
               batch.map(async (rep) => {
                 try {
@@ -794,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const repTimeout = new Promise<never>((_, reject) => {
                     setTimeout(() => reject(new Error(`Rep ${rep.id} calculation timeout`)), 10000);
                   });
-
+                  
                   const repCalculation = unifiedFinancialEngine.calculateRepresentative(rep.id);
                   const financialData = await Promise.race([repCalculation, repTimeout]);
 
@@ -836,10 +736,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.warn('❌ Batch item processing failed:', result.reason);
               }
             });
-
+            
             const batchDuration = Date.now() - batchStartTime;
             console.log(`✅ Batch completed in ${batchDuration}ms (${processedCount}/${representatives.length} processed)`);
-
+            
             // Adaptive delay based on batch performance
             if (batchDuration > 5000) {
               console.log('⏱️ Slow batch detected, adding recovery delay...');
@@ -848,10 +748,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Small delay between batches
               await new Promise(resolve => setTimeout(resolve, 100));
             }
-
+            
           } catch (batchError) {
             console.error(`❌ Batch processing error:`, batchError);
-
+            
             // Add batch items without enhancement as fallback
             batch.forEach(rep => {
               enhancedRepresentatives.push({
@@ -866,12 +766,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               processedCount++;
             });
           }
-
+          
           // Check if we're running out of time
           const elapsedTime = Date.now() - startTime;
           if (elapsedTime > REQUEST_TIMEOUT * 0.8) { // 80% of timeout
             console.warn(`⚠️ Approaching timeout (${elapsedTime}ms), completing with current data`);
-
+            
             // Add remaining representatives without enhancement
             const remaining = representatives.slice(processedCount);
             remaining.forEach(rep => {
@@ -885,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               });
             });
-
+            
             break;
           }
         }
@@ -895,14 +795,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })();
 
       const representatives = await Promise.race([representativesPromise, timeoutPromise]);
-
+      
       // Set response headers for monitoring
       res.header('X-Response-Time', (Date.now() - startTime).toString());
       res.header('X-Representatives-Count', representatives.length.toString());
       res.header('X-Emergency-Fix', 'v35.0');
-
+      
       res.json(representatives);
-
+      
     } catch (error) {
       const errorDuration = Date.now() - startTime;
       console.error('❌ EMERGENCY FIX v35.0: Critical representatives endpoint error:', {
@@ -916,9 +816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Try to get basic representatives data without enhancement
         const basicRepresentatives = await storage.getRepresentatives();
         const limitedReps = basicRepresentatives.slice(0, 100); // Limit for safety
-
+        
         console.log(`⚠️ Returning basic representatives data (${limitedReps.length} items) as fallback`);
-
+        
         res.status(200).json(limitedReps.map(rep => ({
           ...rep,
           financialData: {
@@ -928,13 +828,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastSync: new Date().toISOString()
           }
         })));
-
+        
       } catch (fallbackError) {
         console.error('❌ Fallback also failed:', fallbackError);
-        res.status(500).json({
-          error: "خطا در دریافت نمایندگان",
+        res.status(500).json({ 
+          error: "خطا در دریافت نمایندگان", 
           details: "سیستم موقتاً در دسترس نیست",
-          fallback: true
+          fallback: true 
         });
       }
     }
@@ -1212,7 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })).sort((a, b) => {
           const dateA = new Date(a.paymentDate);
           const dateB = new Date(b.paymentDate);
-          return dateB.getTime() - dateB.getTime(); // Sort descending by payment date
+          return dateB.getTime() - dateA.getTime();
         }),
 
         // ✅ اطلاعات اضافی برای نمایش در پرتال
@@ -1494,7 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Import Enhanced Payment Allocation Engine
           const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-
+          
           // Execute manual allocation using enhanced engine
           const allocationResult = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
             newPayment.id,
@@ -1505,13 +1405,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (allocationResult.success) {
             console.log(`✅ ATOMOS v1.0: Manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
-
+            
             // Update payment status to reflect allocation
             finalPaymentStatus = await storage.updatePayment(newPayment.id, {
               isAllocated: true,
               invoiceId: parseInt(selectedInvoiceId)
             });
-
+            
             console.log(`📊 ATOMOS v1.0: Payment ${newPayment.id} updated - isAllocated: true, invoiceId: ${selectedInvoiceId}`);
           } else {
             console.error(`❌ ATOMOS v1.0: Manual allocation failed:`, allocationResult.errors);
@@ -1525,9 +1425,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`🔄 ATOMOS v1.0: Executing auto-allocation for Representative ${representativeId}`);
 
         try {
-          // Import Enhanced Payment Allocation Engine
+          // Import Enhanced Payment Allocation Engine  
           const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-
+          
           // Execute auto allocation using enhanced engine
           const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(
             newPayment.id,
@@ -1541,16 +1441,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (allocationResult.success && allocationResult.allocatedAmount > 0) {
             console.log(`✅ ATOMOS v1.0: Auto-allocation successful - ${allocationResult.allocatedAmount} allocated to ${allocationResult.allocations.length} invoices`);
-
+            
             // Find the first allocated invoice for payment update
             if (allocationResult.allocations.length > 0) {
               const firstAllocation = allocationResult.allocations[0];
-
+              
               finalPaymentStatus = await storage.updatePayment(newPayment.id, {
                 isAllocated: true,
                 invoiceId: firstAllocation.invoiceId
               });
-
+              
               console.log(`📊 ATOMOS v1.0: Payment ${newPayment.id} auto-allocated to invoice ${firstAllocation.invoiceId}`);
             }
           } else {
@@ -1564,7 +1464,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ✅ CRITICAL: Update payment record to reflect final allocation status
       if (finalPaymentStatus.id === newPayment.id) {
-        finalPaymentStatus = await storage.getPayment(newPayment.id) || finalPaymentStatus;
+        finalPaymentStatus = await storage.getPayment(newPayment.id) || finalPaymentStatusent(newPayment.id, {
+            isAllocated: true,
+            invoiceId: parseInt(selectedInvoiceId)
+          });
+
+          // Update invoice status after allocation
+          const calculatedStatus = await storage.calculateInvoicePaymentStatus(parseInt(selectedInvoiceId));
+          await storage.updateInvoice(parseInt(selectedInvoiceId), { status: calculatedStatus });
+
+          console.log(`✅ SHERLOCK v33.2: Payment ${newPayment.id} successfully allocated to Invoice ${selectedInvoiceId}, status: ${calculatedStatus}`);
+        } catch (allocationError) {
+          console.error(`❌ SHERLOCK v33.2: Manual allocation failed for Payment ${newPayment.id}:`, allocationError);
+          // Ensure payment remains unallocated on failure
+          finalPaymentStatus = await storage.updatePayment(newPayment.id, { isAllocated: false, invoiceId: null });
+        }
+      }
+      // Auto-allocate if requested
+      else if (selectedInvoiceId === "auto") {
+        console.log(`🔄 SHERLOCK v33.2: Executing auto-allocation - Payment ${newPayment.id} for Representative ${representativeId}`);
+        try {
+          await storage.autoAllocatePaymentToInvoices(newPayment.id, representativeId);
+          // Get updated payment status after auto-allocation
+          finalPaymentStatus = await storage.getPayment(newPayment.id);
+        } catch (autoAllocationError) {
+          console.error(`❌ SHERLOCK v33.2: Auto-allocation failed for Payment ${newPayment.id}:`, autoAllocationError);
+        }
+      }
+      // If no allocation specified, payment remains unallocated
+      else {
+        console.log(`📝 SHERLOCK v33.2: Payment ${newPayment.id} created without allocation (manual later)`);
       }
 
       // ✅ SHERLOCK v33.2: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
@@ -1609,144 +1538,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/payments/:id/allocate", authMiddleware, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const payment = await storage.allocatePaymentToInvoice(id, req.body.invoiceId);
+      const paymentId = parseInt(req.params.id);
+      const { invoiceId } = req.body;
+
+      const payment = await storage.allocatePaymentToInvoice(paymentId, invoiceId);
       res.json(payment);
     } catch (error) {
       res.status(500).json({ error: "خطا در تخصیص پرداخت" });
     }
   });
 
-  // ✅ ATOMOS v2.0: Enhanced Payment Allocation Endpoints
-  app.post("/api/payments/allocate-auto", authMiddleware, async (req, res) => {
-    try {
-      const { paymentId, representativeId } = req.body;
-
-      console.log(`🔄 ATOMOS v2.0: Auto-allocation request for payment ${paymentId}, representative ${representativeId}`);
-
-      if (!paymentId) {
-        return res.status(400).json({ error: "Payment ID is required" });
-      }
-
-      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-      const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(paymentId);
-
-      if (result.success) {
-        // Force sync representative after successful allocation
-        if (representativeId) {
-          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-          await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
-        }
-
-        console.log(`✅ ATOMOS v2.0: Auto-allocation successful for payment ${paymentId}`);
-        res.json({
-          success: true,
-          message: "تخصیص خودکار با موفقیت انجام شد",
-          result
-        });
-      } else {
-        console.error(`❌ ATOMOS v2.0: Auto-allocation failed:`, result.errors);
-        res.status(400).json({
-          success: false,
-          error: "تخصیص خودکار ناموفق",
-          details: result.errors
-        });
-      }
-    } catch (error) {
-      console.error("❌ Error in auto-allocation:", error);
-      res.status(500).json({ error: "خطا در تخصیص خودکار" });
-    }
-  });
-
-  app.post("/api/payments/allocate-manual", authMiddleware, async (req, res) => {
-    try {
-      const { paymentId, invoiceId, amount, representativeId } = req.body;
-
-      console.log(`🎯 ATOMOS v2.0: Manual allocation request - Payment: ${paymentId}, Invoice: ${invoiceId}, Amount: ${amount}`);
-
-      if (!paymentId || !invoiceId || !amount) {
-        return res.status(400).json({ error: "Payment ID, Invoice ID, and amount are required" });
-      }
-
-      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-      const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
-        paymentId,
-        invoiceId,
-        parseFloat(amount),
-        'USER'
-      );
-
-      if (result.success) {
-        // Force sync representative after successful allocation
-        if (representativeId) {
-          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-          await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
-        }
-
-        console.log(`✅ ATOMOS v2.0: Manual allocation successful`);
-        res.json({
-          success: true,
-          message: "تخصیص دستی با موفقیت انجام شد",
-          result
-        });
-      } else {
-        console.error(`❌ ATOMOS v2.0: Manual allocation failed:`, result.errors);
-        res.status(400).json({
-          success: false,
-          error: "تخصیص دستی ناموفق",
-          details: result.errors
-        });
-      }
-    } catch (error) {
-      console.error("❌ Error in manual allocation:", error);
-      res.status(500).json({ error: "خطا در تخصیص دستی" });
-    }
-  });
-
-  app.post("/api/payments/deallocate", authMiddleware, async (req, res) => {
-    try {
-      const { paymentId, invoiceId, reason, representativeId } = req.body;
-
-      console.log(`🔄 ATOMOS v2.0: Deallocation request - Payment: ${paymentId}, Invoice: ${invoiceId}`);
-
-      if (!paymentId || !invoiceId) {
-        return res.status(400).json({ error: "Payment ID and Invoice ID are required" });
-      }
-
-      const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-      const result = await EnhancedPaymentAllocationEngine.deallocatePayment(
-        paymentId,
-        invoiceId,
-        'USER',
-        reason || 'Manual deallocation'
-      );
-
-      if (result.success) {
-        // Force sync representative after successful deallocation
-        if (representativeId) {
-          const { unifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
-          await unifiedFinancialEngine.syncRepresentativeDebt(representativeId);
-        }
-
-        console.log(`✅ ATOMOS v2.0: Deallocation successful`);
-        res.json({
-          success: true,
-          message: "لغو تخصیص با موفقیت انجام شد",
-          result
-        });
-      } else {
-        console.error(`❌ ATOMOS v2.0: Deallocation failed:`, result.errors);
-        res.status(400).json({
-          success: false,
-          error: "لغو تخصیص ناموفق",
-          details: result.errors
-        });
-      }
-    } catch (error) {
-      console.error("❌ Error in deallocation:", error);
-      res.status(500).json({ error: "خطا در لغو تخصیص" });
-    }
-  });
 
   // AI Assistant API - Protected (SHERLOCK v1.0 Intelligent System)
   app.get("/api/ai/status", authMiddleware, async (req, res) => {
@@ -2619,7 +2420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           results.processed++;
         } catch (invoiceError) {
-          console.warn('Error processing invoice ${invoiceId}:', invoiceError);
+          console.warn(`Error processing invoice ${invoiceId}:`, invoiceError);
         }
       }
 
@@ -2658,6 +2459,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SHERLOCK v17.8 REMOVED: Duplicate financial reconciliation endpoint
   // All financial reconciliation now uses the standardized Financial Integrity Engine
   // Available at: /api/financial-integrity/representative/:id/reconcile
+
+
 
   // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use unified statistics endpoints instead
 
@@ -2945,6 +2748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Initialize default settings on first run
   // 🛠️ SHERLOCK v12.0: ENHANCED INVOICE EDIT ROUTE WITH DEBUG LOGGING
   app.post("/api/invoices/edit", authMiddleware, async (req, res) => {
     const debug = {
