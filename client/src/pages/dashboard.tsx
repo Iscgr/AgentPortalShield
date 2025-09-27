@@ -324,45 +324,94 @@ const OverdueInvoicesCard = () => {
 
 
 export default function Dashboard() {
-  // 🎯 PHASE 6B: Enhanced dashboard query with optimized endpoint
-  const { data: dashboardData, isLoading } = useQuery<DashboardData>({
-    queryKey: ["/api/unified-financial/dashboard-optimized"],
-    queryFn: () => apiRequest("/api/unified-financial/dashboard-optimized"),
-    staleTime: 2 * 60 * 1000, // 2 minutes (more frequent due to optimization)
-    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes (improved performance allows more frequent updates)
+  // ✅ EMERGENCY FIX v35.0: Enhanced dashboard query with robust error handling
+  const { data: dashboardData, isLoading, error, refetch } = useQuery<DashboardData>({
+    queryKey: ["/api/dashboard"],
+    queryFn: async () => {
+      console.log('🔍 EMERGENCY FIX v35.0: Fetching dashboard data...');
+      try {
+        const response = await apiRequest("/api/dashboard");
+        console.log('✅ Dashboard API response received:', response?.success ? 'Success' : 'Error');
+        return response;
+      } catch (error) {
+        console.error('❌ Dashboard API error:', error);
+        throw error;
+      }
+    },
+    staleTime: 3 * 60 * 1000, // 3 minutes
+    refetchInterval: 10 * 60 * 1000, // 10 minutes
+    retry: 3, // Retry failed requests
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
     select: (data: any) => {
-      console.log('🚀 PHASE 6B: Dashboard using optimized endpoint:', data);
-      
-      // Extract from the optimized API response structure
-      const summary = data?.data?.summary || data?.summary || data?.value || data;
-      const representatives = data?.data?.representatives || {};
-      const invoices = data?.data?.invoices || {};
-      
-      console.log('🎯 PHASE 6B: Optimized summary data:', summary);
-      
-      return {
-        totalRevenue: parseFloat(summary?.totalSystemPaid || '0'),
-        totalDebt: parseFloat(summary?.totalSystemDebt || summary?.totalDebt || '0'),
-        totalCredit: parseFloat(summary?.totalCredit || '0'),
-        totalOutstanding: parseFloat(summary?.totalOutstanding || '0'),
-        totalRepresentatives: parseInt(summary?.totalRepresentatives || representatives?.total || '0'),
-        activeRepresentatives: parseInt(summary?.activeRepresentatives || representatives?.active || '0'),
-        inactiveRepresentatives: parseInt(summary?.inactiveRepresentatives || representatives?.inactive || '0'),
-        riskRepresentatives: parseInt(summary?.riskRepresentatives || '0'),
-        totalInvoices: parseInt(summary?.totalInvoices || invoices?.total || '0'),
-        paidInvoices: parseInt(summary?.paidInvoices || invoices?.paid || '0'),
-        unpaidInvoices: parseInt(summary?.unpaidInvoices || invoices?.unpaid || '0'),
-        overdueInvoices: parseInt(summary?.overdueInvoices || invoices?.overdue || '0'),
-        unsentTelegramInvoices: parseInt(summary?.unsentTelegramInvoices || '0'),
-        totalSalesPartners: parseInt(summary?.totalSalesPartners || '0'),
-        activeSalesPartners: parseInt(summary?.activeSalesPartners || '0'),
-        systemIntegrityScore: parseInt(summary?.systemIntegrityScore || '0'),
-        lastReconciliationDate: summary?.lastReconciliationDate || '',
-        problematicRepresentativesCount: parseInt(summary?.problematicRepresentativesCount || '0'),
-        responseTime: summary?.responseTime || 0,
-        cacheStatus: summary?.cacheStatus || 'OPTIMIZED',
-        lastUpdated: summary?.lastUpdated || new Date().toISOString()
-      };
+      try {
+        console.log('🔍 EMERGENCY FIX v35.0: Processing dashboard data...', data?.success);
+        
+        // Handle both success and error responses gracefully
+        if (!data?.success && data?.data) {
+          console.warn('⚠️ Dashboard returned error but has fallback data');
+        }
+        
+        // Extract from the API response structure with multiple fallbacks
+        const summary = data?.data?.summary || data?.summary || data?.fallbackData || {};
+        const representatives = data?.data?.representatives || {};
+        const invoices = data?.data?.invoices || {};
+        
+        console.log('🔍 EMERGENCY FIX v35.0: Extracted summary data:', {
+          hasSystemDebt: !!summary?.totalSystemDebt,
+          hasRepresentatives: !!summary?.totalRepresentatives,
+          summaryKeys: Object.keys(summary)
+        });
+        
+        return {
+          totalRevenue: parseFloat(summary?.totalSystemPaid || summary?.totalRevenue || '0'),
+          totalDebt: parseFloat(summary?.totalSystemDebt || summary?.totalDebt || '0'),
+          totalCredit: parseFloat(summary?.totalCredit || '0'),
+          totalOutstanding: parseFloat(summary?.totalOutstanding || '0'),
+          totalRepresentatives: parseInt(summary?.totalRepresentatives || representatives?.total || '0'),
+          activeRepresentatives: parseInt(summary?.activeRepresentatives || representatives?.active || '0'),
+          inactiveRepresentatives: parseInt(summary?.inactiveRepresentatives || representatives?.inactive || '0'),
+          riskRepresentatives: parseInt(summary?.riskRepresentatives || summary?.criticalReps || '0'),
+          totalInvoices: parseInt(summary?.totalInvoices || invoices?.total || '0'),
+          paidInvoices: parseInt(summary?.paidInvoices || invoices?.paid || '0'),
+          unpaidInvoices: parseInt(summary?.unpaidInvoices || invoices?.unpaid || '0'),
+          overdueInvoices: parseInt(summary?.overdueInvoices || invoices?.overdue || '0'),
+          unsentTelegramInvoices: parseInt(summary?.unsentTelegramInvoices || '0'),
+          totalSalesPartners: parseInt(summary?.totalSalesPartners || '0'),
+          activeSalesPartners: parseInt(summary?.activeSalesPartners || '0'),
+          systemIntegrityScore: parseInt(summary?.systemIntegrityScore || summary?.systemAccuracy || '0'),
+          lastReconciliationDate: summary?.lastReconciliationDate || summary?.lastCalculationTime || '',
+          problematicRepresentativesCount: parseInt(summary?.problematicRepresentativesCount || summary?.criticalReps || '0'),
+          responseTime: summary?.responseTime || 0,
+          cacheStatus: summary?.cacheStatus || data?.meta?.cacheStatus || 'UNKNOWN',
+          lastUpdated: summary?.lastUpdated || summary?.lastCalculationTime || new Date().toISOString()
+        };
+      } catch (selectError) {
+        console.error('❌ Error processing dashboard data:', selectError);
+        // Return safe fallback data
+        return {
+          totalRevenue: 0,
+          totalDebt: 0,
+          totalCredit: 0,
+          totalOutstanding: 0,
+          totalRepresentatives: 0,
+          activeRepresentatives: 0,
+          inactiveRepresentatives: 0,
+          riskRepresentatives: 0,
+          totalInvoices: 0,
+          paidInvoices: 0,
+          unpaidInvoices: 0,
+          overdueInvoices: 0,
+          unsentTelegramInvoices: 0,
+          totalSalesPartners: 0,
+          activeSalesPartners: 0,
+          systemIntegrityScore: 0,
+          lastReconciliationDate: '',
+          problematicRepresentativesCount: 0,
+          responseTime: 0,
+          cacheStatus: 'ERROR',
+          lastUpdated: new Date().toISOString()
+        };
+      }
     }
   });
 
@@ -374,9 +423,17 @@ export default function Dashboard() {
   
 
 
+  // ✅ EMERGENCY FIX v35.0: Enhanced loading and error states
   if (isLoading) {
     return (
       <div className="space-y-6">
+        <div className="flex justify-center items-center py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">در حال بارگذاری اطلاعات داشبورد...</p>
+            <p className="text-xs text-gray-400 mt-2">ممکن است تا 45 ثانیه طول بکشد</p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -392,10 +449,68 @@ export default function Dashboard() {
     );
   }
 
+  // Enhanced error handling with retry functionality
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+              <h3 className="text-lg font-medium text-red-900 mb-2">
+                خطا در بارگذاری داشبورد
+              </h3>
+              <p className="text-red-700 mb-4">
+                {error instanceof Error ? error.message : 'خطای ناشناخته در سیستم'}
+              </p>
+              <div className="space-x-4">
+                <Button 
+                  onClick={() => refetch()}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <RefreshCw className="w-4 h-4 ml-2" />
+                  تلاش مجدد
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                >
+                  بروزرسانی صفحه
+                </Button>
+              </div>
+              <p className="text-xs text-red-600 mt-4">
+                اگر مشکل ادامه دارد، لطفاً با پشتیبانی تماس بگیرید
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!dashboardData) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">خطا در بارگذاری اطلاعات داشبورد</p>
+      <div className="space-y-6">
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
+              <h3 className="text-lg font-medium text-yellow-900 mb-2">
+                اطلاعات داشبورد در دسترس نیست
+              </h3>
+              <p className="text-yellow-700 mb-4">
+                سیستم موقتاً قادر به بارگذاری اطلاعات نیست
+              </p>
+              <Button 
+                onClick={() => refetch()}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                <RefreshCw className="w-4 h-4 ml-2" />
+                تلاش مجدد
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
