@@ -18,6 +18,8 @@ import { promisify } from 'util';
 import { checkDatabaseHealth, getDatabaseStatus } from './database-manager';
 import errorManager, { ErrorSeverity, ErrorCategory } from './unified-error-manager';
 
+import os from 'os';
+
 const execAsync = promisify(exec);
 
 // 🏷️ Health Status Types
@@ -372,7 +374,7 @@ class ComprehensiveHealthChecker {
       return {
         cpu: {
           usage: cpuUsage,
-          loadAverage: require('os').loadavg()
+          loadAverage: os.loadavg()
         },
         memory: {
           total: totalMem,

@@ -367,6 +367,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint for frontend auth check
+  app.get("/api/auth/me", (req, res) => {
+    if ((req.session as any)?.authenticated) {
+      res.json({
+        user: {
+          id: (req.session as any).userId,
+          username: (req.session as any).username,
+          role: (req.session as any).role || 'ADMIN',
+          permissions: (req.session as any).permissions || [],
+          hasFullAccess: (req.session as any).role === 'SUPER_ADMIN' || (Array.isArray((req.session as any).permissions) && (req.session as any).permissions.includes('FULL_ACCESS'))
+        }
+      });
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
+    }
+  });
+
   // Dashboard endpoint - Updated to use unified financial data with enhanced error handling
   app.get("/api/dashboard", authMiddleware, async (req, res) => {
     try {
@@ -1152,8 +1169,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateRepresentativeFinancials(payment.representativeId);
       }
 
-  // ...existing code...
-
       // Log the activity for audit trail
       await storage.createActivityLog({
         type: "payment_deleted",
@@ -1810,8 +1825,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🔄 به‌روزرسانی اطلاعات مالی نماینده ${invoice.representativeId}`);
       await storage.updateRepresentativeFinancials(invoice.representativeId);
 
-  // ...existing code...
-
       // Log the activity for audit trail
       await storage.createActivityLog({
         type: "invoice_deleted",
@@ -1846,6 +1859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // فاز ۲: Get single invoice details API
+ 
   app.get("/api/invoices/:id", authMiddleware, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
@@ -1961,8 +1975,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-  // ...existing code...
-
       res.json({
         success: true,
         payment,
@@ -1975,7 +1987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ...existing code...
+  // Debt synchronization API - SHERLOCK v1.0 CORE FEATURE
   app.post("/api/representatives/:id/sync-debt", authMiddleware, async (req, res) => {
     try {
       const { id } = req.params;
@@ -2592,17 +2604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute atomic transaction for invoice editing
       const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
       debug.info('Starting Invoice Update Transaction', { transactionId });
-
-      // Update the invoice
-      await storage.updateInvoice(invoiceId, {
-        amount: editedAmount.toString(),
-        usageData: editedUsageData
-      });
-
-      debug.success('Invoice Updated Successfully', { invoiceId, newAmount: editedAmount });
-
       // ✅ SHERLOCK v24.1: Automatic financial synchronization after invoice edit
       try {
         const invoice = await storage.getInvoice(invoiceId);

@@ -257,7 +257,7 @@ export class FinancialConsistencyEngine {
       if (validationResult.corrections.length > 0) {
         // Force cache invalidation after corrections
         const { UnifiedFinancialEngine } = await import('./unified-financial-engine.js');
-        UnifiedFinancialEngine.clearAllCache();
+  UnifiedFinancialEngine.forceInvalidateGlobal('consistency_correction');
       }
 
       return {

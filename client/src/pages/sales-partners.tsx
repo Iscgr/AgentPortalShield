@@ -90,8 +90,8 @@ export default function SalesPartners() {
   const queryClient = useQueryClient();
 
   const { data: salesPartners = [], isLoading } = useQuery<SalesPartner[]>({
-    queryKey: ["/api/sales-partners"],
-    queryFn: () => apiRequest("/api/sales-partners"),
+    queryKey: ["/sales-partners"],
+    queryFn: () => apiRequest("/sales-partners"),
     select: (data: any) => {
       console.log('SHERLOCK v12.1 DEBUG: Sales Partners data:', data);
       if (Array.isArray(data)) return data;
@@ -103,8 +103,8 @@ export default function SalesPartners() {
   });
 
   const { data: stats } = useQuery<SalesPartnerStats>({
-    queryKey: ["/api/sales-partners/statistics"],
-    queryFn: () => apiRequest("/api/sales-partners/statistics"),
+    queryKey: ["/sales-partners/statistics"],
+    queryFn: () => apiRequest("/sales-partners/statistics"),
     select: (data: any) => {
       return data || {
         totalPartners: "0",

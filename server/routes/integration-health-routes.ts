@@ -162,9 +162,8 @@ export function registerIntegrationHealthRoutes(app: Express) {
  */
 
 import { Router, Request, Response } from 'express';
-import { unifiedFinancialEngine } from '../services/unified-financial-engine.js';
-import { db } from '../db.js';
-import { sql } from 'drizzle-orm';
+import { unifiedFinancialEngine, UnifiedFinancialEngine } from '../services/unified-financial-engine.js';
+// Duplicate db/sql imports removed (already imported at top of file)
 
 const router = Router();
 
@@ -250,7 +249,7 @@ router.get('/health', requireAuth, async (req: Request, res: Response) => {
     try {
       // Test cache invalidation and refresh
       const beforeInvalidation = Date.now();
-      unifiedFinancialEngine.constructor.forceInvalidateRepresentative(1);
+  UnifiedFinancialEngine.forceInvalidateRepresentative(1);
       const afterInvalidation = Date.now();
       
       healthCheck.components.cacheSystem = (afterInvalidation - beforeInvalidation) < 10 ? 'EXCELLENT' : 'GOOD';
@@ -491,7 +490,7 @@ router.get("/deployment-ready", requireAuth, async (req, res) => {
     
     // Cache system check
     try {
-      unifiedFinancialEngine.constructor.forceInvalidateRepresentative(1);
+  UnifiedFinancialEngine.forceInvalidateRepresentative(1);
       checks.cacheSystem = true;
     } catch (e) {
       console.error('Cache system check failed:', e);

@@ -184,7 +184,7 @@ const OverdueInvoicesCard = () => {
     queryKey: ["/api/unified-financial/overdue-analysis"],
     queryFn: async () => {
       console.log('🔍 SHERLOCK v32.0: Fetching accurate overdue analysis for dashboard widget...');
-      return apiRequest("/api/unified-financial/overdue-analysis");
+      return apiRequest("/unified-financial/overdue-analysis");
     },
     select: (response: any) => response?.data || response || {},
     staleTime: 30000,
@@ -323,8 +323,8 @@ const OverdueInvoicesCard = () => {
 
 export default function Dashboard() {
   const { data: dashboardData, isLoading } = useQuery<DashboardData>({
-    queryKey: ["/api/dashboard"],
-    queryFn: () => apiRequest("/api/dashboard"),
+    queryKey: ["/dashboard"],
+    queryFn: () => apiRequest("/dashboard"),
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 10 * 60 * 1000, // Refresh every 10 minutes
     select: (data: any) => {

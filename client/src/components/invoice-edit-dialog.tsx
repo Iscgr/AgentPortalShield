@@ -70,7 +70,7 @@ export default function InvoiceEditDialog({
   const [sessionHealthy, setSessionHealthy] = useState(true);
   const [sessionCheckInterval, setSessionCheckInterval] = useState<NodeJS.Timeout | null>(null);
 
-  const { showToast } = useToast();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // SHERLOCK v1.0: UNIFIED AUTHENTICATION SYSTEM
@@ -290,7 +290,7 @@ export default function InvoiceEditDialog({
         } catch (syncError) {
           console.error('❌ Enhanced financial sync failed:', syncError);
           // Show error to user for critical failures
-          showToast("هشدار همگام‌سازی مالی: همگام‌سازی اطلاعات مالی با مشکل مواجه شد. لطفاً صفحه را بازخوانی کنید.", "error");
+          toast({ description: "هشدار همگام‌سازی مالی: همگام‌سازی اطلاعات مالی با مشکل مواجه شد. لطفاً صفحه را بازخوانی کنید." });
         }
       }
 

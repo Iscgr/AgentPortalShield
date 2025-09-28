@@ -12,6 +12,21 @@ import { unifiedFinancialEngine } from '../services/unified-financial-engine.js'
 
 const router = Router();
 
+// Local type definition aligned with client component (debt-verification-panel)
+interface VerificationSummary {
+  totalRepresentatives: number;
+  consistentCount: number;
+  inconsistentCount: number;
+  errorCount: number;
+  consistencyRate: number;
+  totalDiscrepancy: number;
+  averageDiscrepancy: number;
+  totalCalculatedDebt?: number;
+  totalStoredDebt?: number;
+  debtDifferenceAmount?: number;
+  verificationDuration: number;
+}
+
 // ✅ SHERLOCK v32.0: Comprehensive debt column verification
 router.get('/verify-debt-column-consistency', async (req, res) => {
   try {

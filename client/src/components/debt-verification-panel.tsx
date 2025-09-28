@@ -56,7 +56,7 @@ interface VerificationSummary {
 export default function DebtVerificationPanel() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
-  const { showToast } = useToast();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch verification data
@@ -79,7 +79,7 @@ export default function DebtVerificationPanel() {
       });
     },
     onSuccess: () => {
-      toast({
+  toast({
         title: "موفقیت",
         description: "بدهی‌های ناسازگار اصلاح شدند"
       });

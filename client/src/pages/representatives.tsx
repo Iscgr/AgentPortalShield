@@ -267,11 +267,11 @@ export default function Representatives() {
   };
 
   const { data: representatives = [], isLoading, error: repsError, refetch } = useQuery<Representative[]>({
-    queryKey: ["/api/representatives"],
+    queryKey: ["/representatives"],
     queryFn: async () => {
       console.log("🔍 SHERLOCK v32.0: Fetching representatives data");
       try {
-        const data = await apiRequest("/api/representatives");
+        const data = await apiRequest("/representatives");
         console.log("✅ Representatives data loaded:", data?.length || 0, "items");
 
         // ✅ SHERLOCK v32.0: Debug specific representative "Abedmb"
@@ -525,7 +525,7 @@ export default function Representatives() {
   // Create representative mutation
   const createRepresentativeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof representativeFormSchema>) => {
-      return apiRequest("/api/representatives", {
+      return apiRequest("/representatives", {
         method: "POST",
         data: data
       });
@@ -550,7 +550,7 @@ export default function Representatives() {
   // Update representative mutation
   const updateRepresentativeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: Partial<z.infer<typeof representativeFormSchema>> }) => {
-      return apiRequest(`/api/representatives/${id}`, {
+      return apiRequest(`/representatives/${id}`, {
         method: "PUT",
         data: data
       });
@@ -620,11 +620,10 @@ export default function Representatives() {
   };
 
   const handleCopyPortalLink = (publicId: string) => {
-    // ✅ SHERLOCK v32.1: Always use production URL for portal links sent to representatives
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://agent-portal-shield-info9071.replit.app'
-      : window.location.origin;
-    const portalLink = `${baseUrl}/representative/${publicId}`;
+    // ✅ SHERLOCK v36.0: Configurable portal base URL (env-driven)
+    const envBase = (import.meta as any).env?.VITE_PUBLIC_PORTAL_BASE_URL || (window as any).__PUBLIC_PORTAL_BASE_URL__;
+    const baseUrl = envBase || window.location.origin;
+    const portalLink = `${baseUrl.replace(/\/$/, '')}/representative/${publicId}`;
     navigator.clipboard.writeText(portalLink);
     toast({
       title: "کپی شد",
@@ -1250,10 +1249,9 @@ export default function Representatives() {
                         size="sm" 
                         className="w-full"
                         onClick={() => {
-                          const baseUrl = process.env.NODE_ENV === 'production' 
-                            ? 'https://agent-portal-shield-info9071.replit.app'
-                            : window.location.origin;
-                          window.open(`${baseUrl}/representative/${selectedRep.publicId}`, '_blank');
+                          const envBase = (import.meta as any).env?.VITE_PUBLIC_PORTAL_BASE_URL || (window as any).__PUBLIC_PORTAL_BASE_URL__;
+                          const baseUrl = envBase || window.location.origin;
+                          window.open(`${baseUrl.replace(/\/$/, '')}/representative/${selectedRep.publicId}`, '_blank');
                         }}
                       >
                         <ExternalLink className="w-4 h-4 ml-2" />
@@ -2064,7 +2062,6 @@ function EditRepresentativeDialog({
 }
 
 // Internal EditInvoiceDialog component removed - using external component instead
-  // Internal EditInvoiceDialog component removed - using external component instead
 
 // Create Payment Dialog Component
 function CreatePaymentDialog({
@@ -2152,7 +2149,7 @@ function CreatePaymentDialog({
         selectedInvoiceId: "auto"
       };
 
-      await apiRequest("/api/payments", {
+      await apiRequest("/payments", {
         method: "POST",
         data: paymentData
       });
@@ -2269,7 +2266,7 @@ function CreatePaymentDialog({
           isAllocated: !!selectedInvoiceId
         };
 
-        await apiRequest("/api/payments", {
+        await apiRequest("/payments", {
           method: "POST",
           data: paymentData
         });

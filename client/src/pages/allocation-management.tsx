@@ -24,7 +24,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from '@/lib/axios';
+import apiRequest from '@/lib/axios';
 import { formatCurrency } from '@/lib/currency-formatter';
 
 interface AllocationMetrics {
@@ -72,8 +72,11 @@ export default function AllocationManagement() {
   const { data: reportData, isLoading: reportLoading, error: reportError } = useQuery({
     queryKey: ['allocation-monitoring-report'],
     queryFn: async () => {
-      const response = await axios.get('/api/allocation/monitoring-report');
-      return response.data.data as MonitoringReport;
+      const data = await apiRequest('/api/allocation/monitoring-report');
+      // انتظار می‌رود API ساختاری مشابه { data: { metrics, trends, ... } } برگرداند
+      // اگر مستقیماً ساختار نهایی برگردد، fallback مناسب انجام می‌دهیم
+      const wrapped = (data as any)?.data ? (data as any).data : data;
+      return wrapped as MonitoringReport;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -82,19 +85,22 @@ export default function AllocationManagement() {
   const { data: representatives } = useQuery({
     queryKey: ['representatives'],
     queryFn: async () => {
-      const response = await axios.get('/api/representatives');
-      return response.data;
+      const data = await apiRequest('/api/representatives');
+      return (data as any)?.data ? (data as any).data : data;
     },
   });
 
   // Batch allocation mutation
   const batchAllocationMutation = useMutation({
     mutationFn: async (representativeId: number) => {
-      const response = await axios.post(`/api/payments/batch-allocate/${representativeId}`, {
-        maxPayments: 50,
-        strictMode: true
+      const data = await apiRequest(`/api/payments/batch-allocate/${representativeId}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          maxPayments: 50,
+          strictMode: true
+        })
       });
-      return response.data;
+      return (data as any)?.data ? (data as any).data : data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allocation-monitoring-report'] });

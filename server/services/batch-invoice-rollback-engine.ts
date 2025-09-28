@@ -68,13 +68,14 @@ export class BatchInvoiceRollbackEngine {
       console.log(`📊 Found ${targetInvoices.length} invoices to rollback`);
 
       // 2. گروه‌بندی بر اساس نماینده
-      const representativeGroups = targetInvoices.reduce((acc, invoice) => {
+      type InvoiceItem = typeof targetInvoices[number];
+      const representativeGroups: Record<number, InvoiceItem[]> = targetInvoices.reduce((acc, invoice) => {
         if (!acc[invoice.representativeId]) {
           acc[invoice.representativeId] = [];
         }
         acc[invoice.representativeId].push(invoice);
         return acc;
-      }, {} as Record<number, typeof targetInvoices>);
+      }, {} as Record<number, InvoiceItem[]>);
 
       // 3. محاسبه تأثیر مالی قبل از حذف
       for (const [repId, invoiceGroup] of Object.entries(representativeGroups)) {
@@ -85,7 +86,7 @@ export class BatchInvoiceRollbackEngine {
           const currentFinancial = await unifiedFinancialEngine.calculateRepresentative(representativeId);
           
           // محاسبه مجموع فاکتورهای قرار به حذف
-          const totalToDelete = invoiceGroup.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+          const totalToDelete = (invoiceGroup as InvoiceItem[]).reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
           
           // محاسبه وضعیت مالی بعد از حذف
           const projectedDebt = Math.max(0, currentFinancial.actualDebt - totalToDelete);
@@ -132,13 +133,13 @@ export class BatchInvoiceRollbackEngine {
         for (const repState of result.restoredFinancialState) {
           try {
             // Force invalidate cache
-            if (unifiedFinancialEngine.forceInvalidateRepresentative) {
-              unifiedFinancialEngine.forceInvalidateRepresentative(repState.representativeId, {
-                cascadeGlobal: true,
-                reason: 'batch_rollback',
-                immediate: true
-              });
-            }
+            // استفاده از متد استاتیک کلاس اصلی برای invalidation
+            const { UnifiedFinancialEngine } = await import('./unified-financial-engine.js');
+            UnifiedFinancialEngine.forceInvalidateRepresentative(repState.representativeId, {
+              cascadeGlobal: true,
+              reason: 'batch_rollback',
+              immediate: true
+            });
 
             // بروزرسانی بدهی در جدول نمایندگان
             await db.update(representatives)
@@ -245,13 +246,14 @@ export class BatchInvoiceRollbackEngine {
       .orderBy(desc(invoices.id));
 
     // گروه‌بندی بر اساس نماینده
-    const representativeGroups = targetInvoices.reduce((acc, invoice) => {
+    type InvoiceItem = typeof targetInvoices[number];
+    const representativeGroups: Record<number, InvoiceItem[]> = targetInvoices.reduce((acc, invoice) => {
       if (!acc[invoice.representativeId]) {
         acc[invoice.representativeId] = [];
       }
       acc[invoice.representativeId].push(invoice);
       return acc;
-    }, {} as Record<number, typeof targetInvoices>);
+    }, {} as Record<number, InvoiceItem[]>);
 
     const representativeSummary = [];
     
@@ -263,11 +265,12 @@ export class BatchInvoiceRollbackEngine {
         totalDebt: representatives.totalDebt
       }).from(representatives).where(eq(representatives.id, representativeId));
 
+      const typedGroup = invoiceGroup as InvoiceItem[];
       representativeSummary.push({
         representativeId,
         representativeName: representative?.name || `نماینده ${representativeId}`,
-        invoiceCount: invoiceGroup.length,
-        totalAmount: invoiceGroup.reduce((sum, inv) => sum + parseFloat(inv.amount), 0),
+        invoiceCount: typedGroup.length,
+        totalAmount: typedGroup.reduce((sum, inv) => sum + parseFloat(inv.amount), 0),
         currentDebt: parseFloat(representative?.totalDebt || '0')
       });
     }

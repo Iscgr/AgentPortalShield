@@ -271,7 +271,7 @@ export default function Portal() {
 
   const { data, isLoading, error } = useQuery<PortalData>({
     queryKey: [`/api/public/portal/${publicId}`],
-    queryFn: getQueryFn({ on401: "throw" }),
+    queryFn: getQueryFn(`/api/public/portal/${publicId}`),
     enabled: !!publicId,
   });
 
