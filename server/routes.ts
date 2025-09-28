@@ -57,6 +57,8 @@ import { registerHealthRoutes } from './routes/health-routes';
 import { registerUnifiedStatisticsRoutes } from "./routes/unified-statistics-routes.js";
 // Register unified financial routes
 import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-routes.js";
+import { registerShadowAllocationRoutes } from './routes/shadow-allocation-routes';
+import { isCanaryRepresentative } from './services/allocation-canary-helper';
 
 // Import database optimization routes registration
 import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
@@ -65,6 +67,8 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 
 // Import Debt Verification Routes
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
+import { featureFlagManager } from './services/feature-flag-manager';
+import multistageFlagRoutes from './routes/multistage-flag-routes';
 
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession {
@@ -213,6 +217,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // const unifiedFinancialRoutes = (await import('./routes/unified-financial-routes.js')).default;
   // app.use('/api/unified-financial', unifiedFinancialRoutes);
   registerUnifiedFinancialRoutes(app, authMiddleware);
+  // Phase A - Iteration 3: Shadow allocation observation endpoint
+  registerShadowAllocationRoutes(app, authMiddleware);
+  // Phase A - Iteration 7+: Multi-stage flag management (centralized)
+  app.use('/api/multistage-flags', multistageFlagRoutes);
+
+  // Phase A - Iteration 5: Cache metrics endpoint (invoice_balance_cache vs ledger aggregates)
+  app.get('/api/allocations/cache-metrics', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      // نمونه: شمار کل فاکتورهایی که remaining_amount != amount - Σledger
+      const mismatchQuery = await db.execute(sql`
+        SELECT i.id AS invoice_id,
+               i.amount AS invoice_amount,
+               COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0) AS ledger_alloc,
+               COALESCE(ibc.remaining_amount, i.amount) AS cached_remaining,
+               (i.amount - COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0)) AS computed_remaining
+        FROM invoices i
+        LEFT JOIN invoice_balance_cache ibc ON ibc.invoice_id = i.id
+        WHERE (
+          COALESCE(ibc.remaining_amount, i.amount) - (i.amount - COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0))
+        ) <> 0
+        ORDER BY i.id ASC
+        LIMIT 50;
+      `);
+      const mismatches = (mismatchQuery as any).rows || [];
+      const totalMismatchRes = await db.execute(sql`
+        SELECT COUNT(*) AS c FROM invoices i
+        LEFT JOIN invoice_balance_cache ibc ON ibc.invoice_id = i.id
+        WHERE (
+          COALESCE(ibc.remaining_amount, i.amount) - (i.amount - COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0))
+        ) <> 0;
+      `);
+      const totalMismatch = Number((totalMismatchRes as any).rows?.[0]?.c || 0);
+
+      res.json({
+        success: true,
+        totalMismatch,
+        sample: mismatches.map((m: any) => ({
+          invoiceId: Number(m.invoice_id),
+            ledgerAllocated: Number(m.ledger_alloc),
+            cachedRemaining: Number(m.cached_remaining),
+            computedRemaining: Number(m.computed_remaining)
+        }))
+      });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // Canary debt endpoint (Phase A - Iteration 6 skeleton)
+  app.get('/api/allocations/canary-debt', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const repIdRaw = req.query.representativeId;
+      if (!repIdRaw) return res.status(400).json({ success:false, error:'representativeId query required'});
+      const repId = Number(repIdRaw);
+      const canary = isCanaryRepresentative(repId, 5); // 5% rollout target
+      // Placeholder debt computation: در حال حاضر فقط ledger allocations sum برای فاکتورهای نماینده (نمونه ساده)
+      // در آینده: استفاده از cache + ledger.
+      const debtLegacy = await db.execute(sql`SELECT COALESCE(SUM(i.amount),0) AS total FROM invoices i WHERE i.representative_id = ${repId}`);
+      const allocLedger = await db.execute(sql`SELECT COALESCE(SUM(pa.allocated_amount),0) AS total FROM payment_allocations pa JOIN payments p ON p.id = pa.payment_id WHERE p.representative_id = ${repId}`);
+      const totalInv = Number((debtLegacy as any).rows?.[0]?.total || 0);
+      const allocSum = Number((allocLedger as any).rows?.[0]?.total || 0);
+      const debt = totalInv - allocSum;
+      res.json({ success:true, representativeId: repId, canary, ledgerDebt: debt });
+    } catch (e:any) {
+      res.status(500).json({ success:false, error:e.message });
+    }
+  });
+
+  // TEMP (Phase A instrumentation): manual multi-stage flag update for allocation_dual_write (dev-only shortcut)
+  app.post('/api/allocations/dev-set-dual-write', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const state = (req.query.state || req.body?.state || '').toString();
+      if (!state) return res.status(400).json({ success:false, error:'state required (off|shadow|enforce)' });
+      try {
+        featureFlagManager.updateMultiStageFlag('allocation_dual_write', state, 'dev_manual');
+      } catch (err:any) {
+        return res.status(400).json({ success:false, error: err.message });
+      }
+      res.json({ success:true, flag:'allocation_dual_write', newState: featureFlagManager.getMultiStageFlagState('allocation_dual_write') });
+    } catch (e:any) {
+      res.status(500).json({ success:false, error:e.message });
+    }
+  });
+
+  // Debt comparison endpoint (Phase A - Iteration 7) - READ-ONLY drift surface
+  // GET /api/allocations/debt-compare
+  // Optional query: representativeId=<id>
+  // Returns: legacyDebt (standard engine), ledgerDebt (allocations delta), cacheDebt (aggregated remaining), diffs & ratios
+  app.get('/api/allocations/debt-compare', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const repIdParam = req.query.representativeId ? Number(req.query.representativeId) : undefined;
+      if (repIdParam !== undefined && Number.isNaN(repIdParam)) {
+        return res.status(400).json({ success:false, error:'representativeId must be numeric'});
+      }
+
+      // Feature flag gating: only available once dual write at least shadow
+      const dualState = featureFlagManager.getMultiStageFlagState('allocation_dual_write');
+      if (dualState === 'off') {
+        return res.status(409).json({ success:false, error:'allocation_dual_write must be shadow or enforce to access debt comparison', state: dualState });
+      }
+
+      // Legacy debt (standardized) = unpaid/overdue/partial invoices - allocated payments (legacy boolean flag)
+      const legacyQuery = repIdParam ? sql`AND invoices.representative_id = ${repIdParam}` : sql``;
+      const legacyDebtRes = await db.execute(sql`SELECT
+          GREATEST(0,
+            COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid','overdue','partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END),0)
+            - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END),0)
+          ) AS debt
+        FROM invoices
+        LEFT JOIN payments ON payments.representative_id = invoices.representative_id
+        WHERE 1=1 ${legacyQuery};`);
+      const legacyDebt = Number((legacyDebtRes as any).rows?.[0]?.debt || 0);
+
+      // Ledger debt = invoice total - ledger allocations (payment_allocations) (independent of legacy flag)
+      const ledgerTotalsRes = await db.execute(sql`SELECT
+          COALESCE(SUM(CAST(invoices.amount as DECIMAL)),0) AS inv_total,
+          COALESCE(SUM(pa.allocated_amount),0) AS alloc_total
+        FROM invoices
+        LEFT JOIN payment_allocations pa ON pa.invoice_id = invoices.id
+        ${repIdParam ? sql`WHERE invoices.representative_id = ${repIdParam}` : sql``};`);
+      const invTotal = Number((ledgerTotalsRes as any).rows?.[0]?.inv_total || 0);
+      const allocTotal = Number((ledgerTotalsRes as any).rows?.[0]?.alloc_total || 0);
+      const ledgerDebt = invTotal - allocTotal;
+
+      // Cache debt aggregation: sum remaining_amount where status_cached IN ('unpaid','partial') (ignore paid & anomalies negative)
+      const cacheScope = repIdParam ? sql`WHERE invoices.representative_id = ${repIdParam}` : sql``;
+      const cacheDebtRes = await db.execute(sql`SELECT COALESCE(SUM(c.remaining_amount),0) AS cache_debt
+        FROM invoice_balance_cache c
+        JOIN invoices ON invoices.id = c.invoice_id
+        ${cacheScope}
+        AND c.status_cached IN ('unpaid','partial');`);
+      const cacheDebt = Number((cacheDebtRes as any).rows?.[0]?.cache_debt || 0);
+
+      // Diff metrics
+      function ratio(a: number, b: number): number { return b === 0 ? (a === 0 ? 1 : Infinity) : a / b; }
+      const diffLegacyLedger = legacyDebt - ledgerDebt;
+      const diffLegacyCache = legacyDebt - cacheDebt;
+      const diffLedgerCache = ledgerDebt - cacheDebt;
+
+      const response = {
+        success: true,
+        scope: repIdParam ? { representativeId: repIdParam } : { scope: 'global' },
+        mode: dualState,
+        debts: {
+          legacyDebt,
+          ledgerDebt,
+            cacheDebt
+        },
+        diffs: {
+          diffLegacyLedger,
+          diffLegacyCache,
+          diffLedgerCache
+        },
+        ratios: {
+          legacy_over_ledger: ratio(legacyDebt, ledgerDebt),
+          legacy_over_cache: ratio(legacyDebt, cacheDebt),
+          ledger_over_cache: ratio(ledgerDebt, cacheDebt)
+        },
+        timestamp: new Date().toISOString()
+      };
+      res.json(response);
+    } catch (e:any) {
+      res.status(500).json({ success:false, error: e.message });
+    }
+  });
 
 
   // SHERLOCK v18.4: آمار یکپارچه واحد - جایگزین همه سیستم‌های آماری موازی

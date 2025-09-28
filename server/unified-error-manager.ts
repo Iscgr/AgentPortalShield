@@ -15,6 +15,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import { getDatabaseStatus } from './database-manager';
 
 // 🏷️ Error Classification System
@@ -143,12 +144,23 @@ class UnifiedErrorManager {
       error,
       metadata,
       stackTrace: error?.stack,
-      serverInfo: {
-        hostname: require('os').hostname(),
-        pid: process.pid,
-        memory: process.memoryUsage(),
-        uptime: process.uptime()
-      }
+      serverInfo: (() => {
+        try {
+          return {
+            hostname: os.hostname(),
+            pid: process.pid,
+            memory: process.memoryUsage(),
+            uptime: process.uptime()
+          };
+        } catch (e) {
+          return {
+            hostname: 'unknown',
+            pid: process.pid,
+            memory: process.memoryUsage(),
+            uptime: process.uptime()
+          };
+        }
+      })()
     };
 
     // Update statistics

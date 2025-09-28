@@ -214,6 +214,17 @@ class ComprehensiveHealthChecker {
     const startTime = Date.now();
     
     try {
+      // اجازهٔ غیرفعالسازی چک Redis در محیط توسعه یا تست برای جلوگیری از نویز
+      if (process.env.SKIP_REDIS_HEALTH === '1' || process.env.SKIP_REDIS_HEALTH === 'true') {
+        return {
+          status: HealthStatus.DEGRADED,
+          message: 'Redis health check skipped by flag',
+          persianMessage: 'بررسی سلامت Redis به صورت کنترل‌شده غیرفعال شد',
+          timestamp: new Date(),
+          metadata: { skipped: true }
+        };
+      }
+
       // Test Redis connection using Docker
       const { stdout } = await execAsync('docker exec marfanet-redis redis-cli ping');
       const responseTime = Date.now() - startTime;
@@ -236,11 +247,14 @@ class ComprehensiveHealthChecker {
         };
       }
     } catch (error) {
+      // در محیط توسعه اگر کانتینر Redis موجود نباشد downgrade کنیم تا CRITICAL دائمی نشود
+      const isDev = process.env.NODE_ENV !== 'production';
       return {
-        status: HealthStatus.CRITICAL,
+        status: isDev ? HealthStatus.DEGRADED : HealthStatus.CRITICAL,
         message: `Redis health check error: ${(error as Error).message}`,
-        persianMessage: 'خطا در بررسی سلامت Redis',
-        timestamp: new Date()
+        persianMessage: isDev ? 'Redis در دسترس نیست (حالت توسعه)' : 'خطا در بررسی سلامت Redis',
+        timestamp: new Date(),
+        metadata: { downgraded: isDev }
       };
     }
   }
