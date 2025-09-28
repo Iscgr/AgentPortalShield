@@ -17,7 +17,7 @@ export const queryClient = new QueryClient({
 
 // تابع apiRequest برای درخواست‌های API
 export async function apiRequest<T = any>(endpoint: string, options: RequestInit & { data?: any } = {}): Promise<T> {
-  const url = endpoint.startsWith('/') ? `/api${endpoint}` : `/api/${endpoint}`;
+  const url = endpoint.startsWith('/api/') ? endpoint : `/api${endpoint}`;
   
   const defaultOptions: RequestInit = {
     method: 'GET',

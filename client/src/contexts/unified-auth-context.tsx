@@ -11,7 +11,6 @@ interface User {
 }
 
 interface UnifiedAuthContextType {
-  userType?: string; // نوع کاربر (ADMIN, CRM, etc.)
   user: User | null;
   loading: boolean;
   error: string | null;
@@ -34,7 +33,9 @@ export function UnifiedAuthProvider({ children }: { children: React.ReactNode })
     const checkAuth = async () => {
       try {
         // درخواست به API برای بررسی وضعیت احراز هویت
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
         if (response.ok) {
           const data = await response.json();
           setUser(data.user);
@@ -61,6 +62,7 @@ export function UnifiedAuthProvider({ children }: { children: React.ReactNode })
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -79,7 +81,10 @@ export function UnifiedAuthProvider({ children }: { children: React.ReactNode })
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include'
+      });
     } finally {
       setUser(null);
     }

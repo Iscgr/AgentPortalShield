@@ -150,7 +150,7 @@ router.post('/test/:feature', requireAuth, async (req, res) => {
       feature,
       enabled: isEnabled,
       context: { requestId, userGroup },
-      flagConfig: featureFlagManager.getFlags()[feature as keyof FeatureFlagConfig]
+  flagConfig: (featureFlagManager.getFlags() as any)[feature as any]
     });
   } catch (error) {
     console.error('Feature flag test error:', error);

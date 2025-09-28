@@ -4,7 +4,7 @@
  * سرویس نظارت مداوم بر ثبات محاسبات مالی
  */
 
-import { financialConsistencyEngine } from './financial-consistency-engine.js';
+import { financialConsistencyEngine, FinancialConsistencyEngine } from './financial-consistency-engine.js';
 
 export class FinancialMonitoringService {
   private static instance: FinancialMonitoringService;
@@ -65,7 +65,7 @@ export class FinancialMonitoringService {
         
         // اصلاح خودکار در صورت نیاز
         if (validationResult.summary.inconsistentCount > 0) {
-          await financialConsistencyEngine.performSystemCorrection();
+          await FinancialConsistencyEngine.performSystemCorrection();
           console.log('✅ Automatic correction applied');
         }
       } else {

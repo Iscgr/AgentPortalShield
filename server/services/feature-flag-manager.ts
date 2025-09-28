@@ -21,9 +21,21 @@ export interface FeatureFlagConfig {
   PERFORMANCE_MONITORING: FeatureFlag;
 }
 
+// تعریف پرچم‌های چندمرحله‌ای برای گذارهای حساس (ledger و reconciliation)
+export interface MultiStageFlag {
+  state: string;           // حالت جاری (مثلاً off/shadow/enforce)
+  allowed: string[];       // لیست حالت‌های مجاز
+  lastModified: string;
+  modifiedBy: string;
+  description?: string;
+}
+
+type MultiStageFlagKey = 'allocation_dual_write' | 'ledger_backfill_mode' | 'allocation_read_switch' | 'active_reconciliation' | 'outbox_enabled' | 'allocation_runtime_guards';
+
 class FeatureFlagManager {
   private flags: FeatureFlagConfig;
   private lastUpdate: number = 0;
+  private multiStageFlags: Record<MultiStageFlagKey, MultiStageFlag>;
 
   constructor() {
     // Initialize with safe defaults - all optimizations OFF initially
@@ -70,6 +82,52 @@ class FeatureFlagManager {
     };
 
     this.lastUpdate = Date.now();
+    // مقداردهی ایمن پرچم‌های چندمرحله‌ای (همه روی off)
+    this.multiStageFlags = {
+      allocation_dual_write: {
+        state: 'off',
+        allowed: ['off','shadow','enforce'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'کنترل dual-write بین مدل legacy و ledger'
+      },
+      ledger_backfill_mode: {
+        state: 'off',
+        allowed: ['off','read_only','active'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'اجرای backfill روی payment_allocations (shadow)'
+      },
+      allocation_read_switch: {
+        state: 'off',
+        allowed: ['off','canary','full'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'سوییچ تدریجی خواندن تخصیص از ledger'
+      },
+      active_reconciliation: {
+        state: 'off',
+        allowed: ['off','dry','enforce'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'اجرای job آشتی و اعمال سیاست‌ها'
+      },
+      outbox_enabled: {
+        state: 'off',
+        allowed: ['off','on'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'فعال‌سازی الگوی outbox برای event dispatch'
+      }
+      ,
+      allocation_runtime_guards: {
+        state: 'off',
+        allowed: ['off','warn','enforce'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'گاردهای زمان اجرای تخصیص برای جلوگیری از over-allocation (I6/I7)'
+      }
+    };
     console.log('🚩 ATOMOS Feature Flag Manager v1.0 initialized with safe defaults');
   }
 
@@ -147,7 +205,6 @@ class FeatureFlagManager {
    */
   getStatus(): { [key: string]: { enabled: boolean; percentage: number; active: boolean } } {
     const status: any = {};
-    
     Object.entries(this.flags).forEach(([key, flag]) => {
       status[key] = {
         enabled: flag.enabled,
@@ -155,8 +212,42 @@ class FeatureFlagManager {
         active: this.isEnabled(key as keyof FeatureFlagConfig)
       };
     });
-
+    // افزودن multi-stage flags
+    Object.entries(this.multiStageFlags).forEach(([key, flag]) => {
+      status[key] = {
+        enabled: flag.state !== 'off',
+        percentage: 100,
+        active: flag.state !== 'off'
+      };
+      status[key].state = flag.state; // الحاق state پویا
+    });
     return status;
+  }
+
+  /**
+   * دریافت state فعلی یک پرچم چندمرحله‌ای
+   */
+  getMultiStageFlagState(flag: MultiStageFlagKey): string {
+    return this.multiStageFlags[flag].state;
+  }
+
+  /**
+   * به‌روزرسانی پرچم چندمرحله‌ای با اعتبارسنجی حالت مجاز
+   */
+  updateMultiStageFlag(flag: MultiStageFlagKey, newState: string, modifiedBy: string = 'admin') {
+    const current = this.multiStageFlags[flag];
+    if (!current.allowed.includes(newState)) {
+      throw new Error(`State '${newState}' مجاز نیست. حالات مجاز: ${current.allowed.join(', ')}`);
+    }
+    if (current.state === newState) return; // بدون تغییر
+    this.multiStageFlags[flag] = {
+      ...current,
+      state: newState,
+      lastModified: new Date().toISOString(),
+      modifiedBy
+    };
+    this.lastUpdate = Date.now();
+    console.log(`🔄 MultiStageFlag ${flag} → ${newState} by ${modifiedBy}`);
   }
 
   /**

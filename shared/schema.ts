@@ -37,6 +37,22 @@ export const salesPartners = pgTable("sales_partners", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+// Invoice Usage Items (ریزجزئیات مصرف در فایل‌های هفتگی JSON)
+// هدف: نگهداری خطوط خام (event) مرتبط با هر فاکتور برای Traceability و نمایش در پرتال عمومی.
+// رابطه: هر رکورد متعلق به یک invoice است (one-to-many). در فاز فعلی از invoiceNumber برای اتصال ساده استفاده می‌شود.
+export const invoiceUsageItems = pgTable("invoice_usage_items", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id").references(() => invoices.id).notNull(),
+  adminUsername: text("admin_username").notNull(),
+  eventTimestamp: text("event_timestamp").notNull(),
+  eventType: text("event_type").notNull(),
+  description: text("description"),
+  amountText: text("amount_text").notNull(), // مقدار خام به صورت TEXT برای همسانی با منبع
+  amountDec: decimal("amount_dec", { precision: 15, scale: 2 }), // جایگاه تبدیل آتی (Phase A E-A1)
+  rawJson: json("raw_json"), // ذخیره کامل رکورد برای آینده (ممکن است null جهت صرفه‌جویی)
+  createdAt: timestamp("created_at").defaultNow()
+});
+
 // Invoice Batches (دسته‌های فاکتور) - فاز ۱: مدیریت دوره‌ای
 export const invoiceBatches = pgTable("invoice_batches", {
   id: serial("id").primaryKey(),
@@ -93,6 +109,8 @@ export const payments = pgTable('payments', {
   representativeId: integer('representative_id').references(() => representatives.id),
   invoiceId: integer('invoice_id').references(() => invoices.id),
   amount: text('amount').notNull(),
+  // ستون shadow برای مهاجرت تدریجی به DECIMAL (Phase A E-A1)
+  amountDec: decimal('amount_dec', { precision: 15, scale: 2 }),
   paymentDate: text('payment_date').notNull(),
   description: text('description'),
   isAllocated: boolean('is_allocated').default(false),
@@ -175,6 +193,42 @@ export const financialTransactions = pgTable("financial_transactions", {
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow()
 });
+
+// ==================== LEDGER FOUNDATION TABLES (Phase A) ====================
+// زیرلجر تخصیص پرداخت‌ها (E-A2)
+export const paymentAllocations = pgTable('payment_allocations', {
+  id: serial('id').primaryKey(),
+  paymentId: integer('payment_id').notNull().references(() => payments.id, { onDelete: 'cascade' }),
+  invoiceId: integer('invoice_id').notNull().references(() => invoices.id, { onDelete: 'cascade' }),
+  allocatedAmount: decimal('allocated_amount', { precision: 15, scale: 2 }).notNull(),
+  method: text('method').notNull(), // auto | manual | backfill
+  synthetic: boolean('synthetic').notNull().default(false),
+  idempotencyKey: text('idempotency_key'),
+  performedBy: integer('performed_by'), // لینک به admin_users.id در صورت نیاز
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// کش تراز و وضعیت فاکتور (E-A3)
+export const invoiceBalanceCache = pgTable('invoice_balance_cache', {
+  invoiceId: integer('invoice_id').primaryKey().references(() => invoices.id, { onDelete: 'cascade' }),
+  allocatedTotal: decimal('allocated_total', { precision: 15, scale: 2 }).notNull().default('0'),
+  remainingAmount: decimal('remaining_amount', { precision: 15, scale: 2 }).notNull(),
+  statusCached: text('status_cached').notNull(),
+  version: integer('version').notNull().default(0),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// نتایج اجرای drift / آشتی (E-A5)
+export const reconciliationRuns = pgTable('reconciliation_runs', {
+  id: serial('id').primaryKey(),
+  scope: text('scope').notNull(), // representative:<id> یا global
+  diffAbs: decimal('diff_abs', { precision: 15, scale: 2 }).notNull(),
+  diffRatio: decimal('diff_ratio', { precision: 12, scale: 6 }).notNull(),
+  status: text('status').notNull(), // OK | WARN | FAIL
+  meta: json('meta'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 
 // Data Integrity Constraints (محدودیت‌های یکپارچگی داده) - Clock's Precision Mechanism
 export const dataIntegrityConstraints = pgTable("data_integrity_constraints", {

@@ -68,6 +68,17 @@ interface Invoice {
   panelUsername?: string;
 }
 
+interface TotalInvoiceStats {
+  totalInvoices: number;
+  unpaidCount: number;
+  paidCount: number;
+  partialCount: number;
+  overdueCount: number;
+  totalAmount: number;
+  sentToTelegramCount?: number;
+  unsentToTelegramCount?: number;
+}
+
 export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -159,7 +170,7 @@ export default function Invoices() {
   const totalCount = pagination?.totalCount || filteredInvoices.length;
 
   // SHERLOCK v12.2: Fetch total statistics for widgets (not just current page)
-  const { data: totalStats } = useQuery({
+  const { data: totalStats } = useQuery<TotalInvoiceStats | undefined>({
     queryKey: ["/api/invoices/statistics"],
     enabled: true
   });
@@ -241,15 +252,14 @@ export default function Invoices() {
 
   // SHERLOCK v12.2: Use total statistics for widgets, not just current page  
   const stats = totalStats ? {
-    total: totalStats.totalInvoices || 0,
-    unpaid: totalStats.unpaidCount || 0,
-    paid: totalStats.paidCount || 0,
-    partial: totalStats.partialCount || 0,
-    overdue: totalStats.overdueCount || 0,
-    totalAmount: totalStats.totalAmount || 0,
-    // SHERLOCK v12.2: Use total telegram stats from API
-    sentToTelegram: totalStats.sentToTelegramCount || 0,
-    unsentToTelegram: totalStats.unsentToTelegramCount || 0
+    total: totalStats?.totalInvoices ?? 0,
+    unpaid: totalStats?.unpaidCount ?? 0,
+    paid: totalStats?.paidCount ?? 0,
+    partial: totalStats?.partialCount ?? 0,
+    overdue: totalStats?.overdueCount ?? 0,
+    totalAmount: totalStats?.totalAmount ?? 0,
+    sentToTelegram: totalStats?.sentToTelegramCount ?? 0,
+    unsentToTelegram: totalStats?.unsentToTelegramCount ?? 0
   } : {
     total: filteredInvoices.length,
     unpaid: filteredInvoices.filter((inv: Invoice) => inv.status === 'unpaid').length,

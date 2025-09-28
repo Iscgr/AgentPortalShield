@@ -52,9 +52,10 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { toPersianDigits } from "@/lib/persian-date";
-import { FinancialIntegrityDashboard } from '../components/financial-integrity-dashboard';
-import { BatchRollbackManager } from '../components/batch-rollback-manager';
-import { MultiGroupConfiguration } from '../components/multi-group-configuration';
+// ماژول‌های Financial Integrity, BatchRollback, MultiGroupConfiguration حذف شدند طبق پاکسازی ایمن
+// import { FinancialIntegrityDashboard } from '../components/financial-integrity-dashboard';
+// import { BatchRollbackManager } from '../components/batch-rollback-manager';
+// import { MultiGroupConfiguration } from '../components/multi-group-configuration';
 
 // Import default template function
 const getDefaultTelegramTemplate = () => `📋 فاکتور شماره {invoice_number}
@@ -445,7 +446,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="telegram" className="flex items-center">
             <Send className="w-4 h-4 mr-2" />
             تلگرام
@@ -457,14 +458,6 @@ export default function Settings() {
           <TabsTrigger value="invoice-template" className="flex items-center">
             <FileText className="w-4 h-4 mr-2" />
             قالب فاکتور
-          </TabsTrigger>
-          <TabsTrigger value="batch-rollback" className="flex items-center">
-            <RotateCcw className="w-4 h-4 mr-2" />
-            حذف دسته‌جمعی
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center">
-            <Shield className="w-4 h-4 mr-2" />
-            امنیت
           </TabsTrigger>
           <TabsTrigger value="data-reset" className="flex items-center">
             <Database className="w-4 h-4 mr-2" />
@@ -598,8 +591,7 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            {/* Multi-Group Configuration */}
-            <MultiGroupConfiguration toast={toast} />
+            {/* پیکربندی چند گروه تلگرام حذف شد */}
 
           </div>
         </TabsContent>
@@ -742,37 +734,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>پیش‌نمایش پرتال</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
-                <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                    {portalForm.watch('portalTitle') || 'پرتال عمومی نماینده'}
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    {portalForm.watch('portalDescription') || 'مشاهده وضعیت مالی و فاکتورهای شما'}
-                  </p>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
-                      <span className="text-sm font-medium">موجودی حساب:</span>
-                      <span className="text-blue-600 dark:text-blue-400 font-bold">۱,۲۵۰,۰۰۰ تومان</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
-                      <span className="text-sm font-medium">فاکتورهای پرداخت شده:</span>
-                      <span className="text-green-600 dark:text-green-400 font-bold">۱۵ فاکتور</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded">
-                      <span className="text-sm font-medium">فاکتورهای در انتظار:</span>
-                      <span className="text-orange-600 dark:text-orange-400 font-bold">۳ فاکتور</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* پیش‌نمایش پرتال حذف شد */}
         </TabsContent>
 
         {/* Invoice Template Settings */}
@@ -989,105 +951,9 @@ export default function Settings() {
 
 
 
-        {/* Batch Rollback Settings */}
-        <TabsContent value="batch-rollback">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center text-red-600 dark:text-red-400">
-                <RotateCcw className="w-5 h-5 ml-2" />
-                حذف دسته‌جمعی فاکتورها با تاریخ صدور
-              </CardTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                حذف تمام فاکتورهای صادر شده در تاریخ مشخص و بازگشت آمار مالی نمایندگان
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <div className="flex items-center">
-                    <AlertTriangle className="w-5 h-5 ml-2 text-red-600 dark:text-red-400" />
-                    <div>
-                      <p className="font-medium text-red-800 dark:text-red-200">
-                        ⚠️ هشدار: عملیات حساس مالی
-                      </p>
-                      <p className="text-sm text-red-700 dark:text-red-300">
-                        این عملیات تأثیر مستقیم بر آمار مالی سیستم دارد و غیرقابل برگشت است
-                      </p>
-                    </div>
-                  </div>
-                </div>
+        {/* تب حذف دسته‌جمعی حذف شد */}
 
-                <BatchRollbackManager />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Security Settings */}
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="w-5 h-5 ml-2" />
-                تنظیمات امنیتی
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>اعتبارسنجی دو مرحله‌ای</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        فعال‌سازی احراز هویت دو مرحله‌ای برای امنیت بیشتر
-                      </p>
-                    </div>
-                    <Switch />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-base font-medium">بک‌آپ خودکار</Label>
-                  <select className="w-full mt-2 p-2 border border-gray-300 dark:border-gray-600 rounded-lg">
-                    <option value="daily">روزانه</option>
-                    <option value="weekly">هفتگی</option>
-                    <option value="monthly">ماهانه</option>
-                    <option value="disabled">غیرفعال</option>
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>لاگ فعالیت‌ها</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        ذخیره تمام فعالیت‌های انجام شده در سیستم
-                      </p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                  <h4 className="font-medium text-yellow-900 dark:text-yellow-200 mb-2">
-                    تنظیمات پیشرفته امنیتی
-                  </h4>
-                  <div className="space-y-2 text-sm text-yellow-800 dark:text-yellow-300">
-                    <div>• رمزگذاری داده‌های حساس با AES-256</div>
-                    <div>• محدودیت تلاش ورود ناموفق</div>
-                    <div>• نظارت بر دسترسی‌های مشکوک</div>
-                    <div>• بک‌آپ رمزگذاری شده</div>
-                  </div>
-                </div>
-
-                <Button className="w-full">
-                  <Key className="w-4 h-4 mr-2" />
-                  تغییر رمز عبور اصلی
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {/* تب امنیت حذف شد */}
 
         {/* Data Reset Settings */}
         <TabsContent value="data-reset">

@@ -5,6 +5,15 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, or, like, gte, lte, asc, count, desc } from "drizzle-orm";
 import { invoices, representatives, payments, activityLogs } from "@shared/schema";
+
+// SHERLOCK LOG CONTROL v1.0
+const SHERLOCK_ENABLED = process.env.NODE_ENV !== 'production';
+function sherlockLog(...args: any[]) {
+  if (SHERLOCK_ENABLED) {
+    // eslint-disable-next-line no-console
+    console.log(...args);
+  }
+}
 import { unifiedAuthMiddleware, enhancedUnifiedAuthMiddleware } from "./middleware/unified-auth";
 
 import multer from "multer";
@@ -48,6 +57,8 @@ import { registerHealthRoutes } from './routes/health-routes';
 import { registerUnifiedStatisticsRoutes } from "./routes/unified-statistics-routes.js";
 // Register unified financial routes
 import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-routes.js";
+import { registerShadowAllocationRoutes } from './routes/shadow-allocation-routes';
+import { isCanaryRepresentative } from './services/allocation-canary-helper';
 
 // Import database optimization routes registration
 import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
@@ -56,6 +67,8 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 
 // Import Debt Verification Routes
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
+import { featureFlagManager } from './services/feature-flag-manager';
+import multistageFlagRoutes from './routes/multistage-flag-routes';
 
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession {
@@ -204,6 +217,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // const unifiedFinancialRoutes = (await import('./routes/unified-financial-routes.js')).default;
   // app.use('/api/unified-financial', unifiedFinancialRoutes);
   registerUnifiedFinancialRoutes(app, authMiddleware);
+  // Phase A - Iteration 3: Shadow allocation observation endpoint
+  registerShadowAllocationRoutes(app, authMiddleware);
+  // Phase A - Iteration 7+: Multi-stage flag management (centralized)
+  app.use('/api/multistage-flags', multistageFlagRoutes);
+
+  // Phase A - Iteration 5: Cache metrics endpoint (invoice_balance_cache vs ledger aggregates)
+  app.get('/api/allocations/cache-metrics', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      // نمونه: شمار کل فاکتورهایی که remaining_amount != amount - Σledger
+      const mismatchQuery = await db.execute(sql`
+        SELECT i.id AS invoice_id,
+               i.amount AS invoice_amount,
+               COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0) AS ledger_alloc,
+               COALESCE(ibc.remaining_amount, i.amount) AS cached_remaining,
+               (i.amount - COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0)) AS computed_remaining
+        FROM invoices i
+        LEFT JOIN invoice_balance_cache ibc ON ibc.invoice_id = i.id
+        WHERE (
+          COALESCE(ibc.remaining_amount, i.amount) - (i.amount - COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0))
+        ) <> 0
+        ORDER BY i.id ASC
+        LIMIT 50;
+      `);
+      const mismatches = (mismatchQuery as any).rows || [];
+      const totalMismatchRes = await db.execute(sql`
+        SELECT COUNT(*) AS c FROM invoices i
+        LEFT JOIN invoice_balance_cache ibc ON ibc.invoice_id = i.id
+        WHERE (
+          COALESCE(ibc.remaining_amount, i.amount) - (i.amount - COALESCE((SELECT SUM(pa.allocated_amount) FROM payment_allocations pa WHERE pa.invoice_id = i.id),0))
+        ) <> 0;
+      `);
+      const totalMismatch = Number((totalMismatchRes as any).rows?.[0]?.c || 0);
+
+      res.json({
+        success: true,
+        totalMismatch,
+        sample: mismatches.map((m: any) => ({
+          invoiceId: Number(m.invoice_id),
+            ledgerAllocated: Number(m.ledger_alloc),
+            cachedRemaining: Number(m.cached_remaining),
+            computedRemaining: Number(m.computed_remaining)
+        }))
+      });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // Canary debt endpoint (Phase A - Iteration 6 skeleton)
+  app.get('/api/allocations/canary-debt', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const repIdRaw = req.query.representativeId;
+      if (!repIdRaw) return res.status(400).json({ success:false, error:'representativeId query required'});
+      const repId = Number(repIdRaw);
+      const canary = isCanaryRepresentative(repId, 5); // 5% rollout target
+      // Placeholder debt computation: در حال حاضر فقط ledger allocations sum برای فاکتورهای نماینده (نمونه ساده)
+      // در آینده: استفاده از cache + ledger.
+      const debtLegacy = await db.execute(sql`SELECT COALESCE(SUM(i.amount),0) AS total FROM invoices i WHERE i.representative_id = ${repId}`);
+      const allocLedger = await db.execute(sql`SELECT COALESCE(SUM(pa.allocated_amount),0) AS total FROM payment_allocations pa JOIN payments p ON p.id = pa.payment_id WHERE p.representative_id = ${repId}`);
+      const totalInv = Number((debtLegacy as any).rows?.[0]?.total || 0);
+      const allocSum = Number((allocLedger as any).rows?.[0]?.total || 0);
+      const debt = totalInv - allocSum;
+      res.json({ success:true, representativeId: repId, canary, ledgerDebt: debt });
+    } catch (e:any) {
+      res.status(500).json({ success:false, error:e.message });
+    }
+  });
+
+  // TEMP (Phase A instrumentation): manual multi-stage flag update for allocation_dual_write (dev-only shortcut)
+  app.post('/api/allocations/dev-set-dual-write', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const state = (req.query.state || req.body?.state || '').toString();
+      if (!state) return res.status(400).json({ success:false, error:'state required (off|shadow|enforce)' });
+      try {
+        featureFlagManager.updateMultiStageFlag('allocation_dual_write', state, 'dev_manual');
+      } catch (err:any) {
+        return res.status(400).json({ success:false, error: err.message });
+      }
+      res.json({ success:true, flag:'allocation_dual_write', newState: featureFlagManager.getMultiStageFlagState('allocation_dual_write') });
+    } catch (e:any) {
+      res.status(500).json({ success:false, error:e.message });
+    }
+  });
+
+  // Debt comparison endpoint (Phase A - Iteration 7) - READ-ONLY drift surface
+  // GET /api/allocations/debt-compare
+  // Optional query: representativeId=<id>
+  // Returns: legacyDebt (standard engine), ledgerDebt (allocations delta), cacheDebt (aggregated remaining), diffs & ratios
+  app.get('/api/allocations/debt-compare', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const repIdParam = req.query.representativeId ? Number(req.query.representativeId) : undefined;
+      if (repIdParam !== undefined && Number.isNaN(repIdParam)) {
+        return res.status(400).json({ success:false, error:'representativeId must be numeric'});
+      }
+
+      // Feature flag gating: only available once dual write at least shadow
+      const dualState = featureFlagManager.getMultiStageFlagState('allocation_dual_write');
+      if (dualState === 'off') {
+        return res.status(409).json({ success:false, error:'allocation_dual_write must be shadow or enforce to access debt comparison', state: dualState });
+      }
+
+      // Legacy debt (standardized) = unpaid/overdue/partial invoices - allocated payments (legacy boolean flag)
+      const legacyQuery = repIdParam ? sql`AND invoices.representative_id = ${repIdParam}` : sql``;
+      const legacyDebtRes = await db.execute(sql`SELECT
+          GREATEST(0,
+            COALESCE(SUM(CASE WHEN invoices.status IN ('unpaid','overdue','partial') THEN CAST(invoices.amount as DECIMAL) ELSE 0 END),0)
+            - COALESCE(SUM(CASE WHEN payments.is_allocated = true THEN CAST(payments.amount as DECIMAL) ELSE 0 END),0)
+          ) AS debt
+        FROM invoices
+        LEFT JOIN payments ON payments.representative_id = invoices.representative_id
+        WHERE 1=1 ${legacyQuery};`);
+      const legacyDebt = Number((legacyDebtRes as any).rows?.[0]?.debt || 0);
+
+      // Ledger debt = invoice total - ledger allocations (payment_allocations) (independent of legacy flag)
+      const ledgerTotalsRes = await db.execute(sql`SELECT
+          COALESCE(SUM(CAST(invoices.amount as DECIMAL)),0) AS inv_total,
+          COALESCE(SUM(pa.allocated_amount),0) AS alloc_total
+        FROM invoices
+        LEFT JOIN payment_allocations pa ON pa.invoice_id = invoices.id
+        ${repIdParam ? sql`WHERE invoices.representative_id = ${repIdParam}` : sql``};`);
+      const invTotal = Number((ledgerTotalsRes as any).rows?.[0]?.inv_total || 0);
+      const allocTotal = Number((ledgerTotalsRes as any).rows?.[0]?.alloc_total || 0);
+      const ledgerDebt = invTotal - allocTotal;
+
+      // Cache debt aggregation: sum remaining_amount where status_cached IN ('unpaid','partial') (ignore paid & anomalies negative)
+      const cacheScope = repIdParam ? sql`WHERE invoices.representative_id = ${repIdParam}` : sql``;
+      const cacheDebtRes = await db.execute(sql`SELECT COALESCE(SUM(c.remaining_amount),0) AS cache_debt
+        FROM invoice_balance_cache c
+        JOIN invoices ON invoices.id = c.invoice_id
+        ${cacheScope}
+        AND c.status_cached IN ('unpaid','partial');`);
+      const cacheDebt = Number((cacheDebtRes as any).rows?.[0]?.cache_debt || 0);
+
+      // Diff metrics
+      function ratio(a: number, b: number): number { return b === 0 ? (a === 0 ? 1 : Infinity) : a / b; }
+      const diffLegacyLedger = legacyDebt - ledgerDebt;
+      const diffLegacyCache = legacyDebt - cacheDebt;
+      const diffLedgerCache = ledgerDebt - cacheDebt;
+
+      const response = {
+        success: true,
+        scope: repIdParam ? { representativeId: repIdParam } : { scope: 'global' },
+        mode: dualState,
+        debts: {
+          legacyDebt,
+          ledgerDebt,
+            cacheDebt
+        },
+        diffs: {
+          diffLegacyLedger,
+          diffLegacyCache,
+          diffLedgerCache
+        },
+        ratios: {
+          legacy_over_ledger: ratio(legacyDebt, ledgerDebt),
+          legacy_over_cache: ratio(legacyDebt, cacheDebt),
+          ledger_over_cache: ratio(ledgerDebt, cacheDebt)
+        },
+        timestamp: new Date().toISOString()
+      };
+      res.json(response);
+    } catch (e:any) {
+      res.status(500).json({ success:false, error: e.message });
+    }
+  });
 
 
   // SHERLOCK v18.4: آمار یکپارچه واحد - جایگزین همه سیستم‌های آماری موازی
@@ -364,6 +542,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } else {
       res.status(401).json({ authenticated: false });
+    }
+  });
+
+  // Endpoint for frontend auth check
+  app.get("/api/auth/me", (req, res) => {
+    if ((req.session as any)?.authenticated) {
+      res.json({
+        user: {
+          id: (req.session as any).userId,
+          username: (req.session as any).username,
+          role: (req.session as any).role || 'ADMIN',
+          permissions: (req.session as any).permissions || [],
+          hasFullAccess: (req.session as any).role === 'SUPER_ADMIN' || (Array.isArray((req.session as any).permissions) && (req.session as any).permissions.includes('FULL_ACCESS'))
+        }
+      });
+    } else {
+      res.status(401).json({ error: "Not authenticated" });
     }
   });
 
@@ -1152,8 +1347,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateRepresentativeFinancials(payment.representativeId);
       }
 
-  // ...existing code...
-
       // Log the activity for audit trail
       await storage.createActivityLog({
         type: "payment_deleted",
@@ -1331,7 +1524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // ✅ SHERLOCK v33.2: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
-      console.log(`🔄 SHERLOCK v33.2: Starting comprehensive financial sync for representative ${representativeId}`);
+  sherlockLog(`🔄 SHERLOCK v33.2: Starting comprehensive financial sync for representative ${representativeId}`);
 
       // 1. Update representative financials
       await storage.updateRepresentativeFinancials(representativeId);
@@ -1344,14 +1537,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason: 'payment_created',
           immediate: true
         });
-        console.log(`✅ SHERLOCK v33.2: Financial cache invalidated for representative ${representativeId}`);
+  sherlockLog(`✅ SHERLOCK v33.2: Financial cache invalidated for representative ${representativeId}`);
       } catch (cacheError) {
         console.warn(`⚠️ SHERLOCK v33.2: Cache invalidation warning:`, cacheError);
       }
 
       // Log final status for debugging
-      console.log(`🔍 SHERLOCK v33.2: Final payment status - ID: ${finalPaymentStatus.id}, Allocated: ${finalPaymentStatus.isAllocated}, Invoice: ${finalPaymentStatus.invoiceId}`);
-      console.log(`✅ SHERLOCK v33.2: Payment processing completed with financial sync`);
+  sherlockLog(`🔍 SHERLOCK v33.2: Final payment status - ID: ${finalPaymentStatus.id}, Allocated: ${finalPaymentStatus.isAllocated}, Invoice: ${finalPaymentStatus.invoiceId}`);
+  sherlockLog(`✅ SHERLOCK v33.2: Payment processing completed with financial sync`);
 
       res.json(finalPaymentStatus);
     } catch (error) {
@@ -1810,8 +2003,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🔄 به‌روزرسانی اطلاعات مالی نماینده ${invoice.representativeId}`);
       await storage.updateRepresentativeFinancials(invoice.representativeId);
 
-  // ...existing code...
-
       // Log the activity for audit trail
       await storage.createActivityLog({
         type: "invoice_deleted",
@@ -1846,6 +2037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // فاز ۲: Get single invoice details API
+ 
   app.get("/api/invoices/:id", authMiddleware, async (req, res) => {
     try {
       const invoiceId = parseInt(req.params.id);
@@ -1961,8 +2153,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-  // ...existing code...
-
       res.json({
         success: true,
         payment,
@@ -1975,7 +2165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ...existing code...
+  // Debt synchronization API - SHERLOCK v1.0 CORE FEATURE
   app.post("/api/representatives/:id/sync-debt", authMiddleware, async (req, res) => {
     try {
       const { id } = req.params;
@@ -2452,6 +2642,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize default settings on first run
   // 🛠️ SHERLOCK v12.0: ENHANCED INVOICE EDIT ROUTE WITH DEBUG LOGGING
   app.post("/api/invoices/edit", authMiddleware, async (req, res) => {
+    function parsedFloatSafe(val: any): number {
+      if (val === null || val === undefined) return 0;
+      if (typeof val === 'number') return val;
+      const n = parseFloat(String(val).replace(/,/g, ''));
+      return isNaN(n) ? 0 : n;
+    }
     const debug = {
       info: (message: string, data?: any) => {
         const timestamp = new Date().toISOString();
@@ -2576,54 +2772,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       debug.info('Pre-Edit Session State', preEditSessionState);
 
-      // Create an invoice edit record for audit
+      // =============================
+      // 💎 ATOMIC INVOICE EDIT PIPELINE (v1)
+      // Steps:
+      // 1. Fetch current invoice
+      // 2. Compute newAmount (editedAmount OR derived from editedUsageData)
+      // 3. Persist invoice edit audit record
+      // 4. Update invoice (amount, usage_data, updatedAt, status)
+      // 5. Recalculate representative financials (single source of truth)
+      // 6. Return updated invoice & sync metadata
+      // =============================
+
+      const currentInvoice = await storage.getInvoice(invoiceId);
+      if (!currentInvoice) {
+        debug.error('Invoice Not Found For Edit', { invoiceId });
+        return res.status(404).json({ error: 'فاکتور یافت نشد' });
+      }
+
+      // Compute new amount from editedUsageData if structure present
+      let computedAmount = editedAmount;
+      try {
+        if (editedUsageData && Array.isArray((editedUsageData as any).records)) {
+          const records: any[] = (editedUsageData as any).records;
+            // Attempt to derive numeric fields (amount, usage_amount, value)
+            const sum = records.reduce((acc, r) => {
+              for (const key of ['amount','usage_amount','value','price']) {
+                if (r && r[key] !== undefined && r[key] !== null && !isNaN(parseFloat(r[key]))) {
+                  return acc + parseFloat(r[key]);
+                }
+              }
+              return acc;
+            }, 0);
+            if (sum > 0 && Math.abs(sum - parsedFloatSafe(editedAmount)) > 0.01) {
+              computedAmount = sum.toFixed(2);
+            }
+        }
+      } catch (deriveErr) {
+        debug.error('Usage Data Derive Failed (non-fatal)', deriveErr);
+      }
+
+      // Normalize numeric strings
+      const normalizedOriginal = parsedFloatSafe(originalAmount);
+      const normalizedEdited = parsedFloatSafe(computedAmount);
+
+      // Persist edit record FIRST for audit trail
       const editRecord = await storage.createInvoiceEdit({
         invoiceId,
         originalUsageData,
         editedUsageData,
         editType,
         editReason,
-        originalAmount,
-        editedAmount,
+        originalAmount: normalizedOriginal.toFixed(2),
+        editedAmount: normalizedEdited.toFixed(2),
         editedBy
       });
+      debug.success('Edit Record Created', { editRecordId: editRecord.id, normalizedOriginal, normalizedEdited });
 
-      debug.success('Edit Record Created', { editRecordId: editRecord.id });
+      // Update invoice core fields
+      const updatedInvoice = await storage.updateInvoice(invoiceId, {
+        amount: normalizedEdited.toFixed(2),
+        usageData: editedUsageData as any
+      } as any);
 
-      // Execute atomic transaction for invoice editing
+      // Recalculate status if payments exist
+      try {
+        const newStatus = await storage.calculateInvoicePaymentStatus(invoiceId);
+        if (newStatus && newStatus !== updatedInvoice.status) {
+          await storage.updateInvoice(invoiceId, { status: newStatus } as any);
+          (updatedInvoice as any).status = newStatus;
+        }
+      } catch (statusErr) {
+        debug.error('Status Recalculation Failed (non-fatal)', statusErr);
+      }
+
+      // Trigger representative financial recompute (standardized engine)
+      try {
+        await storage.updateRepresentativeFinancials(currentInvoice.representativeId);
+        debug.financial('Representative Financials Recomputed', { representativeId: currentInvoice.representativeId });
+      } catch (finErr) {
+        debug.error('Financial Recompute Failed (non-fatal)', finErr);
+      }
+
       const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      debug.info('Starting Invoice Update Transaction', { transactionId });
-
-      // Update the invoice
-      await storage.updateInvoice(invoiceId, {
-        amount: editedAmount.toString(),
-        usageData: editedUsageData
+      // Return enriched payload
+      res.json({
+        success: true,
+        message: 'فاکتور با موفقیت ویرایش و بروزرسانی شد',
+        transactionId,
+        editId: editRecord.id,
+        updated: {
+          id: updatedInvoice.id,
+            amount: updatedInvoice.amount,
+            status: (updatedInvoice as any).status,
+            representativeId: (updatedInvoice as any).representativeId,
+            usageData: (updatedInvoice as any).usageData
+        },
+        financialSync: true
       });
-
-      debug.success('Invoice Updated Successfully', { invoiceId, newAmount: editedAmount });
-
-      // ✅ SHERLOCK v24.1: Automatic financial synchronization after invoice edit
-      try {
-        const invoice = await storage.getInvoice(invoiceId);
-        if (invoice && Math.abs(editedAmount - originalAmount) > 0.01) {
-          console.log(`🔄 SHERLOCK v24.1: Auto-syncing financial data for representative ${invoice.representativeId}`);
-
-          // Import the financial engine
-          const { unifiedFinancialEngine, UnifiedFinancialEngine } = await import('./services/unified-financial-engine');
-
-          // Force invalidate cache before sync
-          UnifiedFinancialEngine.forceInvalidateRepresentative(invoice.representativeId);
-
-          // Sync representative financial data
-          await unifiedFinancialEngine.syncRepresentativeDebt(invoice.representativeId);
-
-          console.log(`✅ SHERLOCK v24.1: Auto financial sync completed for representative ${invoice.representativeId}`);
-        }
-      } catch (syncError) {
-        console.warn(`⚠️ SHERLOCK v24.1: Non-critical financial sync warning for invoice ${invoiceId}:`, syncError);
-        // Continue execution even if sync fails
-      }
+      return;
 
       // 🎆 SHERLOCK v12.0: POST-EDIT SESSION VALIDATION
       const postEditSessionState = {
