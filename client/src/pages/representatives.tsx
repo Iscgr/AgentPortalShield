@@ -53,8 +53,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { invalidateFinancialCaches } from "@/lib/invalidateFinancialCaches";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
-import { FinancialIntegrityCard } from "@/components/financial-integrity-card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,7 +72,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 import InvoiceEditDialog from "@/components/invoice-edit-dialog";
-import DebtVerificationPanel from "@/components/debt-verification-panel";
+// DebtVerificationPanel و سیستم‌های بررسی/همگام‌سازی مالی حذف شده‌اند طبق پاکسازی ایمن
+// import DebtVerificationPanel from "@/components/debt-verification-panel";
 
 // ✅ SHERLOCK v32.0: Enhanced Real-time debt display with aggressive refresh
 function RealTimeDebtCell({ representativeId, fallbackDebt }: { representativeId: number, fallbackDebt?: string }) {
@@ -242,10 +243,11 @@ export default function Representatives() {
   const itemsPerPage = 30;
 
   // State for sync operations
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<any>(null);
-  const [showVerificationPanel, setShowVerificationPanel] = useState(false);
+  // حذف state های مرتبط با اکشن‌های انطباق و همگام‌سازی مالی
+  // const [isSyncing, setIsSyncing] = useState(false);
+  // const [isVerifying, setIsVerifying] = useState(false);
+  // const [verificationResult, setVerificationResult] = useState<any>(null);
+  // const [showVerificationPanel, setShowVerificationPanel] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -266,8 +268,11 @@ export default function Representatives() {
     return sortOrder === "asc" ? "⬆️" : "⬇️";
   };
 
+  // NOTE: کلید واحد برای نمایندگان جهت یکپارچگی invalidate ها
+  const REPRESENTATIVES_QUERY_KEY = "/representatives";
+
   const { data: representatives = [], isLoading, error: repsError, refetch } = useQuery<Representative[]>({
-    queryKey: ["/representatives"],
+    queryKey: [REPRESENTATIVES_QUERY_KEY],
     queryFn: async () => {
       console.log("🔍 SHERLOCK v32.0: Fetching representatives data");
       try {
@@ -525,25 +530,46 @@ export default function Representatives() {
   // Create representative mutation
   const createRepresentativeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof representativeFormSchema>) => {
-      return apiRequest("/representatives", {
-        method: "POST",
-        data: data
-      });
+      return apiRequest("/representatives", { method: "POST", data });
+    },
+    onMutate: async (newData) => {
+      // Optimistic update: لغو کوئری در حال اجرا
+      await queryClient.cancelQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY] });
+      const previous = queryClient.getQueryData<Representative[]>([REPRESENTATIVES_QUERY_KEY]);
+      if (previous) {
+        const optimistic: Representative = {
+          id: Date.now() * -1, // id موقت منفی
+          code: newData.code,
+            name: newData.name,
+            ownerName: newData.ownerName || "",
+            panelUsername: newData.panelUsername,
+            phone: newData.phone || "",
+            telegramId: newData.telegramId || undefined,
+            publicId: newData.panelUsername + "-tmp", // موقت
+            salesPartnerId: newData.salesPartnerId || 1,
+            isActive: newData.isActive ?? true,
+            totalDebt: "0",
+            totalSales: "0",
+            credit: "0",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            financialData: { actualDebt: 0, paymentRatio: 0, debtLevel: 'NORMAL', lastSync: new Date().toISOString() }
+        } as any;
+        queryClient.setQueryData<Representative[]>([REPRESENTATIVES_QUERY_KEY], [...previous, optimistic]);
+      }
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData([REPRESENTATIVES_QUERY_KEY], context.previous);
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
-      toast({
-        title: "موفقیت",
-        description: "نماینده جدید با موفقیت ایجاد شد"
-      });
+      // بازآوری سریع داده واقعی
+      queryClient.invalidateQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY], refetchType: 'active' });
+      queryClient.refetchQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY], type: 'active' });
+      toast({ title: "موفقیت", description: "نماینده جدید با موفقیت ایجاد شد" });
       setIsCreateOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "خطا",
-        description: error?.message || "خطا در ایجاد نماینده",
-        variant: "destructive"
-      });
     }
   });
 
@@ -555,20 +581,23 @@ export default function Representatives() {
         data: data
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
-      toast({
-        title: "موفقیت",
-        description: "اطلاعات نماینده بروزرسانی شد"
-      });
-      setIsEditOpen(false);
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY] });
+      const previous = queryClient.getQueryData<Representative[]>([REPRESENTATIVES_QUERY_KEY]);
+      if (previous) {
+        const updated = previous.map(r => r.id === id ? { ...r, ...data, updatedAt: new Date().toISOString() } as any : r);
+        queryClient.setQueryData([REPRESENTATIVES_QUERY_KEY], updated);
+      }
+      return { previous };
     },
-    onError: (error: any) => {
-      toast({
-        title: "خطا",
-        description: error?.message || "خطا در بروزرسانی نماینده",
-        variant: "destructive"
-      });
+    onError: (_e, _v, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData([REPRESENTATIVES_QUERY_KEY], ctx.previous);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY] });
+      queryClient.refetchQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY], type: 'active' });
+      toast({ title: "موفقیت", description: "اطلاعات نماینده بروزرسانی شد" });
+      setIsEditOpen(false);
     }
   });
 
@@ -599,10 +628,24 @@ export default function Representatives() {
   const handleViewDetails = async (rep: Representative) => {
     try {
       const detailsResponse = await apiRequest(`/api/representatives/${rep.code}`);
+      // دریافت داده مالی به‌روز برای کارت خلاصه مالی
+      let financialSummary: any = null;
+      try {
+        const finResp = await apiRequest(`/api/unified-financial/representative/${rep.id}`);
+        financialSummary = finResp?.data || finResp;
+      } catch (e) {
+        console.warn('Financial summary fetch failed (non-blocking)', e);
+      }
       setSelectedRep({
         ...rep,
         invoices: detailsResponse.invoices || [],
-        payments: detailsResponse.payments || []
+        payments: detailsResponse.payments || [],
+        financialData: financialSummary ? {
+          actualDebt: financialSummary.actualDebt || 0,
+          paymentRatio: financialSummary.paymentRatio || 0,
+          debtLevel: financialSummary.debtLevel || 'UNKNOWN',
+          lastSync: financialSummary.calculationTimestamp || new Date().toISOString()
+        } : rep.financialData
       });
       setIsDetailsOpen(true);
     } catch (error) {
@@ -722,122 +765,7 @@ export default function Representatives() {
     }
   });
 
-  const handleSyncAllDebts = async () => {
-    setIsSyncing(true);
-    try {
-      console.log('🔄 SHERLOCK v32.0: Starting comprehensive debt synchronization...');
-
-      const response = await fetch('/api/unified-financial/sync-all-representatives', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "موفقیت",
-          description: "همگام‌سازی تمام نمایندگان با موفقیت انجام شد"
-        });
-
-        // ✅ SHERLOCK v32.0: Comprehensive cache invalidation and refresh
-        console.log('🔄 SHERLOCK v32.0: Invalidating all caches...');
-
-        // Invalidate all related queries
-        queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
-        queryClient.invalidateQueries({ queryKey: ["unified-financial"] });
-        queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] });
-        queryClient.invalidateQueries({ queryKey: ["global-financial-summary"] });
-
-        // Force refresh all individual representative calculations
-        representatives?.forEach((rep: Representative) => {
-          queryClient.invalidateQueries({ 
-            queryKey: [`unified-financial-representative-${rep.id}`] 
-          });
-          queryClient.refetchQueries({ 
-            queryKey: [`unified-financial-representative-${rep.id}`] 
-          });
-        });
-
-        // Refresh main representatives data
-        queryClient.refetchQueries({ queryKey: ["/api/representatives"] });
-
-        console.log('✅ SHERLOCK v32.0: All debt data refreshed successfully');
-      } else {
-        toast({
-          title: "خطا",
-          description: '❌ خطا در همگام‌سازی: ' + (result.error || 'خطای ناشناخته'),
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-      toast({
-        title: "خطا",
-        description: '❌ خطا در همگام‌سازی نمایندگان',
-        variant: "destructive"
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleVerifyTotalDebt = async () => {
-    setIsVerifying(true);
-    try {
-      const response = await fetch('/api/unified-financial/verify-total-debt', {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setVerificationResult(result.verification);
-        const calculations = result.verification.calculations;
-        const accuracy = result.verification.accuracy;
-
-        let message = `📊 نتایج تایید مجموع بدهی:\n\n`;
-        message += `💰 مبلغ مورد انتظار: ${result.verification.expectedAmount.toLocaleString('fa-IR')} تومان\n\n`;
-        message += `📈 محاسبات:\n`;
-        message += `• از جدول نمایندگان: ${calculations.fromRepresentativesTable.toLocaleString('fa-IR')} تومان\n`;
-        message += `• از موتور مالی: ${calculations.fromUnifiedEngine.toLocaleString('fa-IR')} تومان\n`;
-        message += `• از SQL مستقیم: ${calculations.fromDirectSQL.toLocaleString('fa-IR')} تومان\n\n`;
-        message += `✅ صحت:\n`;
-        message += `• جدول vs انتظار: ${accuracy.tableVsExpected ? '✅ صحیح' : '❌ ناصحیح'}\n`;
-        message += `• موتور vs انتظار: ${accuracy.engineVsExpected ? '✅ صحیح' : '❌ ناصحیح'}\n`;
-        message += `• SQL vs انتظار: ${accuracy.sqlVsExpected ? '✅ صحیح' : '❌ ناصحیح'}\n`;
-        message += `• همگام بودن همه روش‌ها: ${accuracy.allMethodsConsistent ? '✅ بله' : '❌ خیر'}\n\n`;
-        message += `📊 آمار:\n`;
-        message += `• کل نمایندگان: ${result.verification.statistics.totalRepresentatives}\n`;
-        message += `• نمایندگان بدهکار: ${result.verification.statistics.representativesWithDebt}\n`;
-
-        alert(message);
-      } else {
-        toast({
-          title: "خطا",
-          description: '❌ خطا در تایید: ' + (result.error || 'خطای ناشناخته'),
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Verification error:', error);
-      toast({
-        title: "خطا",
-        description: '❌ خطا در تایید مجموع بدهی',
-        variant: "destructive"
-      });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+  // اکشن‌های مالی حذف شده‌اند (همگام‌سازی و تایید مجموع بدهی). در صورت نیاز آینده می‌توان از نسخه پشتیبان بازیابی کرد.
 
   if (isLoading) {
     return (
@@ -901,46 +829,6 @@ export default function Representatives() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowVerificationPanel(!showVerificationPanel)}
-            className={showVerificationPanel ? "bg-blue-100 text-blue-800" : ""}
-          >
-            <CheckCircle className="w-4 h-4 ml-2" />
-            {showVerificationPanel ? "پنهان کردن بررسی" : "بررسی انطباق بدهی"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast({
-                title: "شروع همگام‌سازی",
-                description: "در حال همگام‌سازی آمار مالی تمام نمایندگان..."
-              });
-              apiRequest('/api/unified-financial/sync-all-representatives', {
-                method: 'POST'
-              }).then(() => {
-                // بروزرسانی همه کش‌ها
-                queryClient.invalidateQueries({ queryKey: ["/api/representatives"] });
-                queryClient.invalidateQueries({ queryKey: ["/api/unified-financial"] });
-                queryClient.invalidateQueries({ queryKey: ["debtor-representatives"] });
-                queryClient.refetchQueries({ queryKey: ["/api/representatives"] });
-
-                toast({
-                  title: "موفقیت", 
-                  description: "همگام‌سازی آمار مالی تمام نمایندگان کامل شد - جدول بروزرسانی شد"
-                });
-              }).catch((error) => {
-                toast({
-                  title: "خطا",
-                  description: "خطا در همگام‌سازی آمار مالی",
-                  variant: "destructive"
-                });
-              });
-            }}
-          >
-            <RefreshCw className="w-4 h-4 ml-2" />
-            همگام‌سازی آمار مالی
-          </Button>
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="w-4 h-4 ml-2" />
             نماینده جدید
@@ -988,7 +876,7 @@ export default function Representatives() {
       </Card>
 
       {/* Debt Verification Panel */}
-      {showVerificationPanel && <DebtVerificationPanel />}
+  {/* پنل بررسی انطباق بدهی حذف شد */}
 
       {/* Representatives Table */}
       <Card>
@@ -1144,40 +1032,7 @@ export default function Representatives() {
         </CardContent>
       </Card>
 
-      {/* Header Buttons for Sync and Verification */}
-      <div className="flex justify-end gap-4 mt-4">
-        <Button
-          onClick={handleSyncAllDebts}
-          disabled={isSyncing}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          {isSyncing ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              در حال همگام‌سازی...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              همگام‌سازی تمام بدهی‌ها
-            </>
-          )}
-        </Button>
-        <Button
-          onClick={handleVerifyTotalDebt}
-          disabled={isVerifying}
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          {isVerifying ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              در حال تایید...
-            </>
-          ) : (
-            "تایید مجموع بدهی"
-          )}
-        </Button>
-      </div>
+      {/* دکمه‌های همگام‌سازی و تایید مجموع بدهی حذف شدند */}
 
       {/* Representative Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
@@ -1269,8 +1124,72 @@ export default function Representatives() {
                     </div>
                   </CardContent>
                 </Card>
-
-                <FinancialIntegrityCard representativeId={selectedRep.id} />
+                {/* کارت خلاصه مالی بازگردانی شده */}
+                {selectedRep && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center">
+                        <DollarSign className="w-5 h-5 ml-2" />
+                        خلاصه مالی به‌روز
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="text-gray-500 text-xs">بدهی واقعی</div>
+                          <div className={`font-bold ${ (selectedRep.financialData?.actualDebt||0) > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(selectedRep.financialData?.actualDebt || 0)}</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="text-gray-500 text-xs">کل فروش</div>
+                          <div className="font-bold">{formatCurrency(parseFloat(selectedRep.totalSales||'0'))}</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="text-gray-500 text-xs">نسبت پرداخت</div>
+                          <div className="font-bold">{toPersianDigits(((selectedRep.financialData?.paymentRatio||0)*100).toFixed(1))}%</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="text-gray-500 text-xs">اعتبار (بستانکاری)</div>
+                          <div className="font-bold text-blue-600">{formatCurrency(parseFloat(selectedRep.credit||'0'))}</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="text-gray-500 text-xs">تعداد فاکتور</div>
+                          <div className="font-bold">{toPersianDigits((selectedRep.invoices?.length||0).toString())}</div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="text-gray-500 text-xs">حالت بدهی</div>
+                          <div className="font-bold">{selectedRep.financialData?.debtLevel || '---'}</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>آخرین محاسبه: {selectedRep.financialData?.lastSync ? new Date(selectedRep.financialData.lastSync).toLocaleString('fa-IR') : '---'}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              const finResp = await apiRequest(`/api/unified-financial/representative/${selectedRep.id}`);
+                              const fin = finResp?.data || finResp;
+                              setSelectedRep(prev => prev ? ({
+                                ...prev,
+                                financialData: {
+                                  actualDebt: fin.actualDebt || 0,
+                                  paymentRatio: fin.paymentRatio || 0,
+                                  debtLevel: fin.debtLevel || 'UNKNOWN',
+                                  lastSync: fin.calculationTimestamp || new Date().toISOString()
+                                }
+                              }) : prev);
+                              toast({ title: 'بروزرسانی شد', description: 'محاسبه مالی نماینده تازه‌سازی شد' });
+                            } catch (e) {
+                              toast({ title: 'خطا', description: 'محاسبه مالی شکست خورد', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          بروزرسانی
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Invoices Section */}
@@ -2085,80 +2004,68 @@ function CreatePaymentDialog({
 
   // ✅ SHERLOCK v34.0: UNIFIED FIFO Auto-Allocation System (Enhanced Engine)
   const handleAutoAllocation = async (paymentAmount: number) => {
+    // نسخه جدید: ایجاد چند پرداخت تخصیص‌یافته مستقل (Simple FIFO Multi-Payment)
     try {
-      console.log('🔧 SHERLOCK v34.0 UNIFIED FIFO: Starting enhanced auto-allocation for oldest invoices first');
-
-      // CRITICAL: Get unpaid invoices sorted by date (OLDEST FIRST - FIFO principle)
       const unpaidInvoices = (representative as any).invoices?.filter(
-        (inv: any) => inv.status === 'unpaid' || inv.status === 'partial' || inv.status === 'overdue'
+        (inv: any) => ['unpaid','partial','overdue'].includes(inv.status)
       ).sort((a: any, b: any) => {
-        // FIFO: Oldest invoices first (ascending order by issue date)
         const dateA = new Date(a.issueDate || a.createdAt).getTime();
         const dateB = new Date(b.issueDate || b.createdAt).getTime();
-        return dateA - dateB; // Ascending: oldest first
+        return dateA - dateB;
       }) || [];
 
-      console.log(`📊 FIFO Order: Processing ${unpaidInvoices.length} invoices from oldest to newest`);
-      if (unpaidInvoices.length > 0) {
-        console.log(`🔍 First invoice (oldest): ${unpaidInvoices[0].invoiceNumber} - ${unpaidInvoices[0].issueDate || unpaidInvoices[0].createdAt}`);
-        console.log(`🔍 Last invoice (newest): ${unpaidInvoices[unpaidInvoices.length-1].invoiceNumber} - ${unpaidInvoices[unpaidInvoices.length-1].issueDate || unpaidInvoices[unpaidInvoices.length-1].createdAt}`);
+      let remaining = paymentAmount;
+      if (unpaidInvoices.length === 0) {
+        // اگر فاکتور باز نیست، یک پرداخت معمولی بدون تخصیص ایجاد می‌کنیم
+        await apiRequest("/payments", { method: 'POST', data: {
+          representativeId: representative.id,
+          amount: paymentAmount.toString(),
+          paymentDate,
+          description: description || `پرداخت ثبت شد (بدون فاکتور فعال)`,
+          selectedInvoiceId: ''
+        }});
+        return;
       }
 
-      let remainingAmount = paymentAmount;
-      const allocations: Array<{invoiceId: number, amount: number, newStatus: string}> = [];
-
-      // Process invoices in FIFO order (oldest first)
       for (const invoice of unpaidInvoices) {
-        if (remainingAmount <= 0) break;
-
-        console.log(`🔄 Processing invoice ${invoice.invoiceNumber} (${invoice.issueDate || invoice.createdAt}) - Amount: ${invoice.amount}`);
-
+        if (remaining <= 0) break;
         const invoiceAmount = parseFloat(invoice.amount);
+        // مبلغ پرداخت شده قبلی روی فاکتور (برای حالت partial)
+        const alreadyPaid = await getCurrentlyPaidAmount(invoice.id);
+        const remainingInvoice = Math.max(0, invoiceAmount - alreadyPaid);
+        if (remainingInvoice <= 0) continue;
+        const allocate = Math.min(remaining, remainingInvoice);
 
-        // Get already paid amount for partial invoices
-        const alreadyPaidAmount = invoice.status === 'partial' 
-          ? await getCurrentlyPaidAmount(invoice.id)
-          : 0;
-
-        const remainingInvoiceAmount = invoiceAmount - alreadyPaidAmount;
-        const allocationAmount = Math.min(remainingAmount, remainingInvoiceAmount);
-
-        if (allocationAmount > 0) {
-          const totalAfterPayment = alreadyPaidAmount + allocationAmount;
-          const newStatus = totalAfterPayment >= invoiceAmount ? 'paid' : 'partial';
-
-          allocations.push({
-            invoiceId: invoice.id,
-            amount: allocationAmount,
-            newStatus
-          });
-
-          console.log(`✅ Allocated ${allocationAmount} to invoice ${invoice.invoiceNumber} - Status: ${newStatus}`);
-          remainingAmount -= allocationAmount;
-        }
+        // ایجاد پرداخت تخصیص‌یافته مستقیم به فاکتور (استفاده از مسیر فعلی با selectedInvoiceId)
+        await apiRequest('/payments', {
+          method: 'POST',
+          data: {
+            representativeId: representative.id,
+            amount: allocate.toString(),
+            paymentDate,
+            description: description || `پرداخت خودکار FIFO برای فاکتور ${invoice.invoiceNumber}`,
+            selectedInvoiceId: invoice.id.toString()
+          }
+        });
+        remaining -= allocate;
       }
 
-      console.log(`📊 FIFO allocation complete. ${allocations.length} invoices allocated, ${remainingAmount} remaining`);
-
-      // Create payment record with proper backend structure
-      const paymentData = {
-        representativeId: representative.id,
-        amount: paymentAmount.toString(),
-        paymentDate,
-        description: description || `تخصیص خودکار پرداخت برای ${representative.name}`,
-        selectedInvoiceId: "auto"
-      };
-
-      await apiRequest("/payments", {
-        method: "POST",
-        data: paymentData
-      });
-
-      // Update representative debt - now handled by backend
-      // await updateRepresentativeDebt(paymentAmount);
-
-    } catch (error) {
-      throw error;
+      // اگر هنوز مقداری باقی ماند (پرداخت بزرگتر از مجموع بدهی فعلی)
+      if (remaining > 0) {
+        await apiRequest('/payments', {
+          method: 'POST',
+          data: {
+            representativeId: representative.id,
+            amount: remaining.toString(),
+            paymentDate,
+            description: `مازاد پرداخت (در حال حاضر بدون فاکتور تخصیص‌یافته)`,
+            selectedInvoiceId: ''
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Auto multi-allocation failed', e);
+      throw e;
     }
   };
 
@@ -2262,8 +2169,10 @@ function CreatePaymentDialog({
           amount,
           paymentDate,
           description: description || `پرداخت برای ${representative.name}`,
+          // برای سازگاری با سرور قدیمی (selectedInvoiceId) و مدل جدید (invoiceId)
           invoiceId: selectedInvoiceId ? parseInt(selectedInvoiceId) : null,
-          isAllocated: !!selectedInvoiceId
+          selectedInvoiceId: selectedInvoiceId && selectedInvoiceId !== 'auto' ? selectedInvoiceId : undefined,
+          isAllocated: !!selectedInvoiceId && selectedInvoiceId !== 'auto'
         };
 
         await apiRequest("/payments", {
@@ -2276,9 +2185,7 @@ function CreatePaymentDialog({
       window.dispatchEvent(new CustomEvent(`payment-updated-${representative.id}`));
 
       // Force refresh all related data immediately
-      queryClient.invalidateQueries({ queryKey: ["representatives"] });
-      queryClient.invalidateQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/unified-financial/debtors"] });
+  await invalidateFinancialCaches(queryClient, { representativeId: representative.id, representativeCode: representative.code, includePayments: true, reason: 'payment_created_manual' });
 
       // Trigger immediate re-fetch
       await queryClient.refetchQueries({ queryKey: [`unified-financial-representative-${representative.id}`] });
@@ -2323,7 +2230,7 @@ function CreatePaymentDialog({
   const performComprehensiveFinancialSync = async () => {
     try {
       // 1. Invalidate all related query caches
-      queryClient.invalidateQueries({ queryKey: ["representatives"] });
+  queryClient.invalidateQueries({ queryKey: ["/representatives"] });
       queryClient.invalidateQueries({ queryKey: ["unified-statistics/representatives"] });
       queryClient.invalidateQueries({ queryKey: ["crm/representatives"] });
       queryClient.invalidateQueries({ queryKey: ["unified-statistics/representatives"] });
@@ -2331,7 +2238,8 @@ function CreatePaymentDialog({
       queryClient.invalidateQueries({ queryKey: [`representatives/${representative.code}`] });
 
       // 2. Force refresh current representative data
-      await queryClient.refetchQueries({ queryKey: [`representatives/${representative.code}`] });
+  await queryClient.refetchQueries({ queryKey: [`representatives/${representative.code}`] });
+  await queryClient.refetchQueries({ queryKey: ["/representatives"], type: 'active' });
 
       // 3. Refresh parent component data if available
       if (window.location.pathname.includes('/crm')) {

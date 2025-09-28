@@ -766,13 +766,17 @@ export class UnifiedFinancialEngine {
     console.log(`✅ All Methods Consistent: ${isConsistent ? 'YES' : 'NO'}`);
     console.log(`👥 Total Representatives: ${allReps.length}`);
     console.log(`💸 Representatives with Debt: ${detailedBreakdown.length}`);
-    console.log(`🎯 Expected Amount (Dashboard Widget): 186,099,690 تومان`);
-    console.log(`✅ Matches Expected: ${Math.round(tableSum) === 186099690 ? 'YES' : 'NO'}`);
-    console.log(`🔍 DIRECT MANUAL CALCULATION VERIFICATION:`);
-    console.log(`   Table Sum: ${Math.round(tableSum)}`);
-    console.log(`   Expected: 186099690`);
-    console.log(`   Difference: ${Math.abs(Math.round(tableSum) - 186099690)}`);
-    console.log(`   Is Accurate: ${Math.round(tableSum) === 186099690 ? '✅ YES' : '❌ NO'}`);
+    // حذف عدد هاردکد شده: قبلاً از 186099690 به عنوان مقدار مرجع ثابت استفاده می‌شد.
+    // اکنون تنها ثبات بین سه روش را گزارش می‌کنیم. اگر نیاز به مقدار مرجع داشبورد باشد
+    // می‌توان از متغیر محیطی EXPECTED_DASHBOARD_DEBT استفاده کرد (در صورت تعریف).
+    const expectedDashboardDebtEnv = process.env.EXPECTED_DASHBOARD_DEBT ? parseFloat(process.env.EXPECTED_DASHBOARD_DEBT) : undefined;
+    if (expectedDashboardDebtEnv && !Number.isNaN(expectedDashboardDebtEnv)) {
+      const diff = Math.abs(Math.round(tableSum) - Math.round(expectedDashboardDebtEnv));
+      console.log(`🎯 Expected (ENV): ${Math.round(expectedDashboardDebtEnv).toLocaleString()} تومان`);
+      console.log(`📐 Diff vs Expected: ${diff.toLocaleString()} تومان (${diff === 0 ? 'MATCH' : 'MISMATCH'})`);
+    } else {
+      console.log(`ℹ️ No EXPECTED_DASHBOARD_DEBT env provided; skipping static comparison.`);
+    }
 
     return {
       representativesTableSum: Math.round(tableSum),
@@ -787,6 +791,10 @@ export class UnifiedFinancialEngine {
    * Real-time debtor list - ULTRA OPTIMIZED v18.7
    */
   async getDebtorRepresentatives(limit: number = 50): Promise<UnifiedFinancialData[]> {
+    // Normalize limit (حفاظت در برابر اعداد اعشاری یا نامعتبر)
+    if (!Number.isInteger(limit) || limit <= 0) {
+      limit = 50;
+    }
     console.log(`🚀 SHERLOCK v23.0: Ultra-optimized debtor calculation for ${limit} records`);
     const startTime = Date.now();
 
@@ -804,17 +812,21 @@ export class UnifiedFinancialEngine {
       const BATCH_SIZE = Math.min(20, limit);
 
       // OPTIMIZATION 2: Pre-filter with minimal debt threshold
+      // Dynamic threshold via ENV (fallback به 1000)
+      const minDebtRaw = process.env.MIN_DEBT_THRESHOLD ? parseFloat(process.env.MIN_DEBT_THRESHOLD) : 1000;
+      const minDebt = Number.isFinite(minDebtRaw) && minDebtRaw >= 0 ? minDebtRaw : 1000;
+
       const highDebtReps = await db.select({
         id: representatives.id,
         name: representatives.name,
         code: representatives.code,
         totalDebt: representatives.totalDebt
       }).from(representatives)
-      .where(sql`CAST(total_debt as DECIMAL) > 1000`) // Only actual debts
+      .where(sql`CAST(total_debt as DECIMAL) > ${minDebt}`) // Only actual debts (dynamic)
       .orderBy(desc(sql`CAST(total_debt as DECIMAL)`))
       .limit(limit * 1.5); // Reduced buffer size
 
-      console.log(`⚡ Pre-filtered to ${highDebtReps.length} candidates in ${Date.now() - startTime}ms`);
+      console.log(`⚡ Pre-filtered to ${highDebtReps.length} candidates (threshold>${minDebt}) in ${Date.now() - startTime}ms`);
 
       if (highDebtReps.length === 0) {
         // Cache empty result as well

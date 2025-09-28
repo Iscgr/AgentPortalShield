@@ -362,6 +362,7 @@ router.post('/sync-representative/:id', requireAuth, async (req, res) => {
 /**
  * ✅ SHERLOCK v23.0: همگام‌سازی تمام نمایندگان
  * POST /api/unified-financial/sync-all-representatives
+ * @deprecated UI مربوط حذف شده؛ تنها برای اسکریپت‌های احتمالی باقی مانده. ترجیح: عدم فراخوانی جدید.
  */
 router.post('/sync-all-representatives', requireAuth, async (req, res) => {
   try {
@@ -463,33 +464,41 @@ async function calculateAllRepresentativesIndividual(): Promise<any[]> {
 /**
  * ✅ SHERLOCK v23.0: محاسبه دستی مجموع بدهی و تایید صحت
  * GET /api/unified-financial/verify-total-debt
+ * @deprecated UI این قابلیت حذف شده. برای مصارف مانیتورینگ قدیمی نگه داشته شده.
  */
 router.get('/verify-total-debt', requireAuth, async (req, res) => {
   try {
     const verificationResult = await unifiedFinancialEngine.verifyTotalDebtSum();
 
+    const expectedEnv = process.env.EXPECTED_DASHBOARD_DEBT ? parseFloat(process.env.EXPECTED_DASHBOARD_DEBT) : undefined;
+    const expectedProvided = expectedEnv && !Number.isNaN(expectedEnv);
+    const tableMatch = expectedProvided ? verificationResult.representativesTableSum === Math.round(expectedEnv!) : null;
+    const engineMatch = expectedProvided ? verificationResult.unifiedEngineSum === Math.round(expectedEnv!) : null;
+    const sqlMatch = expectedProvided ? verificationResult.directSqlSum === Math.round(expectedEnv!) : null;
+
     res.json({
       success: true,
       verification: {
-        expectedAmount: 186099690, // ✅ SHERLOCK v32.0: Updated to real-time calculated amount
+        expectedAmount: expectedProvided ? Math.round(expectedEnv!) : null,
         calculations: {
           fromRepresentativesTable: verificationResult.representativesTableSum,
           fromUnifiedEngine: verificationResult.unifiedEngineSum,
           fromDirectSQL: verificationResult.directSqlSum
         },
         accuracy: {
-          tableVsExpected: verificationResult.representativesTableSum === 183146990,
-          engineVsExpected: verificationResult.unifiedEngineSum === 183146990,
-          sqlVsExpected: verificationResult.directSqlSum === 183146990,
+          tableVsExpected: tableMatch,
+          engineVsExpected: engineMatch,
+          sqlVsExpected: sqlMatch,
           allMethodsConsistent: verificationResult.isConsistent
         },
         statistics: {
-          totalRepresentatives: 245, // Based on your system
+          totalRepresentatives: null, // حذف عدد ثابت؛ در صورت نیاز بعداً محاسبه پویا افزوده می‌شود
           representativesWithDebt: verificationResult.detailedBreakdown.length,
-          representativesWithoutDebt: 245 - verificationResult.detailedBreakdown.length
+          representativesWithoutDebt: null
         },
         topDebtors: verificationResult.detailedBreakdown,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        notes: expectedProvided ? 'مقایسه با مقدار ENV انجام شد' : 'ENV برای مقدار انتظار تعریف نشده است؛ مقایسه ثابت حذف گردید'
       }
     });
 
@@ -554,17 +563,22 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
 
     const directDbCalculation = Math.max(0, totalInvoices.total - totalAllocatedPayments.total);
 
-    // Expected amount from dashboard
-    const expectedAmount = 183146990;
+      const expectedEnv = process.env.EXPECTED_DASHBOARD_DEBT ? parseFloat(process.env.EXPECTED_DASHBOARD_DEBT) : undefined;
+      const expectedProvided = expectedEnv && !Number.isNaN(expectedEnv);
+      const roundedExpected = expectedProvided ? Math.round(expectedEnv!) : null;
 
-    console.log(`📊 IMMEDIATE DEBT CALCULATION RESULTS:`);
-    console.log(`💰 Manual Table Sum: ${Math.round(manualTableSum).toLocaleString()} تومان`);
-    console.log(`🎯 Unified Engine: ${Math.round(globalSummary.totalSystemDebt).toLocaleString()} تومان`);
-    console.log(`📝 Direct DB Calc: ${Math.round(directDbCalculation).toLocaleString()} تومان`);
-    console.log(`🎯 Expected (Dashboard): ${expectedAmount.toLocaleString()} تومان`);
-    console.log(`✅ Table matches Expected: ${Math.round(manualTableSum) === expectedAmount ? 'YES' : 'NO'}`);
-    console.log(`👥 Total Active Reps: ${allActiveReps.length}`);
-    console.log(`💸 Reps with Debt: ${debtorsCount}`);
+      console.log(`📊 IMMEDIATE DEBT CALCULATION RESULTS:`);
+      console.log(`💰 Manual Table Sum: ${Math.round(manualTableSum).toLocaleString()} تومان`);
+      console.log(`🎯 Unified Engine: ${Math.round(globalSummary.totalSystemDebt).toLocaleString()} تومان`);
+      console.log(`📝 Direct DB Calc: ${Math.round(directDbCalculation).toLocaleString()} تومان`);
+      if (expectedProvided) {
+        console.log(`🎯 Expected (ENV): ${roundedExpected!.toLocaleString()} تومان`);
+        console.log(`✅ Table matches Expected: ${Math.round(manualTableSum) === roundedExpected ? 'YES' : 'NO'}`);
+      } else {
+        console.log(`ℹ️ EXPECTED_DASHBOARD_DEBT تعریف نشده؛ مقایسه ثابت انجام نمی‌شود.`);
+      }
+      console.log(`👥 Total Active Reps: ${allActiveReps.length}`);
+      console.log(`💸 Reps with Debt: ${debtorsCount}`);
 
     res.json({
       success: true,
@@ -572,9 +586,9 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
         manualTableSum: Math.round(manualTableSum),
         unifiedEngineSum: Math.round(globalSummary.totalSystemDebt),
         directDbCalculation: Math.round(directDbCalculation),
-        expectedDashboardAmount: expectedAmount,
-        isAccurate: Math.round(manualTableSum) === expectedAmount,
-        difference: Math.abs(Math.round(manualTableSum) - expectedAmount)
+          expectedDashboardAmount: roundedExpected,
+  isAccurate: expectedProvided ? Math.round(manualTableSum) === roundedExpected : null,
+          difference: expectedProvided ? Math.abs(Math.round(manualTableSum) - roundedExpected!) : null
       },
       statistics: {
         totalActiveRepresentatives: allActiveReps.length,
@@ -584,9 +598,9 @@ router.get('/calculate-immediate-debt-sum', requireAuth, async (req, res) => {
       topDebtors: topDebtors.slice(0, 10),
       verification: {
         allMethodsConsistent: Math.abs(Math.round(manualTableSum) - Math.round(globalSummary.totalSystemDebt)) < 1000,
-        tableVsExpected: Math.round(manualTableSum) === expectedAmount,
-        engineVsExpected: Math.round(globalSummary.totalSystemDebt) === expectedAmount,
-        dbVsExpected: Math.round(directDbCalculation) === expectedAmount
+          tableVsExpected: expectedProvided ? Math.round(manualTableSum) === roundedExpected : null,
+          engineVsExpected: expectedProvided ? Math.round(globalSummary.totalSystemDebt) === roundedExpected : null,
+          dbVsExpected: expectedProvided ? Math.round(directDbCalculation) === roundedExpected : null
       },
       calculatedAt: new Date().toISOString()
     });

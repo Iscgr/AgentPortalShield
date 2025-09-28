@@ -18,7 +18,6 @@ const mobileNavItems: MobileNavItem[] = [
   { icon: Home, label: "داشبورد", path: "/" },
   { icon: Users, label: "نمایندگان", path: "/representatives" },
   { icon: FileText, label: "فاکتورها", path: "/invoices" },
-  { icon: BarChart3, label: "گزارشات", path: "/financial-integrity" },
   { icon: Settings, label: "تنظیمات", path: "/settings" }
 ]
 

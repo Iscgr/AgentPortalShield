@@ -5,6 +5,15 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and, or, like, gte, lte, asc, count, desc } from "drizzle-orm";
 import { invoices, representatives, payments, activityLogs } from "@shared/schema";
+
+// SHERLOCK LOG CONTROL v1.0
+const SHERLOCK_ENABLED = process.env.NODE_ENV !== 'production';
+function sherlockLog(...args: any[]) {
+  if (SHERLOCK_ENABLED) {
+    // eslint-disable-next-line no-console
+    console.log(...args);
+  }
+}
 import { unifiedAuthMiddleware, enhancedUnifiedAuthMiddleware } from "./middleware/unified-auth";
 
 import multer from "multer";
@@ -1346,7 +1355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // ✅ SHERLOCK v33.2: COMPREHENSIVE FINANCIAL SYNCHRONIZATION
-      console.log(`🔄 SHERLOCK v33.2: Starting comprehensive financial sync for representative ${representativeId}`);
+  sherlockLog(`🔄 SHERLOCK v33.2: Starting comprehensive financial sync for representative ${representativeId}`);
 
       // 1. Update representative financials
       await storage.updateRepresentativeFinancials(representativeId);
@@ -1359,14 +1368,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason: 'payment_created',
           immediate: true
         });
-        console.log(`✅ SHERLOCK v33.2: Financial cache invalidated for representative ${representativeId}`);
+  sherlockLog(`✅ SHERLOCK v33.2: Financial cache invalidated for representative ${representativeId}`);
       } catch (cacheError) {
         console.warn(`⚠️ SHERLOCK v33.2: Cache invalidation warning:`, cacheError);
       }
 
       // Log final status for debugging
-      console.log(`🔍 SHERLOCK v33.2: Final payment status - ID: ${finalPaymentStatus.id}, Allocated: ${finalPaymentStatus.isAllocated}, Invoice: ${finalPaymentStatus.invoiceId}`);
-      console.log(`✅ SHERLOCK v33.2: Payment processing completed with financial sync`);
+  sherlockLog(`🔍 SHERLOCK v33.2: Final payment status - ID: ${finalPaymentStatus.id}, Allocated: ${finalPaymentStatus.isAllocated}, Invoice: ${finalPaymentStatus.invoiceId}`);
+  sherlockLog(`✅ SHERLOCK v33.2: Payment processing completed with financial sync`);
 
       res.json(finalPaymentStatus);
     } catch (error) {
@@ -2464,6 +2473,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize default settings on first run
   // 🛠️ SHERLOCK v12.0: ENHANCED INVOICE EDIT ROUTE WITH DEBUG LOGGING
   app.post("/api/invoices/edit", authMiddleware, async (req, res) => {
+    function parsedFloatSafe(val: any): number {
+      if (val === null || val === undefined) return 0;
+      if (typeof val === 'number') return val;
+      const n = parseFloat(String(val).replace(/,/g, ''));
+      return isNaN(n) ? 0 : n;
+    }
     const debug = {
       info: (message: string, data?: any) => {
         const timestamp = new Date().toISOString();
@@ -2588,44 +2603,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       debug.info('Pre-Edit Session State', preEditSessionState);
 
-      // Create an invoice edit record for audit
+      // =============================
+      // 💎 ATOMIC INVOICE EDIT PIPELINE (v1)
+      // Steps:
+      // 1. Fetch current invoice
+      // 2. Compute newAmount (editedAmount OR derived from editedUsageData)
+      // 3. Persist invoice edit audit record
+      // 4. Update invoice (amount, usage_data, updatedAt, status)
+      // 5. Recalculate representative financials (single source of truth)
+      // 6. Return updated invoice & sync metadata
+      // =============================
+
+      const currentInvoice = await storage.getInvoice(invoiceId);
+      if (!currentInvoice) {
+        debug.error('Invoice Not Found For Edit', { invoiceId });
+        return res.status(404).json({ error: 'فاکتور یافت نشد' });
+      }
+
+      // Compute new amount from editedUsageData if structure present
+      let computedAmount = editedAmount;
+      try {
+        if (editedUsageData && Array.isArray((editedUsageData as any).records)) {
+          const records: any[] = (editedUsageData as any).records;
+            // Attempt to derive numeric fields (amount, usage_amount, value)
+            const sum = records.reduce((acc, r) => {
+              for (const key of ['amount','usage_amount','value','price']) {
+                if (r && r[key] !== undefined && r[key] !== null && !isNaN(parseFloat(r[key]))) {
+                  return acc + parseFloat(r[key]);
+                }
+              }
+              return acc;
+            }, 0);
+            if (sum > 0 && Math.abs(sum - parsedFloatSafe(editedAmount)) > 0.01) {
+              computedAmount = sum.toFixed(2);
+            }
+        }
+      } catch (deriveErr) {
+        debug.error('Usage Data Derive Failed (non-fatal)', deriveErr);
+      }
+
+      // Normalize numeric strings
+      const normalizedOriginal = parsedFloatSafe(originalAmount);
+      const normalizedEdited = parsedFloatSafe(computedAmount);
+
+      // Persist edit record FIRST for audit trail
       const editRecord = await storage.createInvoiceEdit({
         invoiceId,
         originalUsageData,
         editedUsageData,
         editType,
         editReason,
-        originalAmount,
-        editedAmount,
+        originalAmount: normalizedOriginal.toFixed(2),
+        editedAmount: normalizedEdited.toFixed(2),
         editedBy
       });
+      debug.success('Edit Record Created', { editRecordId: editRecord.id, normalizedOriginal, normalizedEdited });
 
-      debug.success('Edit Record Created', { editRecordId: editRecord.id });
+      // Update invoice core fields
+      const updatedInvoice = await storage.updateInvoice(invoiceId, {
+        amount: normalizedEdited.toFixed(2),
+        usageData: editedUsageData as any
+      } as any);
 
-      // Execute atomic transaction for invoice editing
-      const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      debug.info('Starting Invoice Update Transaction', { transactionId });
-      // ✅ SHERLOCK v24.1: Automatic financial synchronization after invoice edit
+      // Recalculate status if payments exist
       try {
-        const invoice = await storage.getInvoice(invoiceId);
-        if (invoice && Math.abs(editedAmount - originalAmount) > 0.01) {
-          console.log(`🔄 SHERLOCK v24.1: Auto-syncing financial data for representative ${invoice.representativeId}`);
-
-          // Import the financial engine
-          const { unifiedFinancialEngine, UnifiedFinancialEngine } = await import('./services/unified-financial-engine');
-
-          // Force invalidate cache before sync
-          UnifiedFinancialEngine.forceInvalidateRepresentative(invoice.representativeId);
-
-          // Sync representative financial data
-          await unifiedFinancialEngine.syncRepresentativeDebt(invoice.representativeId);
-
-          console.log(`✅ SHERLOCK v24.1: Auto financial sync completed for representative ${invoice.representativeId}`);
+        const newStatus = await storage.calculateInvoicePaymentStatus(invoiceId);
+        if (newStatus && newStatus !== updatedInvoice.status) {
+          await storage.updateInvoice(invoiceId, { status: newStatus } as any);
+          (updatedInvoice as any).status = newStatus;
         }
-      } catch (syncError) {
-        console.warn(`⚠️ SHERLOCK v24.1: Non-critical financial sync warning for invoice ${invoiceId}:`, syncError);
-        // Continue execution even if sync fails
+      } catch (statusErr) {
+        debug.error('Status Recalculation Failed (non-fatal)', statusErr);
       }
+
+      // Trigger representative financial recompute (standardized engine)
+      try {
+        await storage.updateRepresentativeFinancials(currentInvoice.representativeId);
+        debug.financial('Representative Financials Recomputed', { representativeId: currentInvoice.representativeId });
+      } catch (finErr) {
+        debug.error('Financial Recompute Failed (non-fatal)', finErr);
+      }
+
+      const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Return enriched payload
+      res.json({
+        success: true,
+        message: 'فاکتور با موفقیت ویرایش و بروزرسانی شد',
+        transactionId,
+        editId: editRecord.id,
+        updated: {
+          id: updatedInvoice.id,
+            amount: updatedInvoice.amount,
+            status: (updatedInvoice as any).status,
+            representativeId: (updatedInvoice as any).representativeId,
+            usageData: (updatedInvoice as any).usageData
+        },
+        financialSync: true
+      });
+      return;
 
       // 🎆 SHERLOCK v12.0: POST-EDIT SESSION VALIDATION
       const postEditSessionState = {

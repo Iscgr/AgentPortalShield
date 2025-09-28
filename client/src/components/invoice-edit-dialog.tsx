@@ -1100,26 +1100,46 @@ ${data.transactionId ? `🔗 شناسه تراکنش: ${data.transactionId}` : '
                   محاسبه لحظه‌ای: {new Date().toLocaleTimeString('fa-IR')}
                 </div>
               </div>
-                  <Button
-                    onClick={saveChanges}
-                    disabled={isProcessing || !sessionHealthy}
-                    className="min-w-[120px]"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        در حال ذخیره...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        ذخیره تغییرات
-                        {calculatedAmount !== originalAmount && (
-                          <span className="mr-1 text-xs">({calculatedAmount > originalAmount ? '+' : ''}{(calculatedAmount - originalAmount).toLocaleString()})</span>
+                  {(() => {
+                    const activeRecords = editableRecords.filter(r => !r.isDeleted);
+                    const invalidRecords = activeRecords.filter(r => !r.description.trim() || r.amount <= 0);
+                    const disabledReason = !sessionHealthy
+                      ? 'جلسه نامعتبر است'
+                      : !editReason.trim()
+                        ? 'دلیل ویرایش وارد نشده'
+                        : activeRecords.length === 0
+                          ? 'هیچ رکورد فعالی وجود ندارد'
+                          : invalidRecords.length > 0
+                            ? 'برخی رکوردها ناقص یا مبلغ نامعتبر دارند'
+                            : undefined;
+                    return (
+                      <div className="flex flex-col items-end">
+                        <Button
+                          onClick={disabledReason ? undefined : saveChanges}
+                          disabled={!!disabledReason || isProcessing}
+                          className="min-w-[140px] relative group"
+                        >
+                          {isProcessing ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              در حال ذخیره...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              ذخیره تغییرات
+                              {calculatedAmount !== originalAmount && (
+                                <span className="mr-1 text-xs">({calculatedAmount > originalAmount ? '+' : ''}{(calculatedAmount - originalAmount).toLocaleString()})</span>
+                              )}
+                            </>
+                          )}
+                        </Button>
+                        {disabledReason && (
+                          <span className="text-xs text-red-600 mt-1" data-testid="save-disabled-reason">{disabledReason}</span>
                         )}
-                      </>
-                    )}
-                  </Button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

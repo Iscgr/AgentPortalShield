@@ -11,9 +11,6 @@ import { useMobileOptimizations } from "@/hooks/use-mobile-optimizations";
 // Layout components
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-// Import MobileNavigation and advanced mobile components
-// import MobileNavigation from "@/components/layout/mobile-navigation";
-
 
 // Pages
 import Dashboard from "@/pages/dashboard";
@@ -26,23 +23,15 @@ import Portal from "@/pages/portal";
 import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import UnifiedAuth from "@/pages/unified-auth";
-import FinancialIntegrityPage from "@/pages/financial-integrity";
 import AllocationManagement from "@/pages/allocation-management";
-
-
-
-
-
 
 function AuthenticatedRouter() {
   const { isAuthenticated: adminAuthenticated, isLoading: adminIsLoading, user: adminUser } = useUnifiedAuth(); // Use unified auth hook
   const [location] = useLocation();
 
-  // ✅ SHERLOCK v32.1: بهبود تشخیص پرتال عمومی با regex دقیق
   const isPublicPortal = /^\/portal\/[^\/]+\/?$|^\/representative\/[^\/]+\/?$/.test(location);
 
   if (isPublicPortal) {
-    // 🔒 SECURITY: Completely isolated public portal - no admin access
     return (
       <div className="dark public-portal-isolated">
         <Switch>
@@ -79,7 +68,6 @@ function AuthenticatedRouter() {
     );
   }
 
-  // Show loading state while checking authentication
   if (adminIsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -91,16 +79,13 @@ function AuthenticatedRouter() {
     );
   }
 
-  // SHERLOCK v3.0 FIX: Show unified auth for non-authenticated users  
   if (!adminAuthenticated) {
-    // Check if the current location is the admin login page
     if (location === "/admin-login") {
       return <AdminLogin onLoginSuccess={() => {}} />;
     }
     return <UnifiedAuth />;
   }
 
-  // Show admin panel if authenticated
   return (
     <AdminLayout>
       <Switch>
@@ -110,11 +95,9 @@ function AuthenticatedRouter() {
         <Route path="/invoices" component={Invoices} />
         <Route path="/invoice-management" component={InvoiceManagement} />
         <Route path="/sales-partners" component={SalesPartners} />
-        <Route path="/financial-integrity" component={FinancialIntegrityPage} />
         <Route path="/settings" component={Settings} />
         <Route path="/admin-login">
           <AdminLogin onLoginSuccess={() => {
-            // Handle successful login - could redirect or update auth state
             console.log('Admin login successful');
           }} />
         </Route>

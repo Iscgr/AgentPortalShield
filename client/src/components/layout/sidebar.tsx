@@ -10,11 +10,11 @@ import {
   LogOut,
   Menu,
   X,
-  Edit,
-  ShieldCheck
+  Edit
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 
 const navigation = [
   { name: "داشبورد", href: "/dashboard", icon: BarChart3 },
@@ -22,7 +22,6 @@ const navigation = [
   { name: "فاکتورها", href: "/invoices", icon: FileText },
   { name: "مدیریت فاکتورها", href: "/invoice-management", icon: Edit },
   { name: "همکاران فروش", href: "/sales-partners", icon: Handshake },
-  { name: "یکپارچگی مالی", href: "/financial-integrity", icon: ShieldCheck },
   { name: "تنظیمات", href: "/settings", icon: Settings },
 ];
 
@@ -33,6 +32,16 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
   const [location] = useLocation();
+  const { logout } = useUnifiedAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      window.location.href = "/login";
+    } catch (e) {
+      console.error("Logout error", e);
+    }
+  };
 
   return (
     <>
@@ -112,7 +121,11 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
                 <p className="text-sm font-medium text-white">حسابدار اصلی</p>
                 <p className="text-xs text-blue-200">admin@marfanet.com</p>
               </div>
-              <button className="text-blue-200 hover:text-white transition-colors duration-200">
+              <button 
+                className="text-blue-200 hover:text-white transition-colors duration-200"
+                onClick={handleLogout}
+                aria-label="خروج"
+              >
                 <LogOut className="w-5 h-5" />
               </button>
             </div>
