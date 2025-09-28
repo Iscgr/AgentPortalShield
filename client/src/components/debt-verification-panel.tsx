@@ -56,7 +56,7 @@ interface VerificationSummary {
 export default function DebtVerificationPanel() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
-  const { toast } = useToast();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch verification data

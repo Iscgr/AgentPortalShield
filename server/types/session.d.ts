@@ -9,14 +9,6 @@ declare module 'express-session' {
       role: string;
       permissions: string[];
     };
-    crmAuthenticated?: boolean;
-    crmUser?: {
-      id: number;
-      username: string;
-      fullName: string;
-      role: string;
-      permissions: string[];
-      panelType: string;
-    };
+    // ...existing code...
   }
 }

@@ -66,6 +66,7 @@ interface SalesPartnerStats {
   activePartners: string;
   totalCommission: string;
   averageCommissionRate: string;
+  totalCoupledSales?: string;
 }
 
 interface Representative {

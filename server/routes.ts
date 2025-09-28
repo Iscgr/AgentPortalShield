@@ -1,3 +1,4 @@
+import { RepresentativeData, FinancialData, BatchData, ValidatedInvoiceData, ValidatedInvoiceBatchData } from './routes-interfaces';
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -5,7 +6,6 @@ import { db } from "./db";
 import { sql, eq, and, or, like, gte, lte, asc, count, desc } from "drizzle-orm";
 import { invoices, representatives, payments, activityLogs } from "@shared/schema";
 import { unifiedAuthMiddleware, enhancedUnifiedAuthMiddleware } from "./middleware/unified-auth";
-// CRM routes are imported in registerCrmRoutes function
 
 import multer from "multer";
 
@@ -33,17 +33,12 @@ import {
   getDefaultTelegramTemplate,
   formatInvoiceStatus
 } from "./services/telegram";
-
-import { xaiGrokEngine } from "./services/xai-grok-engine";
-import { registerSettingsRoutes } from "./routes/settings-routes";
 import bcrypt from "bcryptjs";
 // Commented out temporarily - import { generateFinancialReport } from "./services/report-generator";
 
 // New import for unified financial engine
 import { unifiedFinancialEngine } from './services/unified-financial-engine.js';
 
-// Import maintenance routes registration
-import { registerMaintenanceRoutes } from "./routes/maintenance-routes";
 // Import integration health routes for Phase 9
 import { registerIntegrationHealthRoutes } from "./routes/integration-health-routes";
 import featureFlagRoutes from './routes/feature-flag-routes.js';
@@ -56,11 +51,6 @@ import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-route
 
 // Import database optimization routes registration
 import databaseOptimizationRoutes from './routes/database-optimization-routes.js';
-
-// Import AI Engine routes
-import aiEngineRoutes from './routes/ai-engine-routes.js';
-// Import Workspace Routes
-import workspaceRoutes from './routes/workspace-routes.js';
 // Import Batch Rollback Routes
 import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 
@@ -77,10 +67,7 @@ interface AuthSession {
   role?: string;
   permissions?: string[];
   user?: any;
-  crmAuthenticated?: boolean; // Added for CRM authentication status
-  crmUserId?: number;
-  crmUsername?: string;
-  crmUser?: any;
+  // ...existing code...
 }
 
 // Remove AuthRequest interface - use Request directly with type assertions
@@ -203,19 +190,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-
-  // Register Settings routes (core system settings)
-  registerSettingsRoutes(app);
-
   // 💗 Register Health Check routes for Ubuntu Server monitoring
   registerHealthRoutes(app);
 
   // SHERLOCK v18.4: Register STANDARDIZED Invoice Routes - eliminates 11,117,500 تومان discrepancy
   registerStandardizedInvoiceRoutes(app, authMiddleware, storage);
-
-  // Register maintenance and monitoring routes
-  registerMaintenanceRoutes(app);
-
   // Register integration health routes for Phase 9
   registerIntegrationHealthRoutes(app);
   app.use('/api/feature-flags', featureFlagRoutes);
@@ -268,39 +247,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sessionInfo,
       serverTime: new Date().toISOString()
     });
-  });
-
-  // xAI Grok Configuration API
-  app.post("/api/settings/xai-grok/configure", authMiddleware, async (req, res) => {
-    try {
-      const { apiKey } = req.body;
-
-      if (!apiKey) {
-        return res.status(400).json({ error: "کلید API الزامی است" });
-      }
-
-      // Update XAI Grok engine configuration
-      xaiGrokEngine.updateConfiguration(apiKey);
-
-      // Save to settings
-      await storage.updateSetting('XAI_API_KEY', apiKey);
-
-      res.json({
-        success: true,
-        message: "تنظیمات xAI Grok ذخیره شد"
-      });
-    } catch (error) {
-      res.status(500).json({ error: "خطا در ذخیره تنظیمات" });
-    }
-  });
-
-  app.post("/api/settings/xai-grok/test", authMiddleware, async (req, res) => {
-    try {
-      const result = await xaiGrokEngine.testConnection();
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: "خطا در تست اتصال" });
-    }
   });
 
   // SHERLOCK v15.0 FIX: Add backward compatibility for both login endpoints
@@ -587,12 +533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalDebt: representatives.reduce((sum, rep) => sum + parseFloat(rep.totalDebt || "0"), 0),
           totalSales: representatives.reduce((sum, rep) => sum + parseFloat(rep.totalSales || "0"), 0)
         },
-        crmPanelData: {
-          representativesAccess: representatives.filter(rep => rep.isActive).length,
-          visibleDebt: representatives.reduce((sum, rep) => sum + parseFloat(rep.totalDebt || "0"), 0),
-          profilesGenerated: representatives.length,
-          aiInsightsAvailable: true
-        },
+        // ...existing code...
         syncHealth: "EXCELLENT",
         conflictCount: 0,
         autoResolvedConflicts: 0
@@ -1211,9 +1152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateRepresentativeFinancials(payment.representativeId);
       }
 
-      // CRITICAL: Invalidate CRM cache to ensure real-time sync
-      // invalidateCrmCache(); // This function needs to be defined or imported if used
-      console.log('🗑️ CRM cache invalidated for immediate synchronization'); // Placeholder log
+  // ...existing code...
 
       // Log the activity for audit trail
       await storage.createActivityLog({
@@ -1328,9 +1267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`💰 SHERLOCK v34.0: Executing UNIFIED manual allocation - Payment ${newPayment.id} to Invoice ${selectedInvoiceId}`);
 
         try {
-          // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص دستی
-          const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-          const allocationResult = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
+          // ✅ استفاده از storage method برای تخصیص دستی
+          const allocationResult = await storage.manualAllocatePaymentToInvoice(
             newPayment.id,
             parseInt(selectedInvoiceId),
             parseFloat(amount),
@@ -1338,14 +1276,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           if (!allocationResult.success) {
-            throw new Error(`Manual allocation failed: ${allocationResult.errors.join(', ')}`);
+            throw new Error(`Manual allocation failed: ${allocationResult.message}`);
           }
 
-          // بروزرسانی وضعیت پرداخت
-          finalPaymentStatus = await storage.updatePayment(newPayment.id, {
-            isAllocated: true,
-            invoiceId: parseInt(selectedInvoiceId)
-          });
+          // استفاده از وضعیت پرداخت ایجاد شده (allocation method وضعیت را بروزرسانی می‌کند)
+          finalPaymentStatus = { ...newPayment, isAllocated: true, invoiceId: parseInt(selectedInvoiceId) };
 
           console.log(`✅ SHERLOCK v34.0: UNIFIED manual allocation successful - ${allocationResult.allocatedAmount} allocated`);
 
@@ -1357,25 +1292,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔄 SHERLOCK v34.0: Executing UNIFIED auto-allocation for Representative ${representativeId}`);
 
           try {
-            // ✅ استفاده از Enhanced Payment Allocation Engine برای تخصیص خودکار
-            const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
-            const allocationResult = await EnhancedPaymentAllocationEngine.autoAllocatePayment(newPayment.id, {
-              method: 'FIFO',
-              allowPartialAllocation: true,
-              allowOverAllocation: false,
-              priorityInvoiceStatuses: ['unpaid', 'overdue', 'partial']
-            });
+            // ✅ استفاده از storage method برای تخصیص خودکار
+            const allocationResult = await storage.autoAllocatePaymentToInvoices(newPayment.id, representativeId);
 
-            if (allocationResult.success && allocationResult.allocatedAmount > 0) {
+            if (allocationResult.success && parseFloat(allocationResult.totalAmount) > 0) {
               // دریافت وضعیت به‌روز شده پرداخت
               const updatedPayments = await storage.getPaymentsByRepresentative(representativeId);
               const thisPayment = updatedPayments.find(p => p.id === newPayment.id);
 
               finalPaymentStatus = thisPayment || newPayment;
-              console.log(`✅ SHERLOCK v34.0: UNIFIED auto-allocation successful - Payment ${newPayment.id} allocated ${allocationResult.allocatedAmount} تومان`);
-              console.log(`📋 SHERLOCK v34.0: Allocation details:`, allocationResult.allocations);
+              console.log(`✅ SHERLOCK v34.0: UNIFIED auto-allocation successful - Payment ${newPayment.id} allocated ${allocationResult.totalAmount} تومان`);
+              console.log(`📋 SHERLOCK v34.0: Allocation details:`, allocationResult.details);
             } else {
-              console.log(`⚠️ SHERLOCK v34.0: Auto-allocation completed but no allocation possible:`, allocationResult.warnings);
+              console.log(`⚠️ SHERLOCK v34.0: Auto-allocation completed but no allocation possible`);
               finalPaymentStatus = newPayment;
             }
           } catch (autoAllocationError: any) {
@@ -1453,68 +1382,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // AI Assistant API - Protected (SHERLOCK v1.0 Intelligent System)
-  app.get("/api/ai/status", authMiddleware, async (req, res) => {
-    try {
-      const aiStatus = await xaiGrokEngine.checkEngineStatus();
-      res.json({
-        status: "operational",
-        engine: "XAI-Grok-4",
-        culturalIntelligence: "persian",
-        version: "SHERLOCK-v1.0",
-        ...aiStatus
-      });
-    } catch (error) {
-      res.status(500).json({ error: "خطا در بررسی وضعیت AI" });
-    }
-  });
-
-  app.post("/api/ai/profile/:id", authMiddleware, async (req, res) => {
-    try {
-      const representativeId = parseInt(req.params.id);
-      const representative = await storage.getRepresentative(representativeId);
-
-      if (!representative) {
-        return res.status(404).json({ error: "نماینده یافت نشد" });
-      }
-
-      // Get related financial data
-      const invoices = await storage.getInvoicesByRepresentative(representativeId);
-      const payments = await storage.getPaymentsByRepresentative(representativeId);
-
-      const profile = await xaiGrokEngine.generatePsychologicalProfile({
-        representative,
-        invoices,
-        payments,
-        culturalContext: "persian_business"
-      });
-
-      res.json(profile);
-    } catch (error) {
-      res.status(500).json({ error: "خطا در تولید پروفایل روانشناختی" });
-    }
-  });
-
-  app.post("/api/ai/insights/:id", authMiddleware, async (req, res) => {
-    try {
-      const representativeId = parseInt(req.params.id);
-      const representative = await storage.getRepresentative(representativeId);
-
-      if (!representative) {
-        return res.status(404).json({ error: "نماینده یافت نشد" });
-      }
-
-      const insights = await xaiGrokEngine.generateCulturalInsights({
-        representative,
-        context: "business_relationship_management"
-      });
-
-      res.json(insights);
-    } catch (error) {
-      res.status(500).json({ error: "خطا در تولید بینش‌های فرهنگی" });
-    }
-  });
-
   // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use detailed invoices endpoint instead
 
   // Unpaid Invoices by Representative API - SHERLOCK v1.0 CRITICAL FIX
@@ -1560,10 +1427,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/invoices/create-manual", authMiddleware, async (req, res) => {
     try {
       console.log('🔧 فاز ۲: ایجاد فاکتور دستی');
-      const validatedData = insertInvoiceSchema.parse(req.body);
+      const validatedData = insertInvoiceSchema.parse(req.body) as ValidatedInvoiceData;
 
       // Check if representative exists
-      const representative = await storage.getRepresentative(validatedData.representativeId);
+      // تبدیل شناسه نماینده به عدد برای تطبیق با امضای تابع
+      const representative = await storage.getRepresentative(Number(validatedData.representativeId));
       if (!representative) {
         return res.status(404).json({ error: "نماینده یافت نشد" });
       }
@@ -1619,7 +1487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
 
       // SHERLOCK v25.2: Extra session verification for critical operations
-      if (!req.session?.authenticated && !req.session?.crmAuthenticated) {
+  if (!req.session?.authenticated) {
         return res.status(401).json({
           success: false,
           error: "جلسه منقضی شده است",
@@ -1942,9 +1810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🔄 به‌روزرسانی اطلاعات مالی نماینده ${invoice.representativeId}`);
       await storage.updateRepresentativeFinancials(invoice.representativeId);
 
-      // CRITICAL: Invalidate CRM cache to ensure real-time sync
-      // invalidateCrmCache(); // This function needs to be defined or imported if used
-      console.log('🗑️ CRM cache invalidated for immediate synchronization'); // Placeholder log
+  // ...existing code...
 
       // Log the activity for audit trail
       await storage.createActivityLog({
@@ -2095,9 +1961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // SHERLOCK v1.0 GAP-3 FIX: Invalidate CRM cache for immediate financial synchronization
-      // invalidateCrmCache(); // This function needs to be defined or imported if used
-      console.log('🔄 CRM cache invalidated after payment creation for real-time sync'); // Placeholder log
+  // ...existing code...
 
       res.json({
         success: true,
@@ -2111,8 +1975,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CRM debt synchronization endpoint - Enhanced Financial Synchronization
-  app.post("/api/crm/representatives/:id/sync-debt", authMiddleware, async (req, res) => {
+  // ...existing code...
+  app.post("/api/representatives/:id/sync-debt", authMiddleware, async (req, res) => {
     try {
       const { id } = req.params;
       const { reason, invoiceId, amountChange, timestamp } = req.body;
@@ -2420,11 +2284,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoice-batches", authMiddleware, async (req, res) => {
     try {
-      const validatedData = insertInvoiceBatchSchema.parse(req.body);
+      const validatedData = insertInvoiceBatchSchema.parse(req.body) as ValidatedInvoiceBatchData;
 
       // Generate unique batch code if not provided
       if (!validatedData.batchCode) {
-        validatedData.batchCode = await storage.generateBatchCode(validatedData.periodStart);
+        validatedData.batchCode = await storage.generateBatchCode(String(validatedData.periodStart));
       }
 
       const batch = await storage.createInvoiceBatch(validatedData);
@@ -2499,72 +2363,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(setting);
     } catch (error) {
       res.status(500).json({ error: "خطا در بروزرسانی تنظیمات" });
-    }
-  });
-
-  // xAI Grok Assistant API
-  // 🗑️ SHERLOCK v18.2: LEGACY REMOVED - Use /api/settings/xai-grok/test instead
-
-  app.post("/api/ai/analyze-financial", authMiddleware, async (req, res) => {
-    try {
-      const dashboardData = await storage.getDashboardData();
-
-      // Use XAI Grok for financial analysis
-      const analysis = await xaiGrokEngine.analyzeFinancialData(
-        parseFloat(dashboardData.totalRevenue),
-        parseFloat(dashboardData.totalDebt),
-        dashboardData.activeRepresentatives,
-        dashboardData.overdueInvoices
-      );
-      res.json(analysis);
-    } catch (error) {
-      res.status(500).json({ error: "خطا در تحلیل مالی هوشمند" });
-    }
-  });
-
-  app.post("/api/ai/analyze-representative", authMiddleware, async (req, res) => {
-    try {
-      const { representativeCode } = req.body;
-      const representative = await storage.getRepresentativeByCode(representativeCode);
-
-      if (!representative) {
-        return res.status(404).json({ error: "نماینده یافت نشد" });
-      }
-
-      const culturalProfile = await xaiGrokEngine.analyzeCulturalProfile(representative);
-      res.json({ representative, culturalProfile });
-    } catch (error) {
-      res.status(500).json({ error: "خطا در تحلیل نماینده" });
-    }
-  });
-
-  app.post("/api/ai/question", authMiddleware, async (req, res) => {
-    try {
-      const { question } = req.body;
-      const answer = await xaiGrokEngine.answerFinancialQuestion(question);
-      res.json({ answer });
-    } catch (error) {
-      res.status(500).json({ error: "خطا در دریافت پاسخ از دستیار هوشمند" });
-    }
-  });
-
-  app.post("/api/ai/generate-report", authMiddleware, async (req, res) => {
-    try {
-      const dashboardData = await storage.getDashboardData();
-      const representatives = await storage.getRepresentatives();
-      const invoices = await storage.getInvoices();
-
-      const reportData = {
-        dashboard: dashboardData,
-        representatives: representatives.slice(0, 10), // Top 10
-        invoices: invoices.slice(0, 20) // Recent 20
-      };
-
-      // const report = await generateFinancialReport(reportData); // Temporarily disabled
-      const report = { message: "گزارش مالی - در حال توسعه", data: reportData };
-      res.json({ report });
-    } catch (error) {
-      res.status(500).json({ error: "خطا در تولید گزارش" });
     }
   });
 
@@ -3190,239 +2988,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // CRM Routes Integration
   // CRM routes are already registered via registerCrmRoutes() function
-
-  // AI Engine routes are integrated above in xAI Grok configuration section
-
-  // Initialize CRM real-time sync
-  // CRM data sync service removed for simplified system
-
-  // Health check endpoint
-  app.get("/health", (req, res) => {
-    res.json({
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
-  });
-
-  // Emergency user reset endpoint for debugging
-  app.post("/api/emergency/reset-users", async (req, res) => {
-    try {
-      console.log('🚨 Emergency user reset requested');
-
-      // Force recreate admin user
-      await storage.initializeDefaultAdminUser("mgr", "8679");
-
-
-      res.json({
-        success: true,
-        message: "کاربران با موفقیت بازنشانی شدند",
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error in emergency user reset:', error);
-      res.status(500).json({
-        error: "خطا در بازنشانی کاربران",
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  });
-
-  // ====== FINANCIAL INTEGRITY API ======
-  // Get financial snapshot for representative
-  app.get("/api/financial-integrity/representative/:id/snapshot", authMiddleware, async (req, res) => {
-    try {
-      const representativeId = parseInt(req.params.id);
-
-      if (!representativeId || isNaN(representativeId)) {
-        return res.status(400).json({
-          error: 'شناسه نماینده معتبر نیست'
-        });
-      }
-
-      // Get representative basic info
-      const representative = await db.select()
-        .from(representatives)
-        .where(eq(representatives.id, representativeId))
-        .limit(1);
-
-      if (!representative.length) {
-        return res.status(404).json({
-          error: 'نماینده یافت نشد'
-        });
-      }
-
-      const rep = representative[0];
-
-      // Calculate financial snapshot using unified financial engine
-      const financialData = await unifiedFinancialEngine.calculateRepresentative(representativeId);
-
-      // Get detailed invoice and payment info
-      const invoicesData = await db.select({
-        count: count(),
-        totalAmount: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
-        unpaidAmount: sql<number>`COALESCE(SUM(CASE WHEN status IN ('unpaid', 'overdue', 'partial') THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
-        paidAmount: sql<number>`COALESCE(SUM(CASE WHEN status = 'paid' THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
-      }).from(invoices).where(eq(invoices.representativeId, representativeId));
-
-      const paymentsData = await db.select({
-        count: count(),
-        totalAmount: sql<number>`COALESCE(SUM(CAST(amount as DECIMAL)), 0)`,
-        allocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = true THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`,
-        unallocatedAmount: sql<number>`COALESCE(SUM(CASE WHEN is_allocated = false THEN CAST(amount as DECIMAL) ELSE 0 END), 0)`
-      }).from(payments).where(eq(payments.representativeId, representativeId));
-
-      const invoice = invoicesData[0];
-      const payment = paymentsData[0];
-
-      // Calculate integrity metrics
-      const hasExcessPayments = payment.totalAmount > invoice.totalAmount;
-      const needsReconciliation = Math.abs(financialData.actualDebt - parseFloat(rep.totalDebt)) > 1000;
-      const integrityScore = needsReconciliation ? 75 : hasExcessPayments ? 85 : 100;
-
-      const snapshot = {
-        representativeId,
-        representativeName: rep.name,
-
-        // فاکتورها
-        totalInvoices: invoice.count,
-        totalInvoiceAmount: invoice.totalAmount,
-        unpaidInvoiceAmount: invoice.unpaidAmount,
-        paidInvoiceAmount: invoice.paidAmount,
-
-        // پرداخت‌ها
-        totalPayments: payment.count,
-        totalPaymentAmount: payment.totalAmount,
-        allocatedPaymentAmount: payment.allocatedAmount,
-        unallocatedPaymentAmount: payment.unallocatedAmount,
-
-        // محاسبات نهایی (استاندارد)
-        standardDebt: financialData.actualDebt,
-        standardCredit: Math.max(0, payment.totalAmount - invoice.totalAmount),
-        standardTotalSales: financialData.totalSales,
-
-        // وضعیت سلامت مالی
-        hasExcessPayments,
-        needsReconciliation,
-        integrityScore
-      };
-
-      res.json({
-        success: true,
-        data: snapshot,
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Error getting financial integrity snapshot:', error);
-      res.status(500).json({
-        error: 'خطا در دریافت اطلاعات مالی'
-      });
-    }
-  });
-
-
-  // ==================== SIMPLE TELEGRAM TEST ROUTE ====================
-  // Direct test for message sending without complex routing
-  app.post("/api/telegram/direct-send-test", authMiddleware, async (req, res) => {
-    try {
-      const { message, groupId } = req.body;
-
-      // Simple test message
-      const testMessage = message || `🤖 تست ارسال مستقیم از MarFaNet\n📅 ${new Date().toLocaleDateString('fa-IR')}\n⏰ ${new Date().toLocaleTimeString('fa-IR')}\n\n✅ سیستم تلگرام عملیاتی است`;
-
-      res.json({
-        success: true,
-        message: "Test message prepared",
-        testData: {
-          message: testMessage,
-          timestamp: new Date().toISOString(),
-          note: "این یک تست مستقیم ارسال پیام است"
-        }
-      });
-
-    } catch (error: unknown) {
-      console.error('❌ Error in direct telegram test:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({
-        success: false,
-        message: 'خطا در تست مستقیم تلگرام',
-        error: errorMessage
-      });
-    }
-  });
-
-  // ==================== ACTUAL TELEGRAM SEND ROUTE ====================
-  // Real message sending to Telegram groups
-  app.post("/api/telegram/send-to-group", authMiddleware, async (req, res) => {
-    try {
-      const { message, groupId, messageType } = req.body;
-
-      // Get bot credentials from settings
-      const botTokenSetting = await storage.getSetting("telegram_bot_token");
-      const chatIdSetting = await storage.getSetting("telegram_chat_id");
-
-      if (!botTokenSetting || !chatIdSetting) {
-        return res.status(400).json({
-          success: false,
-          message: "تنظیمات ربات تلگرام یافت نشد. لطفاً ابتدا توکن و شناسه گروه را تنظیم کنید."
-        });
-      }
-
-      const botToken = botTokenSetting.value;
-      const chatId = chatIdSetting.value;
-
-      // Prepare message with Persian format
-      const finalMessage = message || `#تست_سیستم\n🤖 پیام آزمایشی از MarFaNet\n📅 ${new Date().toLocaleDateString('fa-IR')}\n⏰ ${new Date().toLocaleTimeString('fa-IR')}\n\n✅ سیستم مدیریت کارمندان فعال است`;
-
-      // Send to Telegram
-      const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-      const response = await fetch(telegramApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: finalMessage,
-          parse_mode: 'HTML'
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.ok) {
-        res.json({
-          success: true,
-          message: "پیام با موفقیت در گروه تلگرام ارسال شد",
-          telegramResponse: result,
-          sentMessage: finalMessage
-        });
-      } else {
-        console.error('❌ Telegram API Error:', result);
-        res.status(400).json({
-          success: false,
-          message: "خطا در ارسال پیام تلگرام",
-          error: result.description || 'Unknown telegram error'
-        });
-      }
-
-    } catch (error: unknown) {
-      console.error('❌ Error sending telegram message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({
-        success: false,
-        message: 'خطا در ارسال پیام تلگرام',
-        error: errorMessage
-      });
-    }
-  });
-
-  // ====== ENHANCED TELEGRAM MANAGEMENT ROUTES ======
-  // SHERLOCK v32.0: Advanced Telegram bot with AI-powered message parsing
-  const { registerTelegramRoutes } = await import('./routes/telegram-routes');
-  registerTelegramRoutes(app, authMiddleware);
-  console.log('✅ SHERLOCK v32.0: Enhanced Telegram Management Routes Registered');
 
   const httpServer = createServer(app);
   return httpServer;
