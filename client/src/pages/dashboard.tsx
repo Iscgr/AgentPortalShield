@@ -5,7 +5,6 @@ import {
   Users, 
   FileText,
   Upload,
-  Bot,
   DollarSign,
   CreditCard
 } from "lucide-react";
@@ -13,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import InvoiceUpload from "@/components/invoice-upload";
-import AiChat from "@/components/ai-chat";
 // SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table (now replaced by OverdueInvoicesCard)
 // import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";

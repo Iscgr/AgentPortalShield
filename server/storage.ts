@@ -1,7 +1,7 @@
+import { InvoiceEditRecord, TransactionRecord, ConfigRecord } from './storage-interfaces';
 import {
   representatives, salesPartners, invoices, payments, activityLogs, settings, adminUsers, invoiceEdits,
-  financialTransactions, dataIntegrityConstraints, invoiceBatches, crmUsers, telegramSendHistory,
-  aiConfiguration,
+  financialTransactions, dataIntegrityConstraints, invoiceBatches, telegramSendHistory,
   type Representative, type InsertRepresentative,
   type SalesPartner, type InsertSalesPartner, type SalesPartnerWithCount,
   type Invoice, type InsertInvoice,
@@ -14,12 +14,8 @@ import {
   type DataIntegrityConstraint, type InsertDataIntegrityConstraint,
   // فاز ۱: Import برای مدیریت دوره‌ای فاکتورها
   type InvoiceBatch, type InsertInvoiceBatch,
-  // CRM Users Import
-  type CrmUser, type InsertCrmUser,
   // Telegram Send History Import
-  type TelegramSendHistory, type InsertTelegramSendHistory,
-  // AI Configuration Import
-  type AiConfiguration, type InsertAiConfiguration
+  type TelegramSendHistory, type InsertTelegramSendHistory
 } from "@shared/schema";
 import { db, checkDatabaseHealth, executeWithRetry } from "./database-manager";
 import { eq, desc, sql, and, or, ilike, inArray } from "drizzle-orm";
@@ -125,12 +121,6 @@ export interface IStorage {
   updateAdminUserLogin(id: number): Promise<void>;
   initializeDefaultAdminUser(username: string, password: string): Promise<void>;
 
-  // CRM Users (Authentication)
-  getCrmUser(username: string): Promise<CrmUser | undefined>;
-  createCrmUser(user: InsertCrmUser): Promise<CrmUser>;
-  updateCrmUserLogin(id: number): Promise<void>;
-  initializeDefaultCrmUser(username: string, password: string): Promise<void>;
-
   // Data Reset Functions (Admin Only)
   getDataCounts(): Promise<{
     representatives: number;
@@ -225,13 +215,6 @@ export interface IStorage {
   }): Promise<{transactionId: string, editId: number, success: boolean}>;
 
   // AI Configuration
-  getAiConfigurations(): Promise<AiConfiguration[]>;
-  getAiConfiguration(configName: string): Promise<AiConfiguration | undefined>;
-  getAiConfigurationsByCategory(category: string): Promise<AiConfiguration[]>;
-  createAiConfiguration(config: InsertAiConfiguration): Promise<AiConfiguration>;
-  updateAiConfiguration(configName: string, config: Partial<AiConfiguration>): Promise<AiConfiguration>;
-  deleteAiConfiguration(configName: string): Promise<void>;
-  getActiveAiConfiguration(): Promise<AiConfiguration[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1361,92 +1344,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // CRM Users (Authentication) Implementation
-  async getCrmUser(username: string): Promise<CrmUser | undefined> {
-    return executeWithRetry(
-      async () => {
-        const [user] = await db.select().from(crmUsers).where(eq(crmUsers.username, username));
-        return user || undefined;
-      },
-      'getCrmUser'
-    );
-  }
-
-  async createCrmUser(user: InsertCrmUser): Promise<CrmUser> {
-    return executeWithRetry(
-      async () => {
-        const [newUser] = await db.insert(crmUsers).values(user).returning();
-        return newUser;
-      },
-      'createCrmUser'
-    );
-  }
-
-  async updateCrmUserLogin(id: number): Promise<void> {
-    return executeWithRetry(
-      async () => {
-        await db
-          .update(crmUsers)
-          .set({ lastLoginAt: new Date() })
-          .where(eq(crmUsers.id, id));
-      },
-      'updateCrmUserLogin'
-    );
-  }
-
-  async initializeDefaultCrmUser(username: string, password: string): Promise<void> {
-    try {
-      // Check if CRM user already exists
-      const existingUser = await db
-        .select()
-        .from(crmUsers)
-        .where(eq(crmUsers.username, username))
-        .limit(1);
-
-      if (existingUser.length === 0) {
-        // Hash the password with higher salt rounds for security
-        const passwordHash = await bcrypt.hash(password, 12);
-
-        // Create the CRM user
-        await db.insert(crmUsers).values({
-          username,
-          passwordHash,
-          fullName: 'مدیر CRM',
-          email: `${username}@system.local`,
-          role: 'CRM_MANAGER',
-          permissions: JSON.stringify([
-            'CRM_ACCESS',
-            'REPRESENTATIVE_VIEW',
-            'TASK_MANAGEMENT',
-            'REPORT_GENERATION',
-            'AI_ASSISTANCE'
-          ]),
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-
-        console.log(`✅ Default CRM user '${username}' created successfully with hash: ${passwordHash.substring(0, 10)}...`);
-      } else {
-        // Update existing user password if it exists but might be corrupted
-        const passwordHash = await bcrypt.hash(password, 12);
-        await db
-          .update(crmUsers)
-          .set({
-            passwordHash,
-            isActive: true,
-            role: 'CRM_MANAGER'
-          })
-          .where(eq(crmUsers.username, username));
-
-        console.log(`🔄 CRM user '${username}' password reset successfully`);
-      }
-    } catch (error) {
-      console.error('Error initializing default CRM user:', error);
-      throw error;
-    }
-  }
-
   // CRM Enhanced Methods
   async getRepresentativeById(representativeId: number): Promise<Representative | undefined> {
     return executeWithRetry(
@@ -1624,13 +1521,13 @@ export class DatabaseStorage implements IStorage {
 
         await this.createActivityLog({
           type: "invoice_edited",
-          description: `فاکتور ${edit.invoiceId} توسط ${edit.editedBy} ویرایش شد`,
-          relatedId: edit.invoiceId,
+          description: `فاکتور ${(edit as InvoiceEditRecord).invoiceId} توسط ${(edit as InvoiceEditRecord).editedBy} ویرایش شد`,
+          relatedId: (edit as InvoiceEditRecord).invoiceId,
           metadata: {
-            editType: edit.editType,
-            originalAmount: edit.originalAmount,
-            editedAmount: edit.editedAmount,
-            editedBy: edit.editedBy
+            editType: (edit as InvoiceEditRecord).editType,
+            originalAmount: (edit as InvoiceEditRecord).originalAmount,
+            editedAmount: (edit as InvoiceEditRecord).editedAmount,
+            editedBy: (edit as InvoiceEditRecord).editedBy
           }
         });
 
@@ -1687,7 +1584,7 @@ export class DatabaseStorage implements IStorage {
         const [created] = await db.insert(financialTransactions)
           .values({
             ...transaction,
-            transactionId: transaction.transactionId || nanoid(),
+            transactionId: (transaction as TransactionRecord).transactionId || nanoid(),
             createdAt: new Date()
           })
           .returning();
@@ -2247,68 +2144,98 @@ export class DatabaseStorage implements IStorage {
   }> {
     return executeWithRetry(
       async () => {
-        console.log(`🚀 SHERLOCK v34.1: ENHANCED auto-allocation for payment ${paymentId}, representative ${representativeId}`);
-
-        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+        console.log(`🚀 SHERLOCK v34.1: BASIC auto-allocation for payment ${paymentId}, representative ${representativeId}`);
 
         try {
-          // Use the enhanced allocation engine
-          const result = await EnhancedPaymentAllocationEngine.autoAllocatePayment(
-            paymentId,
-            {
-              method: 'FIFO',
-              allowPartialAllocation: true,
-              allowOverAllocation: false,
-              priorityInvoiceStatuses: ['overdue', 'unpaid', 'partial'],
-              strictValidation: true,
-              auditMode: true
-            }
-          );
+          // Get the payment
+          const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+          if (!payment) {
+            throw new Error(`Payment ${paymentId} not found`);
+          }
 
-          if (result.success) {
-            console.log(`✅ SHERLOCK v34.1: Auto-allocation successful - Allocated: ${result.allocatedAmount}`);
+          // Get already allocated amount for this payment
+          // For now, assume payments are either fully allocated or not allocated at all
+          // This is a simplified implementation since the enhanced engine was removed
+          const allocatedAmount = payment.isAllocated ? parseFloat(payment.amount) : 0;
+          const unallocatedAmount = parseFloat(payment.amount) - allocatedAmount;
+
+          if (unallocatedAmount <= 0) {
+            return {
+              success: false,
+              allocated: 0,
+              totalAmount: "0",
+              details: []
+            };
+          }
+
+          // Get unpaid invoices for the representative (FIFO order)
+          const unpaidInvoices = await db
+            .select()
+            .from(invoices)
+            .where(and(
+              eq(invoices.representativeId, representativeId),
+              or(eq(invoices.status, 'unpaid'), eq(invoices.status, 'partial'))
+            ))
+            .orderBy(invoices.createdAt);
+
+          let remainingAmount = unallocatedAmount;
+          const allocations = [];
+
+          for (const invoice of unpaidInvoices) {
+            if (remainingAmount <= 0) break;
+
+            const invoiceBalance = parseFloat(invoice.totalAmount) - parseFloat(invoice.paidAmount || '0');
+            const allocateAmount = Math.min(remainingAmount, invoiceBalance);
+
+            if (allocateAmount > 0) {
+              // Create allocation record
+              await db.insert(financialTransactions).values({
+                paymentId,
+                invoiceId: invoice.id,
+                amount: allocateAmount.toString(),
+                type: 'allocation',
+                description: `تخصیص خودکار پرداخت ${paymentId} به فاکتور ${invoice.id}`,
+                createdAt: new Date()
+              });
+
+              allocations.push({
+                paymentId,
+                invoiceId: invoice.id,
+                amount: allocateAmount.toString()
+              });
+
+              remainingAmount -= allocateAmount;
+            }
+          }
+
+          const totalAllocated = unallocatedAmount - remainingAmount;
+
+          if (totalAllocated > 0) {
+            console.log(`✅ SHERLOCK v34.1: Auto-allocation successful - Allocated: ${totalAllocated}`);
 
             // Create activity log
             await this.createActivityLog({
               type: 'payment_auto_allocated',
-              description: `تخصیص خودکار پرداخت ${paymentId} به مبلغ ${result.allocatedAmount} با روش FIFO`,
+              description: `تخصیص خودکار پرداخت ${paymentId} به مبلغ ${totalAllocated}`,
               relatedId: paymentId,
               metadata: {
                 representativeId,
-                allocatedAmount: result.allocatedAmount,
-                allocationsCount: result.allocations.length,
-                transactionId: result.transactionId,
-                processingTime: result.processingTime
+                allocatedAmount: totalAllocated,
+                allocationsCount: allocations.length
               }
             });
 
-            // ✅ Update representative debt after successful allocation
+            // Update representative debt after successful allocation
             await this.updateRepresentativeFinancials(representativeId);
 
             return {
               success: true,
-              allocated: result.allocations.length,
-              totalAmount: result.allocatedAmount.toString(),
-              details: result.allocations.map(alloc => ({
-                paymentId: paymentId,
-                invoiceId: alloc.invoiceId,
-                amount: alloc.allocatedAmount.toString()
-              }))
+              allocated: allocations.length,
+              totalAmount: totalAllocated.toString(),
+              details: allocations
             };
           } else {
-            console.log(`❌ SHERLOCK v34.1: Auto-allocation failed:`, result.errors);
-
-            // Log failure for auditing
-            await this.createActivityLog({
-              type: 'payment_auto_allocation_failed',
-              description: `تخصیص خودکار پرداخت ${paymentId} شکست خورد`,
-              relatedId: paymentId,
-              metadata: {
-                representativeId,
-                errors: result.errors,
-                processingTime: result.processingTime
-              }
-            });
+            console.log(`❌ SHERLOCK v34.1: No allocations possible for payment ${paymentId}`);
 
             return {
               success: false,
@@ -2318,12 +2245,12 @@ export class DatabaseStorage implements IStorage {
             };
           }
         } catch (error) {
-          console.error(`❌ SHERLOCK v34.1: Auto-allocation engine error:`, error);
+          console.error(`❌ SHERLOCK v34.1: Auto-allocation error:`, error);
 
-          // Log critical engine errors
+          // Log critical errors
           await this.createActivityLog({
             type: 'payment_auto_allocation_error',
-            description: `خطای بحرانی در موتور تخصیص خودکار پرداخت ${paymentId}`,
+            description: `خطای بحرانی در تخصیص خودکار پرداخت ${paymentId}`,
             relatedId: paymentId,
             metadata: {
               representativeId,
@@ -2354,54 +2281,84 @@ export class DatabaseStorage implements IStorage {
       async () => {
         console.log(`🎯 SHERLOCK v34.1: Manual allocation - Payment ${paymentId} -> Invoice ${invoiceId}, Amount: ${amount}`);
 
-        const { EnhancedPaymentAllocationEngine } = await import('./services/enhanced-payment-allocation-engine.js');
+        try {
+          // Get payment and invoice
+          const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+          const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
 
-        const result = await EnhancedPaymentAllocationEngine.manualAllocatePayment(
-          paymentId,
-          invoiceId,
-          amount,
-          performedBy,
-          reason,
-          {
-            strictValidation: true,
-            auditMode: true,
-            allowOverAllocation: false
+          if (!payment) {
+            throw new Error(`Payment ${paymentId} not found`);
           }
-        );
+          if (!invoice) {
+            throw new Error(`Invoice ${invoiceId} not found`);
+          }
 
-        if (result.success) {
+          // Check if payment is already allocated
+          if (payment.isAllocated) {
+            return {
+              success: false,
+              allocatedAmount: 0,
+              message: 'این پرداخت قبلاً تخصیص داده شده است'
+            };
+          }
+
+          // Check if amount matches payment amount (simplified - only full allocations)
+          if (parseFloat(payment.amount) !== amount) {
+            return {
+              success: false,
+              allocatedAmount: 0,
+              message: 'در حال حاضر فقط تخصیص کامل پرداخت پشتیبانی می‌شود'
+            };
+          }
+
+          // Update payment
+          await db
+            .update(payments)
+            .set({
+              invoiceId: invoiceId,
+              isAllocated: true
+            })
+            .where(eq(payments.id, paymentId));
+
+          // Update invoice paid amount
+          const currentPaidAmount = parseFloat(invoice.paidAmount || '0');
+          const newPaidAmount = currentPaidAmount + amount;
+
+          await db
+            .update(invoices)
+            .set({
+              paidAmount: newPaidAmount.toString(),
+              status: newPaidAmount >= parseFloat(invoice.totalAmount) ? 'paid' : 'partial'
+            })
+            .where(eq(invoices.id, invoiceId));
+
           console.log(`✅ SHERLOCK v34.1: Manual allocation successful`);
 
-          // Get payment info for activity log
-          const [payment] = await db.select().from(payments).where(eq(payments.id, paymentId));
+          // Create activity log
+          await this.createActivityLog({
+            type: 'payment_manual_allocation',
+            description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} به مبلغ ${amount} توسط ${performedBy}`,
+            relatedId: paymentId,
+            metadata: {
+              invoiceId,
+              amount,
+              performedBy,
+              reason,
+              representativeId: payment.representativeId
+            }
+          });
 
-          if (payment) {
-            await this.createActivityLog({
-              type: 'payment_manual_allocation',
-              description: `تخصیص دستی پرداخت ${paymentId} به فاکتور ${invoiceId} به مبلغ ${amount} توسط ${performedBy}`,
-              relatedId: paymentId,
-              metadata: {
-                invoiceId,
-                amount,
-                performedBy,
-                reason,
-                representativeId: payment.representativeId,
-                transactionId: result.transactionId
-              }
-            });
-
-            // Update representative financials
-            await this.updateRepresentativeFinancials(payment.representativeId!);
-          }
+          // Update representative financials
+          await this.updateRepresentativeFinancials(payment.representativeId!);
 
           return {
             success: true,
-            allocatedAmount: result.allocatedAmount,
-            message: `تخصیص دستی با موفقیت انجام شد - مبلغ: ${result.allocatedAmount}`,
-            transactionId: result.transactionId
+            allocatedAmount: amount,
+            message: `تخصیص دستی با موفقیت انجام شد - مبلغ: ${amount}`,
+            transactionId: `manual_${paymentId}_${invoiceId}_${Date.now()}`
           };
-        } else {
-          console.log(`❌ SHERLOCK v34.1: Manual allocation failed:`, result.errors);
+        } catch (error) {
+          console.error(`❌ SHERLOCK v34.1: Manual allocation failed:`, error);
 
           // Log failure for auditing
           await this.createActivityLog({
@@ -2413,14 +2370,14 @@ export class DatabaseStorage implements IStorage {
               amount,
               performedBy,
               reason,
-              errors: result.errors
+              error: error instanceof Error ? error.message : String(error)
             }
           });
 
           return {
             success: false,
             allocatedAmount: 0,
-            message: `خطا در تخصیص: ${result.errors.join(', ')}`
+            message: `خطا در تخصیص: ${error instanceof Error ? error.message : String(error)}`
           };
         }
       },
@@ -2529,139 +2486,6 @@ export class DatabaseStorage implements IStorage {
         };
       },
       'reconcileRepresentativeFinancials'
-    );
-  }
-
-  // ====== AI CONFIGURATION METHODS ======
-  async getAiConfigurations(): Promise<AiConfiguration[]> {
-    return executeWithRetry(
-      () => db.select().from(aiConfiguration).orderBy(desc(aiConfiguration.updatedAt)),
-      'getAiConfigurations'
-    );
-  }
-
-  async getAiConfiguration(configName: string): Promise<AiConfiguration | undefined> {
-    return executeWithRetry(
-      async () => {
-        const [config] = await db
-          .select()
-          .from(aiConfiguration)
-          .where(eq(aiConfiguration.configName, configName));
-        return config;
-      },
-      'getAiConfiguration'
-    );
-  }
-
-  async getAiConfigurationsByCategory(category: string): Promise<AiConfiguration[]> {
-    return executeWithRetry(
-      () => db.select()
-        .from(aiConfiguration)
-        .where(eq(aiConfiguration.configCategory, category))
-        .orderBy(desc(aiConfiguration.updatedAt)),
-      'getAiConfigurationsByCategory'
-    );
-  }
-
-  async createAiConfiguration(config: InsertAiConfiguration): Promise<AiConfiguration> {
-    return executeWithRetry(
-      async () => {
-        const [newConfig] = await db
-          .insert(aiConfiguration)
-          .values({
-            ...config,
-            createdAt: sql`NOW()`,
-            updatedAt: sql`NOW()`
-          })
-          .returning();
-
-        await this.createActivityLog({
-          type: "ai_config_created",
-          description: `تنظیمات AI جدید ایجاد شد: ${config.configName}`,
-          relatedId: null,
-          metadata: {
-            configName: config.configName,
-            category: config.configCategory,
-            createdBy: config.lastModifiedBy
-          }
-        });
-
-        return newConfig;
-      },
-      'createAiConfiguration'
-    );
-  }
-
-  async updateAiConfiguration(configName: string, config: Partial<AiConfiguration>): Promise<AiConfiguration> {
-    return executeWithRetry(
-      async () => {
-        // Create clean object without timestamp fields that cause issues
-        const cleanConfig = Object.fromEntries(
-          Object.entries(config).filter(([key]) =>
-            !['createdAt', 'updatedAt', 'id'].includes(key)
-          )
-        );
-
-        const [updatedConfig] = await db
-          .update(aiConfiguration)
-          .set({
-            ...cleanConfig,
-            updatedAt: sql`NOW()`,
-            configVersion: sql`${aiConfiguration.configVersion} + 1`
-          })
-          .where(eq(aiConfiguration.configName, configName))
-          .returning();
-
-        if (!updatedConfig) {
-          throw new Error(`AI configuration '${configName}' not found`);
-        }
-
-        await this.createActivityLog({
-          type: "ai_config_updated",
-          description: `تنظیمات AI بروزرسانی شد: ${configName}`,
-          relatedId: null,
-          metadata: {
-            configName,
-            updatedBy: config.lastModifiedBy,
-            version: updatedConfig.configVersion
-          }
-        });
-
-        return updatedConfig;
-      },
-      'updateAiConfiguration'
-    );
-  }
-
-  async deleteAiConfiguration(configName: string): Promise<void> {
-    return executeWithRetry(
-      async () => {
-        const result = await db
-          .delete(aiConfiguration)
-          .where(eq(aiConfiguration.configName, configName));
-
-        if (result.rowCount === 0) {
-          throw new Error(`AI configuration '${configName}' not found`);
-        }
-
-        await this.createActivityLog({
-          type: "ai_config_deleted",
-          description: `تنظیمات AI حذف شد: ${configName}`,
-          relatedId: null,
-          metadata: { configName }
-        });
-      },
-      'deleteAiConfiguration'
-    );
-  }
-
-  async getActiveAiConfiguration(): Promise<AiConfiguration[]> {
-    return executeWithRetry(
-      () => db.select()
-        .from(aiConfiguration)
-        .where(eq(aiConfiguration.isActive, true))
-        .orderBy(aiConfiguration.configCategory, desc(aiConfiguration.updatedAt)),
-      'getActiveAiConfiguration'
     );
   }
 

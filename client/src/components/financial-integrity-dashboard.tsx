@@ -33,7 +33,7 @@ interface SystemReconciliationResult {
 }
 
 export function FinancialIntegrityDashboard() {
-  const { toast } = useToast();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [isReconciling, setIsReconciling] = useState(false);
 
@@ -49,10 +49,7 @@ export function FinancialIntegrityDashboard() {
       method: 'POST'
     }),
     onSuccess: (result: { data: SystemReconciliationResult; message: string }) => {
-      toast({
-        title: "موفقیت",
-        description: result.message
-      });
+      showToast("موفقیت: " + result.message, 'success');
       
       // بروزرسانی cache ها
       queryClient.invalidateQueries({ queryKey: ['/api/financial-integrity/problematic-representatives'] });
@@ -60,11 +57,7 @@ export function FinancialIntegrityDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/representatives'] });
     },
     onError: (error: any) => {
-      toast({
-        title: "خطا",
-        description: error?.message || "خطا در تطبیق مالی سراسری",
-        variant: "destructive"
-      });
+      showToast("خطا: " + (error?.message || "خطا در تطبیق مالی سراسری"), 'error');
     }
   });
 

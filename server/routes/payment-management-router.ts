@@ -212,38 +212,46 @@ paymentManagementRouter.post('/batch-allocate/:representativeId', async (req, re
   try {
     const representativeId = parseInt(req.params.representativeId);
     const { maxPayments, priorityMethod, strictMode } = req.body;
-    
+
     console.log(`🚀 SHERLOCK v35.0: Batch allocation request for representative ${representativeId}`);
-    
-    const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
-    
-    const result = await EnhancedPaymentAllocationEngine.batchAllocatePayments(
-      representativeId,
-      {
-        maxPayments: maxPayments || 50,
-        priorityMethod: priorityMethod || 'FIFO',
-        strictMode: strictMode !== false
-      }
-    );
-    
-    if (result.success) {
-      res.json({
-        success: true,
-        message: `تخصیص دسته‌ای کامل شد - ${result.processedPayments} پرداخت پردازش شد`,
-        data: {
-          processedPayments: result.processedPayments,
-          totalAllocated: result.totalAllocated,
-          details: result.details
+
+    // Get unallocated payments for this representative
+    const unallocatedPayments = await storage.getUnallocatedPayments(representativeId);
+
+    let processedPayments = 0;
+    let totalAllocated = 0;
+    const details = [];
+
+    // Process up to maxPayments
+    const paymentsToProcess = unallocatedPayments.slice(0, maxPayments || 50);
+
+    for (const payment of paymentsToProcess) {
+      try {
+        const result = await storage.autoAllocatePaymentToInvoices(payment.id, representativeId);
+        if (result.success) {
+          processedPayments++;
+          totalAllocated += parseFloat(result.totalAmount);
+          details.push({
+            paymentId: payment.id,
+            allocated: result.allocated,
+            amount: result.totalAmount
+          });
         }
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        error: 'تخصیص دسته‌ای ناموفق',
-        details: result.errors
-      });
+      } catch (error) {
+        console.error(`Error allocating payment ${payment.id}:`, error);
+      }
     }
-    
+
+    res.json({
+      success: true,
+      message: `تخصیص دسته‌ای کامل شد - ${processedPayments} پرداخت پردازش شد`,
+      data: {
+        processedPayments,
+        totalAllocated: totalAllocated.toString(),
+        details
+      }
+    });
+
   } catch (error) {
     console.error('❌ Batch allocation error:', error);
     res.status(500).json({ error: "خطا در تخصیص دسته‌ای" });
@@ -254,18 +262,29 @@ paymentManagementRouter.post('/batch-allocate/:representativeId', async (req, re
 paymentManagementRouter.get('/allocation-report/:representativeId', async (req, res) => {
   try {
     const representativeId = parseInt(req.params.representativeId);
-    
+
     console.log(`📊 SHERLOCK v35.0: Generating allocation report for representative ${representativeId}`);
-    
-    const { EnhancedPaymentAllocationEngine } = await import('../services/enhanced-payment-allocation-engine.js');
-    
-    const report = await EnhancedPaymentAllocationEngine.generateAllocationReport(representativeId);
-    
+
+    // Get basic allocation statistics
+    const payments = await storage.getPaymentsByRepresentative(representativeId);
+    const allocatedPayments = payments.filter(p => p.isAllocated);
+    const unallocatedPayments = payments.filter(p => !p.isAllocated);
+
+    const report = {
+      representativeId,
+      totalPayments: payments.length,
+      allocatedPayments: allocatedPayments.length,
+      unallocatedPayments: unallocatedPayments.length,
+      totalAllocatedAmount: allocatedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+      totalUnallocatedAmount: unallocatedPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+      allocationRate: payments.length > 0 ? (allocatedPayments.length / payments.length) * 100 : 0
+    };
+
     res.json({
       success: true,
       data: report
     });
-    
+
   } catch (error) {
     console.error('❌ Allocation report error:', error);
     res.status(500).json({ error: "خطا در تولید گزارش تخصیص" });

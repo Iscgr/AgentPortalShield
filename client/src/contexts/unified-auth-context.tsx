@@ -1,164 +1,101 @@
+/**
+ * Context برای مدیریت احراز هویت یکپارچه
+ */
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useLocation } from "wouter";
-
-interface UnifiedUser {
-  id: number;
+interface User {
+  id: string;
   username: string;
   role: string;
-  panelType: 'ADMIN_PANEL';
   permissions?: string[];
-  hasFullAccess?: boolean;
-  authenticated?: boolean;
 }
 
 interface UnifiedAuthContextType {
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  user: UnifiedUser | null;
-  userType: 'ADMIN' | null;
-  login: () => void;
+  userType?: string; // نوع کاربر (ADMIN, CRM, etc.)
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  checkAuth: () => Promise<void>;
-  loginMutation: any;
-  adminLoginMutation: any;
+  isAuthenticated: boolean;
+  isLoading: boolean; // Alias for loading, for backward compatibility
+  userType?: string; // نوع کاربر (ADMIN, CRM, etc.)
 }
 
-const UnifiedAuthContext = createContext<UnifiedAuthContextType | undefined>(undefined);
+const UnifiedAuthContext = createContext<UnifiedAuthContextType | null>(null);
 
-export function UnifiedAuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<UnifiedUser | null>(null);
-  const [userType, setUserType] = useState<'ADMIN' | null>(null);
-  const [, setLocation] = useLocation();
+export function UnifiedAuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Admin login mutation
-  const adminLoginMutation = useMutation({
-    mutationFn: async (credentials: { username: string; password: string }) => {
-      console.log('🔐 SHERLOCK v1.0: Admin Login Request:', credentials);
-      const response = await apiRequest('/api/auth/login', { 
-        method: 'POST', 
-        data: credentials 
-      });
-      console.log('✅ SHERLOCK v1.0: Admin Login Success:', response);
-      return response;
-    },
-    onSuccess: (data) => {
-      console.log('🔐 SHERLOCK v1.0: Admin Auth Success - Setting state');
-      setIsAuthenticated(true);
-      setUser({
-        ...data.user,
-        panelType: 'ADMIN_PANEL',
-        authenticated: true
-      });
-      setUserType('ADMIN');
-      queryClient.invalidateQueries();
-      setTimeout(() => {
-        console.log('🔐 SHERLOCK v1.0: Redirecting to admin dashboard');
-        setLocation('/dashboard');
-      }, 100);
-    },
-    onError: (error: any) => {
-      console.error('❌ SHERLOCK v1.0: Admin login error:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserType(null);
-    }
-  });
-
-
-  // Unified login mutation (for backward compatibility)
-  const loginMutation = adminLoginMutation;
-
-  const checkAuth = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Check actual session status from server
-      const response = await fetch('/api/auth/status', {
-        credentials: 'include',
-        method: 'GET'
-      });
-      
-      if (response.ok) {
-        const authData = await response.json();
-        if (authData.authenticated) {
-          console.log('✅ SHERLOCK v32.3: User is authenticated:', authData.user);
-          setIsAuthenticated(true);
-          setUser({
-            id: authData.user.id,
-            username: authData.user.username,
-            role: authData.user.role,
-            panelType: 'ADMIN_PANEL',
-            authenticated: true,
-            permissions: authData.user.permissions || ['FULL_ACCESS'],
-            hasFullAccess: authData.user.hasFullAccess
-          });
-          setUserType('ADMIN');
-        } else {
-          console.log('❌ SHERLOCK v32.3: User not authenticated');
-          setIsAuthenticated(false);
-          setUser(null);
-          setUserType(null);
+  useEffect(() => {
+    // بررسی احراز هویت در لود اولیه
+    const checkAuth = async () => {
+      try {
+        // درخواست به API برای بررسی وضعیت احراز هویت
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
         }
-      } else {
-        console.log('❌ SHERLOCK v32.3: Auth check failed');
-        setIsAuthenticated(false);
-        setUser(null);
-        setUserType(null);
+      } catch (err) {
+        console.error('Error checking authentication:', err);
+      } finally {
+        setLoading(false);
       }
-      
-    } catch (error) {
-      console.error('❌ SHERLOCK v32.3: Auth check error:', error);
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserType(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
-  const login = () => {
-    setIsAuthenticated(true);
+    checkAuth();
+  }, []);
+
+  const login = async (username: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // پیاده‌سازی لاگین
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+    } catch (err) {
+      setError('Login failed. Please check your credentials.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", { 
-        method: "POST", 
-        credentials: "include" 
-      });
-    } catch (error) {
-      console.error('❌ SHERLOCK v1.0: Logout error:', error);
+      await fetch('/api/auth/logout', { method: 'POST' });
     } finally {
-      setIsAuthenticated(false);
       setUser(null);
-      setUserType(null);
-      setLocation('/auth');
     }
   };
 
-  // Check authentication on mount only - no periodic checks
-  useEffect(() => {
-    checkAuth();
-    // SHERLOCK v26.0: No periodic auth checks - one time setup only
-  }, []);
-
   return (
-    <UnifiedAuthContext.Provider
-      value={{
-        isAuthenticated,
-        isLoading,
-        user,
-        userType,
-        login,
+    <UnifiedAuthContext.Provider 
+      value={{ 
+        user, 
+        loading, 
+        error, 
+        login, 
         logout,
-        checkAuth,
-        loginMutation,
-        adminLoginMutation,
+        isAuthenticated: !!user,
+        isLoading: loading, // اضافه کردن isLoading به عنوان alias برای loading
+        userType: user?.role === 'admin' ? 'ADMIN' : user?.role || undefined // تعیین نوع کاربر براساس نقش
       }}
     >
       {children}
@@ -168,13 +105,12 @@ export function UnifiedAuthProvider({ children }: { children: ReactNode }) {
 
 export function useUnifiedAuth() {
   const context = useContext(UnifiedAuthContext);
-  if (context === undefined) {
-    throw new Error("useUnifiedAuth must be used within a UnifiedAuthProvider");
+  if (!context) {
+    throw new Error('useUnifiedAuth must be used within an UnifiedAuthProvider');
   }
   return context;
 }
 
-// Export unified auth as default
+// برای سازگاری با کد قبلی
+export const AuthProvider = UnifiedAuthProvider;
 export const useAuth = useUnifiedAuth;
-
-export default UnifiedAuthContext;
