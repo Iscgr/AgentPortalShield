@@ -607,22 +607,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Convert legacy format to consolidated format for consistency
           consolidatedData = {
-            totalRevenue: legacySummary.totalRevenue || 0,
-            totalDebt: legacySummary.totalDebt || 0,
-            totalCredit: legacySummary.totalCredit || 0,
-            totalOutstanding: legacySummary.totalOutstanding || 0,
-            totalRepresentatives: 0, // Will be populated below if needed
-            activeRepresentatives: legacySummary.activeSalesPartners || 0,
-            inactiveRepresentatives: 0,
-            totalInvoices: 0,
-            paidInvoices: 0,
-            unpaidInvoices: 0,
-            overdueInvoices: 0,
-            totalPayments: 0,
-            totalPaymentAmount: 0,
-            unallocatedPaymentAmount: 0,
-            systemIntegrityScore: legacySummary.systemIntegrityScore || 0,
-            lastUpdated: new Date().toISOString(),
+            totalRevenue: legacySummary.totalSystemPaid || 0,
+            totalDebt: legacySummary.totalSystemDebt || 0,
+            totalCredit: 0, // Legacy doesn't have direct credit field
+            totalOutstanding: legacySummary.totalUnpaidAmount || 0,
+            totalRepresentatives: legacySummary.totalRepresentatives || 0,
+            activeRepresentatives: legacySummary.activeRepresentatives || 0,
+            inactiveRepresentatives: Math.max(0, (legacySummary.totalRepresentatives || 0) - (legacySummary.activeRepresentatives || 0)),
+            totalInvoices: (legacySummary.unpaidInvoicesCount || 0) + (legacySummary.overdueInvoicesCount || 0), // Approximate
+            paidInvoices: 0, // Legacy doesn't track this separately
+            unpaidInvoices: legacySummary.unpaidInvoicesCount || 0,
+            overdueInvoices: legacySummary.overdueInvoicesCount || 0,
+            totalPayments: 0, // Legacy doesn't track payment count
+            totalPaymentAmount: legacySummary.totalSystemPaid || 0,
+            unallocatedPaymentAmount: 0, // Legacy doesn't track unallocated
+            systemIntegrityScore: Math.round(legacySummary.systemAccuracy || 0),
+            lastUpdated: legacySummary.lastCalculationTime || new Date().toISOString(),
             queryTimeMs: 999, // Indicate fallback mode
             cacheStatus: 'UNAVAILABLE' as const
           };

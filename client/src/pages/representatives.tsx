@@ -56,6 +56,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { invalidateFinancialCaches } from "@/lib/invalidateFinancialCaches";
+import { useOptimizedCacheRefresh } from '@/hooks/useOptimizedCacheRefresh';
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -261,6 +262,15 @@ export default function Representatives() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // ✅ E-B8: Optimized Cache Refresh Manager
+  const { 
+    refreshMetrics, 
+    clearAllCaches, 
+    isRefreshing, 
+    lastRefreshDuration,
+    performanceMetrics 
+  } = useOptimizedCacheRefresh();
 
   // SHERLOCK v11.0: Enhanced sorting logic
   const handleSort = (column: string) => {
@@ -574,11 +584,23 @@ export default function Representatives() {
         queryClient.setQueryData([REPRESENTATIVES_QUERY_KEY], context.previous);
       }
     },
-    onSuccess: () => {
-      // بازآوری سریع داده واقعی
-      queryClient.invalidateQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY], refetchType: 'active' });
-      queryClient.refetchQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY], type: 'active' });
-      toast({ title: "موفقیت", description: "نماینده جدید با موفقیت ایجاد شد" });
+    onSuccess: async () => {
+      // ✅ E-B8: Optimized cache refresh instead of manual invalidation
+      console.log('🚀 E-B8: Optimized refresh after representative creation');
+      await refreshMetrics({
+        reason: 'representative_created',
+        cascadeGlobal: true,
+        onProgress: (progress, stage) => {
+          console.log(`📊 E-B8: ${stage} - ${progress}%`);
+        }
+      });
+      
+      toast({ 
+        title: "موفقیت", 
+        description: lastRefreshDuration 
+          ? `نماینده جدید ایجاد شد (رفرش: ${Math.round(lastRefreshDuration)}ms)` 
+          : "نماینده جدید با موفقیت ایجاد شد" 
+      });
       setIsCreateOpen(false);
     }
   });
@@ -603,10 +625,24 @@ export default function Representatives() {
     onError: (_e, _v, ctx) => {
       if (ctx?.previous) queryClient.setQueryData([REPRESENTATIVES_QUERY_KEY], ctx.previous);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY] });
-      queryClient.refetchQueries({ queryKey: [REPRESENTATIVES_QUERY_KEY], type: 'active' });
-      toast({ title: "موفقیت", description: "اطلاعات نماینده بروزرسانی شد" });
+    onSuccess: async ({ id }) => {
+      // ✅ E-B8: Optimized cache refresh with representative-specific targeting
+      console.log(`🚀 E-B8: Optimized refresh after representative ${id} update`);
+      await refreshMetrics({
+        representativeId: id,
+        reason: 'representative_updated',
+        cascadeGlobal: false, // Only refresh specific representative
+        onProgress: (progress, stage) => {
+          console.log(`📊 E-B8: ${stage} - ${progress}%`);
+        }
+      });
+      
+      toast({ 
+        title: "موفقیت", 
+        description: lastRefreshDuration 
+          ? `اطلاعات نماینده بروزرسانی شد (رفرش: ${Math.round(lastRefreshDuration)}ms)` 
+          : "اطلاعات نماینده بروزرسانی شد" 
+      });
       setIsEditOpen(false);
     }
   });
@@ -813,11 +849,22 @@ export default function Representatives() {
                 {repsError?.message || 'خطای ناشناخته در دریافت اطلاعات نمایندگان'}
               </p>
               <Button 
-                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/representatives"] })}
+                onClick={async () => {
+                  console.log('🚀 E-B8: Starting optimized cache refresh for representatives');
+                  await clearAllCaches('manual_retry_representatives');
+                  
+                  if (lastRefreshDuration && lastRefreshDuration < 2000) {
+                    toast({
+                      title: "بروزرسانی موفق",
+                      description: `اطلاعات در ${Math.round(lastRefreshDuration)}ms بروزرسانی شد`
+                    });
+                  }
+                }}
+                disabled={isRefreshing}
                 className="mr-4"
               >
-                <RefreshCw className="w-4 h-4 ml-2" />
-                تلاش مجدد
+                <RefreshCw className={`w-4 h-4 ml-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'در حال بروزرسانی...' : 'تلاش مجدد'}
               </Button>
             </div>
           </CardContent>
@@ -842,6 +889,24 @@ export default function Representatives() {
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="w-4 h-4 ml-2" />
             نماینده جدید
+          </Button>
+          
+          {/* E-B8: Performance Metrics Display */}
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              console.log('🚀 E-B8: Manual cache refresh triggered');
+              await clearAllCaches('manual_global_refresh');
+            }}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`w-4 h-4 ml-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'بروزرسانی...' : 'رفرش کامل'}
+            {lastRefreshDuration && (
+              <span className="text-xs text-gray-500 mr-2">
+                ({Math.round(lastRefreshDuration)}ms)
+              </span>
+            )}
           </Button>
         </div>
       </div>
