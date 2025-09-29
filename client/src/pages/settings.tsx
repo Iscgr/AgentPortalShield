@@ -362,6 +362,15 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales-partners"] });
+      // تلاش برای همگام‌سازی کامل بدهی‌ها پس از حذف عمده جهت جلوگیری از مقادیر قدیمی
+      (async () => {
+        try {
+          await apiRequest('/api/unified-financial/sync-all-representatives', { method: 'POST' });
+          queryClient.invalidateQueries({ queryKey: ["/api/unified-financial/total-debt"] });
+        } catch (e) {
+          console.warn('Sync-all after reset failed (non-blocking)', e);
+        }
+      })();
       dataResetForm.reset();
       setShowDataCounts(false);
     },

@@ -161,12 +161,77 @@ export class AllocationService {
     const readSwitchState = featureFlagManager.getMultiStageFlagState('allocation_read_switch');
     const useLedger = readSwitchState === 'full' || (readSwitchState === 'canary' && isCanaryRepresentative(representativeId, 5));
     if (useLedger) {
-      // خواندن از cache با متد مناسب
-      return await InvoiceBalanceCacheService.getRepresentativeDebt(representativeId);
+      // خواندن ledger-aware (cache اول، سپس fallback محاسبه مستقیم اگر cache خالی باشد)
+      const res = await InvoiceBalanceCacheService.getRepresentativeDebtLedgerAware(representativeId);
+      return res.debt;
     } else {
       // fallback قدیمی
       const invoiceBalance = await db.execute(sql`SELECT COALESCE(SUM(amount), 0) as balance FROM invoices WHERE representative_id = ${representativeId}`);
       return Number((invoiceBalance as any).rows?.[0]?.balance || 0);
     }
+  }
+
+  /**
+   * allocatePartial (Phase B – Skeleton)
+   * - فقط در حالت allocation_partial_mode != off فعال می‌شود.
+   * - هیچ تغییری در legacy isAllocated پرداخت ایجاد نمی‌کند (shadow-only رفتار).
+   * - ورودی lines: آرایه‌ای از { invoiceId, amount }
+   * - اینورینت گارد: Σ(amount) ≤ مبلغ پرداخت، Σ(amount) ≤ remaining هر فاکتور.
+   */
+  static async allocatePartial(paymentId: number, lines: Array<{ invoiceId: number; amount: number }>, performedBy?: number) {
+    const partialMode = featureFlagManager.getMultiStageFlagState('allocation_partial_mode');
+    if (partialMode === 'off') {
+      throw new Error('Partial allocation feature is OFF');
+    }
+    if (!Array.isArray(lines) || !lines.length) throw new Error('lines array required');
+
+    return await db.transaction(async (tx) => {
+      const [payment] = await tx.select().from(payments).where(eq(payments.id, paymentId));
+      if (!payment) throw new Error('Payment not found');
+      const paymentBaseAmount = payment.amountDec ? Number(payment.amountDec) : parseAmountText(payment.amount);
+
+      // جمع ورودی
+      const totalAllocate = lines.reduce((s,l) => s + Number(l.amount||0), 0);
+      if (totalAllocate <= 0) throw new Error('Total allocation must be > 0');
+      if (totalAllocate - paymentBaseAmount > 0.000001) {
+        const msg = `Σ lines (${totalAllocate}) exceeds payment amount (${paymentBaseAmount})`;
+        if (partialMode === 'enforce') throw new Error(msg); else console.warn('[PARTIAL][WARN]', msg);
+      }
+
+      const messages: string[] = [];
+      let inserted = 0; let skipped = 0; let anomalies = 0;
+      for (const line of lines) {
+        const amount = Number(line.amount);
+        if (!(amount > 0)) { skipped++; continue; }
+        // remaining فاکتور را محاسبه کنیم (cache → fallback aggregate)
+        const [inv] = await tx.select().from(invoices).where(eq(invoices.id, line.invoiceId));
+        if (!inv) { skipped++; messages.push(`Invoice ${line.invoiceId} not found`); continue; }
+        const invoiceAllocRes = await tx.execute(sql`SELECT COALESCE(SUM(allocated_amount),0) AS s FROM payment_allocations WHERE invoice_id = ${line.invoiceId}`);
+        const alreadyAllocated = Number((invoiceAllocRes as any).rows?.[0]?.s || 0);
+        const invoiceAmountNum = Number(inv.amount);
+        const remaining = invoiceAmountNum - alreadyAllocated;
+        if (amount - remaining > 0.000001) {
+          const msg = `Line over remaining invoice=${line.invoiceId} amount=${amount} remaining=${remaining}`;
+          anomalies++;
+          if (partialMode === 'enforce') throw new Error(msg); else { messages.push(msg); continue; }
+        }
+        try {
+          await tx.insert(paymentAllocations).values({
+            paymentId,
+            invoiceId: line.invoiceId,
+            allocatedAmount: amount,
+            method: 'manual',
+            synthetic: false,
+            performedBy,
+            idempotencyKey: `p:${paymentId}-i:${line.invoiceId}-a:${amount}-${Date.now()}`
+          });
+          inserted++;
+          try { await InvoiceBalanceCacheService.recompute(line.invoiceId); } catch {}
+        } catch (e:any) {
+          messages.push(`Insert fail invoice=${line.invoiceId}: ${e.message}`);
+        }
+      }
+      return { paymentId, mode: partialMode, inserted, skipped, anomalies, messages };
+    });
   }
 }

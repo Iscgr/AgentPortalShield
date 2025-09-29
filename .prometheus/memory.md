@@ -1,5 +1,5 @@
 # Memory Spine (حافظه عملیاتی فاز ۲)
-آخرین بروزرسانی: E-D5-PythonIntegrationCompleted
+آخرین بروزرسانی: Add-IngestionDeterminism + FinancialSummaryRefactor (D15..D18)
 
 ## 1. مأموریت (Mission Statement)
 پیاده‌سازی امن، مرحله‌ای و بدون کاهش دامنه‌ی مسئله برای: (۱) ایجاد زیرلجر تخصیص پرداخت‌ها، (۲) مهاجرت نوع مبلغ، (۳) ایجاد کش تراز فاکتور، (۴) ابزار پایش Drift، (۵) بسترسازی برای UI تخصیص جزئی، (۶) ادغام Python برای محاسبات حجمی و سازوکار آتی تطبیقی—all بدون نقض اصل «Enhance Not Eliminate».
@@ -57,6 +57,10 @@ TODO: افزودن I11 در آینده (Cross-period integrity بعد از Parti
 | D12 | iter7 | Logging ESM Patch + Redis Health Noise Mitigation + Session Table Migration | حذف کامل health checker یا خاموشی موقت | حفظ observability بدون کاهش دامنه | کاهش نویز بحرانی و آماده‌سازی برای drift metrics پایدار | بازبینی هنگام ورود real Redis |
 | D13 | iter8 | Ledger Read Switch با flag canary/full | direct fallback | کاهش ریسک drift با گذار تدریجی | نیاز به monitoring | بعد از Phase B |
 | D14 | iter8 | Fix allocation-service calculateDebt | SQL مستقیم یا فرضیه | استفاده از cache با متد getRepresentativeDebt | پایه سلامت ledger read | monitoring drift بعدی |
+| D15 | iter9 | Deterministic Ingestion Progress (NDJSON seq) | چاپ فقط خلاصه نهایی | نیاز به استریم مرحله‌ای و ابزارپذیر | Debug و مانیتور دقیق ingestion | بازبینی اگر حجم >100K |
+| D16 | iter9 | Fallback بدون DATABASE_URL برای dry-run | خطای فوری و توقف | انعطاف در CI / محیط dev | امکان تحلیل بدون DB | در زمان integration تست real DB |
+| D17 | iter9 | Refactor Financial Summary به ماژول Panel جداگانه | Inline query در dashboard | کاهش coupling و تکرار کوئری | ساده‌سازی توسعه KPI آتی | گسترش به hook اختصاصی در بعد |
+| D18 | iter9 | حذف UnifiedStatCard محلی تکراری | چند نسخه کارت آماری | یکپارچگی و کاهش رندر زائد | پایه طراحی thốngی کارت‌ها | بازبینی طی Design System |
 
 ## 6. ریفرنس Trace IDs (Mapping Skeleton)
 Draft JSON (تولید بعد):
@@ -209,6 +213,9 @@ Suites:
 | T45 | Ledger Read Switch Implemented | flag فعال، تست invariants سبز | بروزرسانی plan.md برای Phase B |
 | T46 | Allocation Cache Service Enhanced | متد getRepresentativeDebt اضافه شد | تست E-B1 complete |
 | T47 | Invariants I1-I5 Verified | تست‌های پایه سبز پس از db:push | آماده Phase C یا ادامه B |
+| T48 | Ingestion Progress Determinism Added | --progress NDJSON seq events | اضافه کردن fallback بدون DB |
+| T49 | Financial Summary Panel Extracted | کارت‌های کلیدی جدا و memoized | کاهش query duplication |
+| T50 | Dashboard Cleanup | حذف کارت موقت، ادغام Panel | آماده اضافه KPIهای جدید |
 
 ## 14. مسیرهای بعدی (Next Anticipated Steps)
 ~~Phase A / Iteration 5 (پیشنهادی):~~
@@ -219,6 +226,11 @@ Suites:
 ~~5. مستند status transition تفصیلی + نمودار state~~
 
 **فاز ۱ تکمیل شد در T44 - مورخ September 29, 2025**
+
+### الحاق مسیرهای افزوده پس از Iter9
+- پیاده‌سازی hook useFinancialSummary (جایگزینی select تکراری) – فاز B تقویت.
+- افزودن تست مقایسه python vs node (Harness) – پیش‌نیاز فعال‌سازی alert drift خودکار.
+- توسعه ingestion state machine UI بر اساس رویدادهای seq (Epik پیشنهادی E-C6 Potential).
 
 ## 15. NOTES موقت
 این فایل منبع حقیقت داخلی طراحی است؛ هر تغییر باید با plan.md منطبق و در صورت divergence علت ثبت شود.

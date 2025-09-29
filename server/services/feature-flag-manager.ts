@@ -31,7 +31,7 @@ export interface MultiStageFlag {
   description?: string;
 }
 
-type MultiStageFlagKey = 'allocation_dual_write' | 'ledger_backfill_mode' | 'allocation_read_switch' | 'active_reconciliation' | 'outbox_enabled' | 'allocation_runtime_guards';
+type MultiStageFlagKey = 'allocation_dual_write' | 'ledger_backfill_mode' | 'allocation_read_switch' | 'active_reconciliation' | 'outbox_enabled' | 'allocation_runtime_guards' | 'usage_line_visibility' | 'allocation_partial_mode';
 
 class FeatureFlagManager {
   private flags: FeatureFlagConfig;
@@ -135,6 +135,20 @@ class FeatureFlagManager {
         lastModified: new Date().toISOString(),
         modifiedBy: 'init',
         description: 'گاردهای زمان اجرای تخصیص برای جلوگیری از over-allocation (I6/I7)'
+      },
+      usage_line_visibility: {
+        state: 'off',
+        allowed: ['off','on'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'نمایش خطوط تخصیص و usage برای شفافیت (E-B6)'
+      },
+      allocation_partial_mode: {
+        state: 'off',
+        allowed: ['off','allow','enforce'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'فعال‌سازی تخصیص جزئی پرداخت‌ها (E-B2)'      
       }
     };
     console.log('🚩 ATOMOS Feature Flag Manager v1.0 initialized with safe defaults');

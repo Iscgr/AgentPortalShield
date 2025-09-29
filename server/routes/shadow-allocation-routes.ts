@@ -53,4 +53,27 @@ export function registerShadowAllocationRoutes(app: Express, authMiddleware: any
       res.status(500).json({ success: false, error: e.message });
     }
   });
+
+  // Phase B: مشاهده خطوط تخصیص (usage lines) - ترکیب payment_allocations + پرداخت‌های legacy
+  app.get('/api/allocations/lines', authMiddleware, async (req: Request, res: Response) => {
+    try {
+      const visibilityState = featureFlagManager.getMultiStageFlagState('usage_line_visibility');
+      if (visibilityState === 'off') {
+        return res.status(403).json({ success: false, error: 'usage_line_visibility خاموش است' });
+      }
+      const limit = Math.min(parseInt(String(req.query.limit || '100')), 500);
+      // آخرین خطوط ledger
+      const ledgerRows = await db.execute(sql`SELECT pa.id, pa.payment_id, pa.invoice_id, pa.allocated_amount, pa.method, pa.synthetic, pa.created_at FROM payment_allocations pa ORDER BY pa.id DESC LIMIT ${limit}`);
+      // پرداخت‌های legacy allocated (برای مرجع) - بدون join پیچیده
+      const legacyRows = await db.execute(sql`SELECT p.id AS payment_id, p.invoice_id, CASE WHEN p.amount_dec IS NOT NULL THEN p.amount_dec ELSE NULLIF(regexp_replace(p.amount, '[^0-9.-]', '', 'g'), '')::DECIMAL END AS amount_dec, p.is_allocated, p.created_at FROM payments p WHERE p.is_allocated = true ORDER BY p.id DESC LIMIT ${limit}`);
+      res.json({
+        success: true,
+        ledger: (ledgerRows as any).rows,
+        legacy: (legacyRows as any).rows,
+        meta: { limit, visibility: visibilityState }
+      });
+    } catch (e:any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
 }

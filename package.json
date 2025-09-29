@@ -14,6 +14,7 @@
     ,"backfill:dry": "tsx scripts/backfill-dry-run.ts"
     ,"cast:payments:dry": "tsx scripts/payments-cast-shadow.ts --dry-run"
     ,"cast:payments:apply": "tsx scripts/payments-cast-shadow.ts --apply"
+    ,"cast:payments:validate": "tsx scripts/payments-cast-validate.ts"
     ,"ingest:dry": "tsx scripts/ingest-real-sample.ts --dry-run"
     ,"ingest:apply": "tsx scripts/ingest-real-sample.ts --apply"
   },

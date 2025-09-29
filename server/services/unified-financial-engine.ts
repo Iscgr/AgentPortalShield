@@ -311,6 +311,23 @@ export class UnifiedFinancialEngine {
 
   // ✅ ADMIN PANEL OPTIMIZATION: Debt query cache to reduce repeated queries
   private static debtQueryCache = new Map<number, { debt: any; timestamp: number }>(); // Changed 'any' to 'UnifiedFinancialData[]' for clarity
+
+  /**
+   * سیستم پاکسازی کامل همه کش‌های داخلی موتور مالی
+   * استفاده در سناریوهای destructive مانند reset-data یا مهاجرت‌های عمده
+   */
+  static clearAllCaches(reason: string = 'manual_reset') {
+    try {
+      const qSize = this.queryCache.size;
+      const dSize = this.debtQueryCache.size;
+      this.queryCache.clear();
+      this.debtQueryCache.clear();
+      this.invalidationQueue.clear();
+      console.log(`🧹 UnifiedFinancialEngine caches cleared (${qSize} query, ${dSize} debt) :: reason=${reason}`);
+    } catch (err) {
+      console.warn('⚠️ Failed to clear UnifiedFinancialEngine caches:', err);
+    }
+  }
   private static readonly DEBT_CACHE_TTL = 30 * 1000; // 30 seconds for debt queries
 
   static async calculateBatch(representativeIds: number[]): Promise<Map<number, any>> {

@@ -8,6 +8,8 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { checkDatabaseHealth, closeDatabaseConnection, pool } from "./db";
 import { performanceMonitoringMiddleware } from "./middleware/performance";
+import { featureFlagManager } from './services/feature-flag-manager';
+import { DriftJobService } from './services/drift-job-service';
 
 
 const app = express();
@@ -306,6 +308,19 @@ app.use((req, res, next) => {
   };
 
   startServer();
+
+  // Phase B: Auto-start drift job if reconciliation flag is active
+  try {
+    const reconState = featureFlagManager.getMultiStageFlagState('active_reconciliation');
+    if (reconState === 'dry' || reconState === 'enforce') {
+      DriftJobService.start();
+      console.log('⏱️ DriftJobService auto-started (state=' + reconState + ')');
+    } else {
+      console.log('DriftJobService not started (active_reconciliation=' + reconState + ')');
+    }
+  } catch (e:any) {
+    console.warn('Could not auto-start DriftJobService:', e.message);
+  }
 
   // Simplified error handling
   process.on('uncaughtException', (error) => {

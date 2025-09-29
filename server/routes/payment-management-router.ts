@@ -7,6 +7,8 @@
 import { Router } from 'express';
 import { storage } from '../storage.js';
 import { unifiedAuthMiddleware } from '../middleware/unified-auth.js';
+import { featureFlagManager } from '../services/feature-flag-manager.js';
+import { AllocationService } from '../services/allocation-service.js';
 
 export const paymentManagementRouter = Router();
 export const requireAuth = unifiedAuthMiddleware;
@@ -187,6 +189,26 @@ paymentManagementRouter.post('/manual-allocate', async (req, res) => {
   } catch (error) {
     console.error('❌ Manual allocation error:', error);
     res.status(500).json({ error: "خطا در تخصیص دستی" });
+  }
+});
+
+// PHASE B: Partial allocation (shadow ledger) endpoint
+paymentManagementRouter.post('/partial-allocate', async (req, res) => {
+  try {
+    const mode = featureFlagManager.getMultiStageFlagState('allocation_partial_mode');
+    if (mode === 'off') {
+      return res.status(403).json({ success: false, error: 'Partial allocation feature disabled' });
+    }
+    const { paymentId, lines } = req.body;
+    if (!paymentId || !Array.isArray(lines)) {
+      return res.status(400).json({ success: false, error: 'paymentId و lines الزامی است' });
+    }
+    const performedBy = (req.session as any)?.username || 'ADMIN';
+    const result = await AllocationService.allocatePartial(Number(paymentId), lines, performedBy);
+    res.json({ success: true, data: result });
+  } catch (error:any) {
+    console.error('❌ Partial allocate error:', error);
+    res.status(400).json({ success: false, error: error.message || 'خطای ناشناخته' });
   }
 });
 

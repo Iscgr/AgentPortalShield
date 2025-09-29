@@ -118,6 +118,9 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 3. Portal Theming & Accessibility (E-B3)
 4. Active Reconciliation Engine (E-B4)
 5. Debt KPI Surface (E-B5)
+6. Usage Line Visibility & Audit (E-B6)
+7. Financial Summary Refactor Consolidation (E-B7)
+8. Representative Metrics Refresh Optimization (E-B8)
 
 ### 3.3 جزئیات اپیک‌ها
 #### E-B1: Ledger Read Switch
@@ -146,6 +149,27 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 - شاخص‌ها: debt_drift_ppm, avg_allocation_latency, partial_allocation_ratio, overpayment_buffer.
 - UI: صفحه Financial Integrity واقعی.
 
+#### E-B6: Usage Line Visibility & Audit
+- دامنه: شفاف‌سازی کامل خطوط تخصیص/مصرف (usage lines) برای هر پرداخت و فاکتور.
+- مؤلفه‌ها: API read-only endpoint `/api/allocations/lines?representative=...` + UI Drilldown در Modal.
+- اهداف: کاهش ابهام کاربر در منشأ تغییر «باقیمانده» و پشتیبانی پشتیبانی (support).
+- پذیرش: نمایش حداکثر 200 خط اخیر با قابلیت فیلتر وضعیت (synthetic/manual/auto).
+- Rollback: خاموش کردن Feature Flag `usage_line_visibility`.
+
+#### E-B7: Financial Summary Refactor Consolidation
+- دامنه: استخراج پنل خلاصه مالی به یک کوئری واحد (انجام شده – Decision D17) و حذف Query های تکراری.
+- اهداف: کاهش تعداد رندر/کوئری ≤ 50% نسبت به baseline قبلی؛ ثبات کارت‌ها در Dashboard و Representatives.
+- KPI: P95 بارگذاری پنل خلاصه < 120ms؛ بدون اختلاف در ارقام (Diff=0) با نسخه قبل.
+- پذیرش: تست همسانی (snapshot JSON) برای پاسخ API مربوط به summary.
+- Rollback: بازگشت به چند کوئری مستقل (در صورت کشف regression محاسباتی).
+
+#### E-B8: Representative Metrics Refresh Optimization
+- دامنه: بهینه‌سازی رفرش پس از Reset/Sync (استفاده از cache purge + invalidate هوشمند).
+- اهداف: کاهش زمان «نمایش رقم صحیح» پس از Reset از N ثانیه به < 2s.
+- اجزا: Hook invalidate مرکزی، clearAllCaches(reason) (Decision D16)، رویداد progress.
+- پذیرش: نماینده‌ای با 50 فاکتور و 20 پرداخت پس از reset حداکثر در 2 ثانیه رقم بدهی صحیح را نمایش می‌دهد.
+- Rollback: بازگشت به invalidate کامل React Query.
+
 ### 3.4 معیار خروج فاز B
 - Partial Allocation UI در محیط staging با 0 خطای بحرانی.
 - Debt Drift میانگین < 0.05%.
@@ -165,6 +189,7 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 3. Backup Automation & WAL Archiving (E-C3)
 4. Integrity Alerting & SLA Dash (E-C4)
 5. Activity Log Partitioning (E-C5)
+ 6. Ingestion Progress State Machine & Determinism (E-C6)
 
 ### 4.3 جزئیات اپیک‌ها
 #### E-C1: Outbox
@@ -190,6 +215,13 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 - استراتژی: RANGE by month.
 - Purge policy > 180 روز.
 
+#### E-C6: Ingestion Progress State Machine & Determinism
+- دامنه: تبدیل اسکریپت ingestion به یک State Machine مستند (States: INIT, GROUP_START, GROUP_SKIP, GROUP_APPLY, COMPLETE, ERROR).
+- اهداف: تضمین دترمینیسم ترتیبی (Decision D15) + قابلیت از سرگیری (resume) آینده.
+- خروجی: رویدادهای NDJSON با seq یکتا و checksum گروه.
+- پذیرش: دو اجرای متوالی روی ورودی ثابت → seq/event type sequence کاملاً یکسان.
+- Rollback: بازگشت به نسخه خطی ساده بدون state tracking.
+
 ### 4.4 معیار خروج فاز C
 - RPO ≤ 5m, RTO ≤ 30m شبیه‌سازی.
 - Replay موفق ≥ 99.9% صحت.
@@ -208,6 +240,7 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 3. Debt Forecast Prototype (E-D3)
 4. Performance Micro-Optimizations (E-D4)
 5. Python Integration for Financial Computation (E-D5)
+6. Python vs Node Consistency Harness (E-D6)
 
 ### 5.3 خلاصه اپیک‌ها
 | اپیک | توضیح | معیار پذیرش |
@@ -219,6 +252,12 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 | E-D5 | **Python Financial Computation Microservice** | **FastAPI service برای محاسبات دقیق (Decimal)، reconciliation engine، و debt verification؛ ادغام با Node.js via HTTP API؛ افزایش سرعت محاسبات ≥40% در bulk operations** |
 
 #### E-D5 جزئیات: Python Integration for Financial Computation
+#### E-D6: Python vs Node Consistency Harness
+- دامنه: اسکریپت مقایسه محاسبه بدهی و انحراف (drift) بین موتور Node و سرویس Python.
+- اجزا: اجرای bulk debt از Python (API یا client) + محاسبه محلی Node، تولید گزارش تفاوت در ppm.
+- KPI: Drift متوسط < 100ppm قبل از فعال‌سازی کامل Python، حداکثر Drift مشاهده شده < 0.01 مبلغ کل.
+- پذیرش: اجرای اسکریپت `compare-python-node-debt` خروجی JSON با فیلدهای (max_diff, avg_ppm, representative_count, worst[]).
+- Rollback: غیرفعال‌سازی موقت فراخوانی Python و تکیه بر Node فقط.
 - **دامنه**: FastAPI microservice برای محاسبات مالی سنگین
 - **مؤلفه‌ها**: 
   - Decimal-based calculations (حذف rounding errors)
@@ -244,6 +283,9 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 | E-C3 (Backup) | E-C4 | اطمینان | Alert باید به سلامت backup تکیه کند |
 | E-C4 (Integrity Alerting) | E-D5 | داده | Python سرویس از alerting برای trigger batch jobs استفاده کند |
 | E-B4 (Active Reconciliation) | E-D5 | عملکرد | Python برای بهینه‌سازی reconciliation engine |
+| E-B7 (Financial Summary Refactor) | E-B8 | کارایی | بهینه‌سازی refresh بر refactor واحد مبتنی است |
+| E-C6 (Ingestion Progress SM) | E-D6 | داده/اعتبار | Harness نیاز به رویدادهای دترمینیستیک برای baseline دارد |
+| E-D5 (Python Integration) | E-D6 | اعتبار | Consistency Harness برای سنجش قبل از rollout لازم است |
 
 ---
 ## 7. Traceability به review.md
@@ -456,6 +498,8 @@ I10: Drift_abs(representative) ≤ threshold جاری فاز.
 - پیشنهاد افزودن ستون‌: payment_allocations.synthetic (BOOL), payment_allocations.idempotency_key (TEXT UNIQUE).
 - افزودن اپیک کوچک «Ledger Backfill Guard» به فاز A (E-A6) اگر نیاز به صراحت: ایجاد قفل feature + گزارش پیشرفت.
 - توسعه اینورینت‌ها و Flagها برای کنترل ریسک‌های همزمانی.
+- الحاق اپیک‌های جدید: E-B6, E-B7, E-B8, E-C6, E-D6 مطابق تصمیمات اخیر.
+- پیوند تصمیمات: D15 (Deterministic Ingestion Progress) → E-C6؛ D16 (Dry-Run Fallback) → پشتیبانی قابلیت تست ingestion؛ D17 (Financial Summary Consolidation) → E-B7؛ D18 (Representative Metrics Refresh) → E-B8.
 
 ### 16.12 Next Design Artifacts (در صورت تأیید این افزوده‌ها)
 1. DDL پیشنهادی payment_allocations + invoice_balance_cache + reconciliation_runs.

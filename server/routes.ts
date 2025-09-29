@@ -67,6 +67,8 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 
 // Import Debt Verification Routes
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
+// Import Active Reconciliation Routes - Phase B: E-B4
+import activeReconciliationRoutes from './routes/active-reconciliation-routes.js';
 import { featureFlagManager } from './services/feature-flag-manager';
 
 // --- Interfaces for Authentication Middleware ---
@@ -395,6 +397,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // SHERLOCK v32.0: Register Debt Verification Routes for debt consistency checks
   app.use('/api/debt-verification', debtVerificationRoutes);
+  
+  // Phase B: E-B4 - Active Reconciliation Engine Routes
+  app.use('/api/reconciliation', activeReconciliationRoutes);
 
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
@@ -966,6 +971,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await storage.resetData(resetOptions);
 
       console.log('Data reset completed:', result.deletedCounts);
+
+      // پاکسازی کش‌های مالی جهت جلوگیری از نمایش داده کهنه پس از حذف گسترده
+      try {
+        const { UnifiedFinancialEngine } = await import('./services/unified-financial-engine.js');
+        UnifiedFinancialEngine.clearAllCaches('admin_reset_data');
+      } catch (cacheErr) {
+        console.warn('Failed to clear financial engine caches after reset:', cacheErr);
+      }
 
       res.json({
         success: true,

@@ -3,6 +3,26 @@
  * ادغام محاسبات Python با Node.js
  */
 
+export interface PythonBulkDebtResult {
+  representative_id: number;
+  total_sales: number;
+  total_paid: number;
+  total_debt: number;
+  debt_level: string;
+  invoice_count: number;
+  payment_count: number;
+  last_invoice_date: string | null;
+  last_payment_date: string | null;
+}
+
+export interface DriftDetectionResult {
+  total_drift: number;
+  drift_ratio: number;
+  anomalies?: any[];
+  processing_time_ms: number;
+  scope?: string;
+}
+
 export class PythonFinancialClient {
   private baseUrl: string;
 
@@ -47,23 +67,49 @@ export class PythonFinancialClient {
   }
 
   /**
-   * تشخیص drift با دقت بالا
+   * Enhanced drift detection with Python-powered anomaly analysis
+   * Supports both global scope and targeted representative analysis
    */
-  async detectDrift(scope: string = 'global') {
+  async detectDrift(options: {
+    representatives?: number[];
+    threshold: number;
+    includeAnomalies?: boolean;
+    scope?: string;
+  } | string = 'global'): Promise<DriftDetectionResult> {
     try {
+      // Handle backward compatibility for simple string scope
+      const requestBody = typeof options === 'string' 
+        ? { scope: options }
+        : {
+            representative_ids: options.representatives || [],
+            threshold: options.threshold,
+            include_anomalies: options.includeAnomalies !== false,
+            scope: options.scope || 'global'
+          };
+
       const response = await fetch(`${this.baseUrl}/reconcile/drift-detection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope })
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(45000) // Extended timeout for complex analysis
       });
 
       if (!response.ok) {
-        throw new Error(`Python service error: ${response.status}`);
+        throw new Error(`Python drift detection error: ${response.status}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      // Ensure consistent return format
+      return {
+        total_drift: result.total_drift || 0,
+        drift_ratio: result.drift_ratio || 0,
+        anomalies: result.anomalies || [],
+        processing_time_ms: result.processing_time_ms || 0,
+        scope: result.scope || (typeof options === 'string' ? options : options.scope)
+      };
     } catch (error) {
-      console.error('Failed to call Python drift detection:', error);
+      console.error('Python drift detection failed:', error);
       throw error;
     }
   }

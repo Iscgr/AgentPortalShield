@@ -1,106 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
-import { 
-  TrendingUp, 
-  AlertTriangle, 
-  Users, 
-  FileText,
-  Upload,
-  DollarSign,
-  CreditCard
-} from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import InvoiceUpload from "@/components/invoice-upload";
+import FinancialSummaryPanel from "@/components/financial-summary-panel";
 // SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table (now replaced by OverdueInvoicesCard)
 // import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
 
+// ساختار داده داشبورد (پیش از ریفکتور کامل به hook اختصاصی)
 interface DashboardData {
-  totalRevenue: number;
-  totalDebt: number;
-  totalCredit: number;
-  totalOutstanding: number;
-  totalRepresentatives: number;
-  activeRepresentatives: number;
-  inactiveRepresentatives: number;
-  riskRepresentatives: number;
-  totalInvoices: number;
-  paidInvoices: number;
-  unpaidInvoices: number;
-  overdueInvoices: number;
-  unsentTelegramInvoices: number;
-  totalSalesPartners: number;
-  activeSalesPartners: number;
-  systemIntegrityScore: number;
-  lastReconciliationDate: string;
-  problematicRepresentativesCount: number;
-  responseTime: number;
-  cacheStatus: string;
-  lastUpdated: string;
+  totalRevenue: number; totalDebt: number; totalCredit: number; totalOutstanding: number;
+  totalRepresentatives: number; activeRepresentatives: number; inactiveRepresentatives: number; riskRepresentatives: number;
+  totalInvoices: number; paidInvoices: number; unpaidInvoices: number; overdueInvoices: number;
+  unsentTelegramInvoices: number; totalSalesPartners: number; activeSalesPartners: number; systemIntegrityScore: number;
+  lastReconciliationDate: string; problematicRepresentativesCount: number; responseTime: number; cacheStatus: string; lastUpdated: string;
 }
 
 
 
-// Placeholder for UnifiedStatCard - assuming it's defined elsewhere and used for generic stats
-function UnifiedStatCard({ title, statKey, endpoint, icon, formatter, color }: { title: string; statKey: keyof DashboardData | 'totalSystemDebt'; endpoint: string; icon: React.ReactNode; formatter: string; color: string }) {
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: [endpoint],
-    queryFn: () => apiRequest(endpoint),
-    select: (data: any) => data?.value || data
-  });
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <Skeleton className="h-4 w-24 mb-2" />
-          <Skeleton className="h-8 w-20 mb-2" />
-          <Skeleton className="h-3 w-16" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  let displayValue: React.ReactNode = "-";
-  const rawValue = dashboardData?.[statKey];
-
-  if (rawValue !== undefined && rawValue !== null) {
-    if (formatter === "currency") {
-      displayValue = formatCurrency(rawValue as number);
-    } else if (formatter === "number") {
-      displayValue = toPersianDigits(rawValue.toString());
-    } else {
-      displayValue = toPersianDigits(rawValue.toString());
-    }
-  }
-
-  const getTrendColor = () => {
-    if (color === "green") return "text-green-400";
-    if (color === "red") return "text-red-400";
-    if (color === "blue") return "text-blue-400";
-    return "text-gray-300";
-  };
-
-  return (
-    <Card className={`bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700`}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-300">{title}</p>
-            <p className="text-2xl font-bold text-white mt-2">{displayValue}</p>
-            {/* Trend display can be added here if data is available */}
-          </div>
-          <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
-            {icon}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// کامپوننت UnifiedStatCard محلی حذف شد؛ اکنون از نسخه ماژولار shared استفاده می‌کنیم.
 
 
 function StatCard({ 
@@ -406,9 +327,9 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* File Upload Section - Main Dashboard Content */}
-      <div className="max-w-4xl mx-auto">
+    <div className="space-y-8">
+      <FinancialSummaryPanel />
+      <div className="max-w-5xl mx-auto">
         <InvoiceUpload />
       </div>
     </div>
