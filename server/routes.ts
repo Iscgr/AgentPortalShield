@@ -69,6 +69,7 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
 // Import Active Reconciliation Routes - Phase B: E-B4
 import activeReconciliationRoutes from './routes/active-reconciliation-routes.js';
+import guardMetricsRoutes from './routes/guard-metrics-routes.js';
 import { featureFlagManager } from './services/feature-flag-manager';
 
 // --- Interfaces for Authentication Middleware ---
@@ -1254,6 +1255,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payments API - Protected (ادغام شده با مدیریت پرداخت)
   // Use the payment management router for all payment-related operations
   app.use('/api/payments', paymentManagementRouter);
+  // Slice 5: Guard metrics observability endpoint
+  app.use('/api/allocations', guardMetricsRoutes);
 
   // SHERLOCK v35.0: Allocation Monitoring Routes
   app.get("/api/allocation/metrics", authMiddleware, async (req, res) => {

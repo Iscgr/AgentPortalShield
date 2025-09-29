@@ -103,6 +103,17 @@ export class InvoiceBalanceCacheService {
   }
 
   /**
+   * recomputeBatch: بازسازی سریع چند فاکتور در یک حلقه (استفاده بعد از allocatePartial)
+   */
+  static async recomputeBatch(invoiceIds: number[]): Promise<{ processed: number; errors: number }> {
+    let processed = 0; let errors = 0;
+    for (const id of invoiceIds) {
+      try { await this.recompute(id); processed++; } catch { errors++; }
+    }
+    return { processed, errors };
+  }
+
+  /**
    * محاسبه مجموع بدهی یک نماینده از cache
    */
   static async getRepresentativeDebt(representativeId: number): Promise<number> {

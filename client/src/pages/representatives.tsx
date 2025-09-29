@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PartialAllocationModal } from '@/components/partial-allocation-modal';
 import { 
   Table, 
   TableBody, 
@@ -234,6 +235,8 @@ export default function Representatives() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPaymentCreateOpen, setIsPaymentCreateOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [partialAllocateOpen, setPartialAllocateOpen] = useState(false);
+  const [paymentForPartial, setPaymentForPartial] = useState<any>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [isPaymentDeleteConfirmOpen, setIsPaymentDeleteConfirmOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
@@ -1356,6 +1359,17 @@ export default function Representatives() {
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
+                                {!payment.isAllocated && (
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => { setPaymentForPartial(payment); setPartialAllocateOpen(true); }}
+                                    className="ml-2 h-8 px-2"
+                                    title="تخصیص جزئی"
+                                  >
+                                    جزئی
+                                  </Button>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1497,6 +1511,17 @@ export default function Representatives() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Partial Allocation Modal */}
+      <PartialAllocationModal
+        paymentId={paymentForPartial?.id || null}
+        open={partialAllocateOpen}
+        onOpenChange={(o) => { if(!o) { setPartialAllocateOpen(false); setPaymentForPartial(null);} else setPartialAllocateOpen(true); }}
+        onAllocated={() => {
+          // پس از تخصیص موفق refresh نماینده
+          if (selectedRep) handleViewDetails(selectedRep);
+        }}
+      />
 
       {/* SHERLOCK v1.0 PAYMENT DELETION CONFIRMATION DIALOG */}
       <Dialog open={isPaymentDeleteConfirmOpen} onOpenChange={setIsPaymentDeleteConfirmOpen}>

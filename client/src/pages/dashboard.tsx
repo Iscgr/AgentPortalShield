@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import InvoiceUpload from "@/components/invoice-upload";
 import FinancialSummaryPanel from "@/components/financial-summary-panel";
+import GuardMetricsPanel from "@/components/guard-metrics-panel";
 // SHERLOCK v10.0 NEW COMPONENT: Debtor Representatives Table (now replaced by OverdueInvoicesCard)
 // import DebtorRepresentativesCard from "@/components/debtor-representatives-card";
 import { formatCurrency, toPersianDigits } from "@/lib/persian-date";
@@ -329,6 +330,10 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <FinancialSummaryPanel />
+      {/* Slice 5: Guard Metrics Observability Panel */}
+      <div className="max-w-5xl mx-auto">
+        <GuardMetricsPanel />
+      </div>
       <div className="max-w-5xl mx-auto">
         <InvoiceUpload />
       </div>

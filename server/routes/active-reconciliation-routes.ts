@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { activeReconciliationEngine } from '../services/active-reconciliation-engine.js';
 import { featureFlagManager } from '../services/feature-flag-manager.js';
 import errorManager from '../unified-error-manager.js';
+import { ReconciliationService } from '../services/reconciliation-service.js';
 
 const router = Router();
 
@@ -221,6 +222,26 @@ router.post('/cancel/:runId', async (req, res) => {
       error: 'CANCELLATION_FAILED',
       message: error instanceof Error ? error.message : 'Failed to cancel reconciliation'
     });
+  }
+});
+
+/**
+ * GET /api/reconciliation/summary
+ * خلاصه لحظه‌ای drift (global + top representatives) بدون ثبت رکورد پایگاه داده.
+ * پارامترهای اختیاری:
+ *   limit: تعداد نمایندگان در breakdown (پیش‌فرض 20)
+ */
+router.get('/summary', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    // اجرای محاسبه global بدون ثبت (record=false)
+    const global = await ReconciliationService.runShadowDriftCheck({ record: false });
+    const breakdown = await ReconciliationService.runShadowDriftBreakdown(limit);
+    res.json({ success: true, data: { global, breakdown, limit } });
+  } catch (error:any) {
+    console.error('Failed to get reconciliation summary:', error);
+    await errorManager.logSystemError('Failed to get reconciliation summary', error);
+    res.status(500).json({ success: false, error: 'SUMMARY_FAILED', message: error.message || 'خطا در خلاصه drift' });
   }
 });
 

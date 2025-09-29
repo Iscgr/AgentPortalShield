@@ -5,10 +5,13 @@
  */
 import { db } from '../database-manager';
 import { payments, invoices, paymentAllocations } from '@shared/schema';
+import { validateAllocations } from './allocation-invariants.js';
+import { GuardMetricsService } from './guard-metrics-service.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { featureFlagManager } from './feature-flag-manager';
 import { isCanaryRepresentative } from './allocation-canary-helper';
 import { InvoiceBalanceCacheService } from './invoice-balance-cache-service';
+import { stableIdempotencyKey } from '../utils/crypto-hash';
 
 export interface AllocationResultShadow {
   legacyUpdated: boolean;
@@ -178,7 +181,7 @@ export class AllocationService {
    * - ورودی lines: آرایه‌ای از { invoiceId, amount }
    * - اینورینت گارد: Σ(amount) ≤ مبلغ پرداخت، Σ(amount) ≤ remaining هر فاکتور.
    */
-  static async allocatePartial(paymentId: number, lines: Array<{ invoiceId: number; amount: number }>, performedBy?: number) {
+  static async allocatePartial(paymentId: number, lines: Array<{ invoiceId: number; amount: number; idempotencyKey?: string }>, performedBy?: number) {
     const partialMode = featureFlagManager.getMultiStageFlagState('allocation_partial_mode');
     if (partialMode === 'off') {
       throw new Error('Partial allocation feature is OFF');
@@ -186,22 +189,50 @@ export class AllocationService {
     if (!Array.isArray(lines) || !lines.length) throw new Error('lines array required');
 
     return await db.transaction(async (tx) => {
-      const [payment] = await tx.select().from(payments).where(eq(payments.id, paymentId));
+  const [payment] = await tx.select().from(payments).where(eq(payments.id, paymentId));
       if (!payment) throw new Error('Payment not found');
       const paymentBaseAmount = payment.amountDec ? Number(payment.amountDec) : parseAmountText(payment.amount);
 
       // جمع ورودی
-      const totalAllocate = lines.reduce((s,l) => s + Number(l.amount||0), 0);
-      if (totalAllocate <= 0) throw new Error('Total allocation must be > 0');
-      if (totalAllocate - paymentBaseAmount > 0.000001) {
-        const msg = `Σ lines (${totalAllocate}) exceeds payment amount (${paymentBaseAmount})`;
-        if (partialMode === 'enforce') throw new Error(msg); else console.warn('[PARTIAL][WARN]', msg);
+      // جمع مبلغ تخصیص قبلی این پرداخت (ledger)
+      const existingPayAlloc = await tx.execute(sql`SELECT COALESCE(SUM(allocated_amount),0) AS s FROM payment_allocations WHERE payment_id = ${paymentId}`);
+      const alreadyAllocatedPayment = Number((existingPayAlloc as any).rows?.[0]?.s || 0);
+
+      // آماده‌سازی snapshots فاکتورها برای validator
+      const invoiceIds = [...new Set(lines.map(l => l.invoiceId))];
+      const invoiceSnaps = [] as any[];
+      for (const invId of invoiceIds) {
+        const [inv] = await tx.select().from(invoices).where(eq(invoices.id, invId));
+        if (!inv) continue;
+        const invoiceAllocRes = await tx.execute(sql`SELECT COALESCE(SUM(allocated_amount),0) AS s FROM payment_allocations WHERE invoice_id = ${invId}`);
+        const alreadyAllocatedInvoice = Number((invoiceAllocRes as any).rows?.[0]?.s || 0);
+        invoiceSnaps.push({ invoiceId: invId, invoiceAmount: Number(inv.amount), alreadyAllocatedInvoice });
+      }
+
+      const guardState = featureFlagManager.getMultiStageFlagState('allocation_runtime_guards');
+      const validation = validateAllocations(
+        { paymentId, paymentAmount: paymentBaseAmount, alreadyAllocatedPayment },
+        invoiceSnaps,
+        lines.map(l => ({ invoiceId: l.invoiceId, amount: Number(l.amount), idempotencyKey: l.idempotencyKey })),
+        { tolerance: 1e-6 }
+      );
+
+      if (!validation.ok) {
+        // ثبت هر violation به صورت جداگانه
+        validation.violations.forEach(v => GuardMetricsService.record(v, { paymentId, mode: partialMode }));
+        if (guardState === 'enforce') {
+          GuardMetricsService.record('ENFORCE_BLOCK', { paymentId });
+          throw new Error('Allocation validation failed: ' + validation.violations.join('|'));
+        } else if (guardState === 'warn') {
+          console.warn('[ALLOC_GUARD][WARN]', validation.violations);
+        }
       }
 
       const messages: string[] = [];
       let inserted = 0; let skipped = 0; let anomalies = 0;
+      const touchedInvoiceIds: number[] = [];
       for (const line of lines) {
-        const amount = Number(line.amount);
+  const amount = Number(line.amount);
         if (!(amount > 0)) { skipped++; continue; }
         // remaining فاکتور را محاسبه کنیم (cache → fallback aggregate)
         const [inv] = await tx.select().from(invoices).where(eq(invoices.id, line.invoiceId));
@@ -223,15 +254,25 @@ export class AllocationService {
             method: 'manual',
             synthetic: false,
             performedBy,
-            idempotencyKey: `p:${paymentId}-i:${line.invoiceId}-a:${amount}-${Date.now()}`
+            idempotencyKey: line.idempotencyKey || stableIdempotencyKey(paymentId, line.invoiceId, amount)
           });
           inserted++;
-          try { await InvoiceBalanceCacheService.recompute(line.invoiceId); } catch {}
+          // حذف recompute تکی؛ فقط شناسه را برای batch بعد از حلقه ذخیره می‌کنیم
+          if (!touchedInvoiceIds.includes(line.invoiceId)) touchedInvoiceIds.push(line.invoiceId);
         } catch (e:any) {
           messages.push(`Insert fail invoice=${line.invoiceId}: ${e.message}`);
         }
       }
-      return { paymentId, mode: partialMode, inserted, skipped, anomalies, messages };
+      // اجرای batch recompute خارج از حلقه برای کاهش round-trip ها
+      if (touchedInvoiceIds.length) {
+        try {
+          const { processed, errors } = await InvoiceBalanceCacheService.recomputeBatch(touchedInvoiceIds);
+          messages.push(`Batch cache recompute processed=${processed} errors=${errors}`);
+        } catch (e:any) {
+          messages.push('Batch cache recompute failed: ' + e.message);
+        }
+      }
+      return { paymentId, mode: partialMode, guardState, inserted, skipped, anomalies, messages, validation };
     });
   }
 }

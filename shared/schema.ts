@@ -251,6 +251,18 @@ export const reconciliationRuns = pgTable('reconciliation_runs', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Guard Metrics Events (Phase B - E-B5 Persistence مرحله 1)
+// هدف: ذخیره رویدادهای ثبت‌شده توسط GuardMetricsService برای تحلیل زمانی و KPI
+export const guardMetricsEvents = pgTable('guard_metrics_events', {
+  id: serial('id').primaryKey(),
+  eventType: text('event_type').notNull(), // همان type در record()
+  // level بالقوه برای آینده (warn/enforce) - فعلاً nullable
+  level: text('level'),
+  // اختیاری: شناسه نماینده یا موجودیت در context (Json فیلد)
+  context: json('context'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
 
 // Data Integrity Constraints (محدودیت‌های یکپارچگی داده) - Clock's Precision Mechanism
 export const dataIntegrityConstraints = pgTable("data_integrity_constraints", {
