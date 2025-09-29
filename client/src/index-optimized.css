@@ -396,11 +396,11 @@
 
 /* UPLOAD AREA */
 .upload-area {
-  @apply border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors hover:border-primary hover:bg-muted;
+  @apply border-2 border-dashed border-border rounded-lg p-8 text-center transition-colors hover:border-primary hover:bg-primary/5;
 }
 
 .upload-area.dragover {
-  @apply border-primary bg-muted;
+  @apply border-primary bg-primary/10;
 }
 
 /* ANIMATIONS */

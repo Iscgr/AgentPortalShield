@@ -48,19 +48,19 @@ function StatCard({
       <CardContent className="p-4 lg:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-blue-200">
+            <p className="text-sm font-medium text-muted-foreground">
               {title}
             </p>
-            <p className="text-2xl font-bold text-white mt-2">
+            <p className="text-2xl font-bold text-foreground mt-2">
               {toPersianDigits(value)}
             </p>
             {subtitle && (
-              <p className="text-sm text-blue-300 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {subtitle}
               </p>
             )}
           </div>
-          <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
+          <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
             <Icon className={`w-6 h-6 ${colorClass}`} />
           </div>
         </div>

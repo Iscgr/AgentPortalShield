@@ -1,25 +1,18 @@
-// 🎨 Claymorphism Card Component
+// 🎨 Unified Card Component (replacing claymorphism)
 import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface ClayCardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'metric' | 'floating' | 'pulse';
-  gradient?: 'lavender' | 'mint' | 'blue' | 'peach' | 'sage';
 }
 
 const ClayCard = React.forwardRef<HTMLDivElement, ClayCardProps>(
-  ({ className, variant = 'default', gradient, children, ...props }, ref) => {
+  ({ className, variant = 'default', children, ...props }, ref) => {
     return (
       <div
         ref={ref}
         className={cn(
-          'clay-card p-6',
-          {
-            'clay-metric-card': variant === 'metric',
-            'clay-floating': variant === 'floating',
-            'clay-pulse': variant === 'pulse',
-          },
-          gradient && `clay-gradient-${gradient}`,
+          'unified-card p-6',
           className
         )}
         {...props}
