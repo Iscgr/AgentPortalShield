@@ -6,7 +6,6 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UnifiedAuthProvider, useUnifiedAuth } from "@/contexts/unified-auth-context";
-import { useMobileOptimizations } from "@/hooks/use-mobile-optimizations";
 
 // Layout components
 import Sidebar from "@/components/layout/sidebar";
@@ -111,7 +110,6 @@ function AuthenticatedRouter() {
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isMobile } = useMobileOptimizations();
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -129,14 +127,12 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  const { isMobile } = useMobileOptimizations();
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <UnifiedAuthProvider>
           <Router>
-            <div className={`min-h-screen bg-background ${isMobile ? 'mobile-optimized' : ''}`}>
+            <div className={`min-h-screen bg-background`}>
               <AuthenticatedRouter />
             </div>
           </Router>

@@ -56,20 +56,20 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
       
       {/* Sidebar */}
       <div className={cn(
-        "admin-sidebar fixed right-0 top-0 h-screen z-50 w-80 transform transition-all duration-300 ease-in-out",
+        "sidebar-nav fixed right-0 top-0 h-screen z-50 w-80 transform transition-all duration-300 ease-in-out",
         "lg:translate-x-0",
         isOpen ? "translate-x-0" : "translate-x-full"
       )}>
         {/* Logo Section */}
-        <div className="p-6 border-b border-white/10">
+        <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 space-x-reverse">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Shield className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white mb-1">MarFaNet</h1>
-                <p className="text-sm text-blue-200">سیستم مدیریت مالی</p>
+                <h1 className="text-xl font-bold text-foreground mb-1">MarFaNet</h1>
+                <p className="text-sm text-muted-foreground">سیستم مدیریت مالی</p>
               </div>
             </div>
             
@@ -77,7 +77,7 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden text-white hover:bg-white/10"
+              className="lg:hidden text-foreground hover:bg-muted"
               onClick={onToggle}
               aria-label="بستن منوی ناوبری"
               title="بستن منوی ناوبری"
@@ -101,10 +101,8 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
                   aria-label={`رفتن به صفحه ${item.name}`}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "admin-nav-item flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent",
-                    isActive
-                      ? "active text-white"
-                      : "text-blue-100 hover:text-white"
+                    "unified-nav-item",
+                    isActive && "active"
                   )}
                 >
                   <item.icon className="ml-3 w-5 h-5" aria-hidden="true" />
@@ -116,18 +114,18 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
         </nav>
 
         {/* User Profile Section */}
-        <div className="absolute bottom-0 right-0 left-0 p-4 border-t border-white/10">
-          <div className="admin-glass-card p-4">
+        <div className="absolute bottom-0 right-0 left-0 p-4 border-t border-border">
+          <div className="unified-card p-4">
             <div className="flex items-center space-x-3 space-x-reverse">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                <Users className="w-5 h-5 text-primary-foreground" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-white">حسابدار اصلی</p>
-                <p className="text-xs text-blue-200">admin@marfanet.com</p>
+                <p className="text-sm font-medium text-foreground">حسابدار اصلی</p>
+                <p className="text-xs text-muted-foreground">admin@marfanet.com</p>
               </div>
               <button 
-                className="text-blue-200 hover:text-white transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent rounded-md p-1"
+                className="text-muted-foreground hover:text-foreground transition-colors duration-200 focus-ring rounded-md p-1"
                 onClick={handleLogout}
                 aria-label="خروج از سیستم"
                 title="خروج از سیستم"
