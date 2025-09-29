@@ -71,16 +71,6 @@ Legend: [D]=Done, [P]=Partial, [N]=Not Started
 | Activity Log Partitioning | N | استراتژی RANGE ماهیانه پیاده نشده |
 | Ingestion Progress State Machine & Determinism | P | State output NDJSON seq اضافه (Iter گذشته) – formal state table/metadata ناقص |
 
-### Phase D
-| اپیک | وضعیت | توضیح |
-|------|--------|-------|
-| Adaptive Allocation Engine | N | الگوریتم Aging/Weighted طراحی اولیه فقط |
-| Analytics Export | N | خروجی CSV/Parquet پیاده نشده |
-| Debt Forecast Prototype | N | مدل ARIMA/MAvg صرفاً در plan |
-| Performance Micro-Optimizations | N | Virtualized Table و Render Reduction انجام نشده |
-| Python Financial Microservice | N | هنوز هیچ سرویس FastAPI یا Flag اجرایی |
-| Python vs Node Consistency Harness | N | Harness مقایسه پیاده نشده |
-
 ---
 ## 4. Feature Flags Matrix
 | Flag | حالات | وضعیت جاری | توضیح تکمیلی |

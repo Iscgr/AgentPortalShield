@@ -409,6 +409,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Phase B: E-B4 - Active Reconciliation Engine Routes
   app.use('/api/reconciliation', activeReconciliationRoutes);
 
+  // Phase C: E-C1 - Outbox Pattern Routes
+  const outboxRoutes = await import('./routes/outbox-routes');
+  app.use('/api/outbox', outboxRoutes.default);
+
   // SHERLOCK v1.0: Session Recovery and Debug Endpoint
   app.get("/api/auth/session-debug", (req, res) => {
     const sessionInfo = {

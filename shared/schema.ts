@@ -263,6 +263,20 @@ export const guardMetricsEvents = pgTable('guard_metrics_events', {
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// ==================== RELIABILITY TABLES (Phase C) ====================
+// Telegram Outbox Pattern (E-C1)
+// هدف: تضمین تحویل پیام‌های تلگرام با retry mechanism و KPI tracking
+export const outbox = pgTable('outbox', {
+  id: serial('id').primaryKey(),
+  type: text('type').notNull(), // 'TELEGRAM_MESSAGE', 'EMAIL', 'WEBHOOK'
+  payload: json('payload').notNull(), // محتوای پیام شامل recipient، message، options
+  status: text('status').notNull().default('PENDING'), // PENDING | PROCESSING | SENT | FAILED | CANCELLED
+  retryCount: integer('retry_count').notNull().default(0),
+  nextRetryAt: timestamp('next_retry_at'),
+  errorLast: text('error_last'), // آخرین خطای مواجه شده
+  processedAt: timestamp('processed_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
 
 // Data Integrity Constraints (محدودیت‌های یکپارچگی داده) - Clock's Precision Mechanism
 export const dataIntegrityConstraints = pgTable("data_integrity_constraints", {
@@ -967,6 +981,8 @@ export const insertDailyReportSchema = omitInsert(createInsertSchema(dailyReport
 
 export const insertReconciliationActionSchema = omitInsert(createInsertSchema(reconciliationActions), "id", "createdAt", "appliedAt");
 
+export const insertOutboxSchema = omitInsert(createInsertSchema(outbox), "id", "createdAt");
+
 // ==================== TYPES ====================
 
 export type Employee = typeof employees.$inferSelect;
@@ -989,3 +1005,6 @@ export type InsertTechnicalReport = z.infer<typeof insertTechnicalReportSchema>;
 
 export type DailyReport = typeof dailyReports.$inferSelect;
 export type InsertDailyReport = z.infer<typeof insertDailyReportSchema>;
+
+export type Outbox = typeof outbox.$inferSelect;
+export type InsertOutbox = z.infer<typeof insertOutboxSchema>;

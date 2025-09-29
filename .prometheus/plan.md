@@ -144,54 +144,14 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 - Backup automation فعال
 
 ---
-## 5. فاز D – Optimization & Advanced Intelligence
-
-### 5.1 اهداف Phase D
-- Allocation Strategy تطبیقی (Aging / Risk / Weighted)
-- Export & Analytics Interfaces
-- Predictive Debt Forecast (نسخه ابتدایی)
-
-### 5.2 اپیک‌های Phase D
-
-#### E-D1: Adaptive Allocation Engine
-- الگوریتم وزن‌دهی: sort by (overdueAge DESC, amount DESC)
-- بهبود متوسط زمان تسویه فاکتورهای قدیمی ≥ 15%
-
-#### E-D2: Analytics Export  
-- خروجی CSV/Parquet از رویدادهای مالی
-- تولید فایل ≤ 30s برای 12 ماه
-
-#### E-D3: Debt Forecast Prototype
-- مدل ساده ARIMA یا moving average روی جریان بدهی
-- خطای MAPE < 10% در افق 30 روز
-
-#### E-D4: Performance Micro-Optimizations
-- حذف رندر مازاد، Virtualized Table
-- کاهش P95 رندر فهرست فاکتور > 30%
-
-#### E-D5: Python Financial Computation Microservice
-- FastAPI service برای محاسبات دقیق (Decimal)
-- ادغام با Node.js via HTTP API
-- افزایش سرعت محاسبات ≥40% در bulk operations
-
-#### E-D6: Python vs Node Consistency Harness
-- اسکریپت مقایسه محاسبه بدهی بین موتور Node و Python
-- Drift متوسط < 100ppm قبل فعال‌سازی کامل
-
-### 5.3 معیار خروج فاز D
-- Allocation Strategy تطبیقی فعال
-- Analytics Export operational
-- Python integration validated
-
----
 ## 6. ماتریس وابستگی (Dependency Matrix)
 
 | From | To | نوع وابستگی | توضیح |
 |------|----|-------------|-------|
 | E-C1 (Outbox) | E-C4 | عملکرد | Alert نیاز به outbox health دارد |
 | E-C3 (Backup) | E-C4 | اطمینان | Alert باید به سلامت backup تکیه کند |
-| E-C4 (Integrity Alerting) | E-D5 | داده | Python سرویس از alerting برای trigger استفاده کند |
-| E-D5 (Python Integration) | E-D6 | اعتبار | Consistency Harness برای سنجش قبل rollout |
+| E-C4 (Integrity Alerting) | E-C5 | داده | Partitioning نیاز به alerting برای trigger دارد |
+| E-C5 (Activity Log Partitioning) | E-C6 | عملکرد | State Machine نیاز به partitioning برای performance دارد |
 
 ---
 ## 7. وضعیت فعلی و Progress
@@ -202,21 +162,17 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 | **Phase A** | 100% ✅ | Ledger foundation, dual-write, cache materialization |
 | **Phase B** | 100% ✅ | Reconciliation engine, KPI dashboard, performance optimization |
 | **Phase C** | 0% | Reliability and observability infrastructure |
-| **Phase D** | 0% | Advanced intelligence and optimization |
 
 ### 7.2 Overall Project Progress
 **Current Progress: ~65%**
 - Phase A (25% weight): 100% complete = 25%
 - Phase B (40% weight): 100% complete = 40%  
-- Phase C (25% weight): 0% complete = 0%
-- Phase D (10% weight): 0% complete = 0%
-- **Total: 65% Complete**
+- Phase C (35% weight): 0% complete = 0%
 
 ### 7.3 معیارهای تکمیل پروژه
 - ✅ Phase A: Ledger infrastructure stable
 - ✅ Phase B: UX and reconciliation operational  
 - 🎯 Phase C: Reliability and backup systems
-- 🎯 Phase D: Advanced features and optimization
 
 ---
 ## 8. استراتژی اجرای Phase C
@@ -244,11 +200,6 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 1. **E-C1 Telegram Outbox**: Begin implementation
 2. **E-C3 Backup Automation**: Design backup strategy
 3. **Infrastructure Setup**: Prepare monitoring and alerting
-
-### Long-term Goals (Phase D)  
-1. **Python Integration**: Advanced computation capabilities
-2. **Analytics Platform**: Data export and insights
-3. **Predictive Features**: Debt forecasting and optimization
 
 ---
 
