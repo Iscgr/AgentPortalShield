@@ -18,6 +18,7 @@ import { useUnifiedAuth } from "@/contexts/unified-auth-context";
 
 const navigation = [
   { name: "داشبورد", href: "/dashboard", icon: BarChart3 },
+  { name: "KPI مالی", href: "/kpi-dashboard", icon: BarChart3 },
   { name: "نمایندگان", href: "/representatives", icon: Users },
   { name: "فاکتورها", href: "/invoices", icon: FileText },
   { name: "مدیریت فاکتورها", href: "/invoice-management", icon: Edit },
@@ -78,14 +79,16 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
               size="sm"
               className="lg:hidden text-white hover:bg-white/10"
               onClick={onToggle}
+              aria-label="بستن منوی ناوبری"
+              title="بستن منوی ناوبری"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5" aria-hidden="true" />
             </Button>
           </div>
         </div>
 
         {/* Navigation Menu */}
-        <nav className="mt-6 px-4 flex-1">
+        <nav className="mt-6 px-4 flex-1" aria-label="منوی اصلی ناوبری">
           <div className="space-y-2">
             {navigation.map((item) => {
               const isActive = location === item.href || 
@@ -95,14 +98,16 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
                 <Link
                   key={item.name}
                   href={item.href}
+                  aria-label={`رفتن به صفحه ${item.name}`}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "admin-nav-item flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300",
+                    "admin-nav-item flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent",
                     isActive
                       ? "active text-white"
                       : "text-blue-100 hover:text-white"
                   )}
                 >
-                  <item.icon className="ml-3 w-5 h-5" />
+                  <item.icon className="ml-3 w-5 h-5" aria-hidden="true" />
                   {item.name}
                 </Link>
               );
@@ -122,11 +127,12 @@ export default function Sidebar({ isOpen = true, onToggle }: SidebarProps) {
                 <p className="text-xs text-blue-200">admin@marfanet.com</p>
               </div>
               <button 
-                className="text-blue-200 hover:text-white transition-colors duration-200"
+                className="text-blue-200 hover:text-white transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent rounded-md p-1"
                 onClick={handleLogout}
-                aria-label="خروج"
+                aria-label="خروج از سیستم"
+                title="خروج از سیستم"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
           </div>

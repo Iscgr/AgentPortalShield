@@ -7,6 +7,11 @@ interface ImportMetaEnv {
   readonly [key: string]: string | undefined;
 }
 
+// NOTE: برای جلوگیری از تداخل با index signature (string) مقدار DEV را به صورت رشته تفسیر می‌کنیم ("true"/"false").
+interface ImportMetaEnvExtra {
+  readonly DEV?: string; // interpret truthy via === 'true'
+}
+
 interface ImportMeta {
   readonly env: ImportMetaEnv;
   readonly hot: {
@@ -22,9 +27,8 @@ interface ImportMeta {
   readonly glob: (pattern: string) => Record<string, () => Promise<any>>;
 }
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+// ترکیب دو اینترفیس: (Hack) - در TS declaration merging انجام می‌شود
+interface ImportMeta extends ImportMetaEnvExtra {}
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;

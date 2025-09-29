@@ -3,6 +3,25 @@
 @tailwind utilities;
 
 :root {
+  /* === Design System Core Tokens (Phase B3 - Contrast Enhanced) === */
+  /* 5-Color Semantic Palette - WCAG AA Compliant */
+  --ds-primary: hsl(258 62% 58%); /* Darker primary for better contrast */
+  --ds-primary-foreground: var(--primary-foreground);
+  --ds-neutral: hsl(220 9% 46%);
+  --ds-neutral-foreground: hsl(210 20% 98%);
+  --ds-success: hsl(145 65% 35%); /* Much darker green for AA compliance */
+  --ds-success-foreground: hsl(145 25% 96%);
+  --ds-warning: hsl(40 90% 55%);
+  --ds-warning-foreground: hsl(40 30% 10%);
+  --ds-danger: var(--destructive);
+  --ds-danger-foreground: var(--destructive-foreground);
+  /* Focus Ring */
+  --focus-ring-color: hsl(258 90% 70% / 0.9);
+  --focus-ring-offset: 2px;
+  --focus-ring-width: 3px;
+}
+
+:root {
   /* Claymorphism Theme - Soft Pastel Colors */
   --background: hsl(280, 15%, 97%);
   --foreground: hsl(260, 15%, 25%);
@@ -58,9 +77,9 @@
   --popover-foreground: hsl(280, 15%, 85%);
   --card: hsl(265, 25%, 10%);
   --card-foreground: hsl(280, 15%, 85%);
-  --border: hsl(270, 15%, 20%);
+  --border: hsl(270, 15%, 45%); /* Further enhanced for 3:1 WCAG ratio */
   --input: hsl(270, 20%, 18%);
-  --primary: hsl(258, 62%, 65%);
+  --primary: hsl(258, 62%, 58%); /* Enhanced for WCAG contrast compliance */
   --primary-foreground: hsl(0, 0%, 100%);
   --secondary: hsl(155, 35%, 35%);
   --secondary-foreground: hsl(155, 45%, 85%);
@@ -112,9 +131,9 @@
   --popover-foreground: hsl(280, 15%, 85%);
   --card: hsl(265, 25%, 10%);
   --card-foreground: hsl(280, 15%, 85%);
-  --border: hsl(270, 15%, 20%);
+  --border: hsl(270, 15%, 45%); /* Further enhanced for 3:1 WCAG ratio */
   --input: hsl(270, 20%, 18%);
-  --primary: hsl(258, 62%, 65%);
+  --primary: hsl(258, 62%, 58%); /* Darker for better contrast (was 65%) */
   --primary-foreground: hsl(0, 0%, 100%);
   --secondary: hsl(155, 35%, 35%);
   --secondary-foreground: hsl(155, 45%, 85%);
@@ -125,7 +144,7 @@
   --ring: hsl(258, 30%, 55%);
 
   /* Dark Claymorphism Colors */
-  --clay-lavender: hsl(258, 62%, 65%);
+  --clay-lavender: hsl(258, 62%, 58%); /* Matched with primary */
   --clay-mint: hsl(155, 35%, 35%);
   --clay-baby-blue: hsl(195, 45%, 35%);
   --clay-peach: hsl(25, 50%, 45%);
@@ -1473,3 +1492,31 @@
     overscroll-behavior: contain !important;
   }
 }
+
+  /* === Accessibility Utilities (Phase B3 Initial) === */
+  @layer utilities {
+    .focus-ring-base:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: var(--focus-ring-offset);
+      box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--focus-ring-color);
+      transition: outline-color 120ms ease, box-shadow 120ms ease;
+    }
+    .icon-button-a11y {
+      position: relative;
+    }
+    .icon-button-a11y:focus-visible {
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: var(--focus-ring-offset);
+    }
+    .sr-only-inline {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+  }

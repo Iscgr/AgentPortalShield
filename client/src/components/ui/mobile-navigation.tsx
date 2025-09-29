@@ -41,13 +41,15 @@ export function MobileNavigation() {
               className={cn(
                 "flex flex-col items-center justify-center min-h-[44px] min-w-[44px] px-2 py-1 rounded-lg transition-all duration-200",
                 "touch-manipulation select-none",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isActive 
                   ? "bg-primary/10 text-primary" 
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               )}
-              aria-label={item.label}
+              aria-label={`رفتن به ${item.label}`}
+              aria-current={isActive ? "page" : undefined}
             >
-              <Icon className={cn("h-5 w-5 mb-1", isActive && "text-primary")} />
+              <Icon className={cn("h-5 w-5 mb-1", isActive && "text-primary")} aria-hidden="true" />
               <span className={cn(
                 "text-xs font-medium leading-none",
                 isActive ? "text-primary" : "text-muted-foreground"

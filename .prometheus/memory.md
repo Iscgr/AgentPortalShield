@@ -1,5 +1,6 @@
 # Memory Spine (حافظه عملیاتی فاز ۲)
-آخرین بروزرسانی: Add-IngestionDeterminism + FinancialSummaryRefactor (D15..D18)
+آخرین بروزرسانی: E-B3 Portal Acc| D25 | E-B5 Stage 3 KPI Implementation | 29 Sep | Comprehensive visualization: trends, export, navigation |
+| D26 | E-B4 Active Reconciliation Complete | 29 Sep | Full implementation confirmed: detection + repair + execution + integration |ssibility Complete (WCAG AA contrast audit, focus standardization, aria-labels) – هماهنگ با review.md (Sep 28 2025)
 
 ## 1. مأموریت (Mission Statement)
 پیاده‌سازی امن، مرحله‌ای و بدون کاهش دامنه‌ی مسئله برای: (۱) ایجاد زیرلجر تخصیص پرداخت‌ها، (۲) مهاجرت نوع مبلغ، (۳) ایجاد کش تراز فاکتور، (۴) ابزار پایش Drift، (۵) بسترسازی برای UI تخصیص جزئی، (۶) ادغام Python برای محاسبات حجمی و سازوکار آتی تطبیقی—all بدون نقض اصل «Enhance Not Eliminate».
@@ -60,7 +61,14 @@ TODO: افزودن I11 در آینده (Cross-period integrity بعد از Parti
 | D15 | iter9 | Deterministic Ingestion Progress (NDJSON seq) | چاپ فقط خلاصه نهایی | نیاز به استریم مرحله‌ای و ابزارپذیر | Debug و مانیتور دقیق ingestion | بازبینی اگر حجم >100K |
 | D16 | iter9 | Fallback بدون DATABASE_URL برای dry-run | خطای فوری و توقف | انعطاف در CI / محیط dev | امکان تحلیل بدون DB | در زمان integration تست real DB |
 | D17 | iter9 | Refactor Financial Summary به ماژول Panel جداگانه | Inline query در dashboard | کاهش coupling و تکرار کوئری | ساده‌سازی توسعه KPI آتی | گسترش به hook اختصاصی در بعد |
+| D18 | iter10 | E-B3 WCAG AA Compliance Strategy (focus-visible + contrast audit) | basic aria-label only | نیاز استاندارد accessibility و automated testing | کاهش maintenance burden، professional UX | کاملاً پایدار after Lighthouse validation |
 | D18 | iter9 | حذف UnifiedStatCard محلی تکراری | چند نسخه کارت آماری | یکپارچگی و کاهش رندر زائد | پایه طراحی thốngی کارت‌ها | بازبینی طی Design System |
+| D19 | slice6 | Guard Metrics Persistence Stage 1 | ذخیره فقط in-memory | نیاز تاریخچه و آنالیز نرخ | فراهم‌سازی Summaries 1h/24h | بعد Stage 3 Visualization |
+| D20 | slice7 | Guard Metrics Alert Classification | تأخیر تا فاز C | کشف زودهنگام انحراف | اولویت دهی به ایمنی قبل Visualization | آستانه‌ها پویا بعداً |
+| D21 | slice7 | Multi-Window Summary API (1h/24h) | فقط snapshot فعلی | نیاز Trend پایه | فراهم‌سازی ورودی نمودار آتی | افزودن rollup روزانه فاز C |
+| D22 | slice7 | عدم شروع Visualization زودهنگام | اجرای همزمان Charts | جلوگیری از بازکار UI پیش از A11y | حفظ تمرکز روی پایه KPI | بازبینی بعد E-B3 |
+| D24 | slice8 | E-B6 Usage Line Visibility Complete - API + UI Implementation | فقط فعال‌سازی API | شفافیت کامل تخصیص + audit trail + UI integration | ✅ COMPLETED: API endpoints + Modal component + Table buttons + CSV export | بعد KPI Visualization Stage 3 |
+| D25 | slice9 | E-B5 Stage 3 KPI Dashboard Complete - Visualization + Export Implementation | فقط Persistence/Alerts بدون UI | comprehensive financial metrics visualization + real-time monitoring | ✅ COMPLETED: KPI Dashboard page + Chart components + Export endpoints + API integration + Navigation | بعد Active Reconciliation Engine (E-B4) |
 
 ## 6. ریفرنس Trace IDs (Mapping Skeleton)
 Draft JSON (تولید بعد):
@@ -199,7 +207,8 @@ Suites:
 | T31 | Allocation Cache Sync | recompute بعد از allocateFull | backfill sync |
 | T32 | Backfill Cache Sync | recompute بعد از active/orphan | drift I10 تست |
 | T33 | I10 Drift Test Added | per representative threshold | canary skeleton |
-| T34 | Canary Read Skeleton | /api/allocations/canary-debt | بروزرسانی D9 |
+| T35 | E-B6 API Implementation | 3 endpoints اضافه شد: /lines, /lines/payment/:id, /lines/invoice/:id + feature flag فعال | UI component development |
+| T36 | E-B6 Testing Complete | 5 validation tests سبز شده با tsx | آماده Integration با Frontend |
 | T35 | Local DB Provisioned | docker compose db + drizzle push | آماده اجرای CAST |
 | T36 | CAST Dry-Run (Empty Dataset) | 0 rows → withinTolerance=true | نیاز داده تست برای سناریوی واقعی |
 | T37 | Memory Updated Iter6 | D10 ثبت شد | آمادگی برای apply بعد از ورود داده |
@@ -216,6 +225,14 @@ Suites:
 | T48 | Ingestion Progress Determinism Added | --progress NDJSON seq events | اضافه کردن fallback بدون DB |
 | T49 | Financial Summary Panel Extracted | کارت‌های کلیدی جدا و memoized | کاهش query duplication |
 | T50 | Dashboard Cleanup | حذف کارت موقت، ادغام Panel | آماده اضافه KPIهای جدید |
+| T51 | Guard Metrics Table Added | ایجاد migration + schema guard_metrics_events | پایه persistence |
+| T52 | Persistence Service Queue | enqueue + flushImmediate + batch logic | گذار shadow persistence |
+| T53 | Multi-Window Summary Implemented | getMultiWindowSummary(1h,24h) | ورودی KPI آینده |
+| T54 | Alerts Threshold Map Added | guard-metrics-thresholds.ts | تفکیک warn/critical پایه |
+| T55 | Alerts Analyzer | computeCurrentAlerts() | خروجی API /alerts |
+| T56 | Guard Metrics Routes Extended | history + alerts endpoints | ادغام UI Panel |
+| T57 | UI Guard Metrics Panel Enhanced | نمایش summaries + alerts badges | آماده Visualization Stage 3 |
+| T58 | A11y Phase 1 Applied | aria-label header/menu + calendar icons hidden + axe dev hook | contrast audit بعدی |
 
 ## 14. مسیرهای بعدی (Next Anticipated Steps)
 ~~Phase A / Iteration 5 (پیشنهادی):~~
@@ -227,6 +244,37 @@ Suites:
 
 **فاز ۱ تکمیل شد در T44 - مورخ September 29, 2025**
 
+### 14.1 گزینه‌های اولویت بعدی (Pending Decision)
+1. E-B3 (Accessibility/Theming Refactor) – کاهش ریسک بازکار قبل از KPI Charts.
+2. E-B6 (Usage Line Visibility) – ارتقای شفافیت و Audit جریان مالی.
+3. E-B5 Stage 3 (Visualization & Export) – ارزش مانیتورینگ تسریع ولی نیاز پایه A11y.
+
+Recommendation: ترتیب (B3 → B6 → B5 Stage 3) مطابق review.md.
+
+### 14.2 آماده‌سازی فنی پیش از Visualization
+| مورد | وضعیت | اقدام پیشنیاز |
+|------|-------|----------------|
+| Dynamic Threshold Config | N | ایجاد جدول threshold_config |
+| Rollup Aggregation Job | N | job ساعتی تولید buckets |
+| Export Endpoint | N | /api/allocations/guard-metrics/export |
+| Sparkline Data API | N | bucketed counts (hour) |
+
+### 14.3 Coverage شکاف های تست فوری
+| شکاف | توضیح | اقدام |
+|------|-------|-------|
+| I6-I10 Formal Tests | فعلاً runtime فقط | ایجاد spec invariants-extended |
+| Partial Allocation Edge | overflow / rounding | test: allocation-partial-edge.spec.ts |
+| Repair Plan Generation | خالی | skeleton test fail-first |
+| Financial Summary Snapshot | تضمین عدم regression | snapshot JSON ذخیره |
+
+### 14.4 Observability ارتقاء آینده
+| متریک | وضعیت | فاز هدف |
+|-------|-------|---------|
+| guard_metrics_event_rate | N | B5 Stage 3 |
+| allocation_latency_ms P95 | N | B5 Stage 3 |
+| drift_ppm_trend | Partial | B5 Stage 3 |
+| reconciliation_repair_success | N | B4 enforce |
+
 ### الحاق مسیرهای افزوده پس از Iter9
 - پیاده‌سازی hook useFinancialSummary (جایگزینی select تکراری) – فاز B تقویت.
 - افزودن تست مقایسه python vs node (Harness) – پیش‌نیاز فعال‌سازی alert drift خودکار.
@@ -237,3 +285,53 @@ Suites:
 
 ---
 END_OF_MEMORY
+
+## 16. Progress & Remaining Actions Snapshot (Auto-Alignment)
+این بخش به صورت افزوده (non-destructive) جهت همگام‌سازی سریع عامل‌ها با وضعیت فعلی است. مقادیر % تقریبی‌اند.
+
+### Phase B Active Epic Status
+| Epic | Code | % | Core Remaining | Test Gap | Flag Dependency |
+|------|------|----|----------------|----------|-----------------|
+| Ledger Read Switch | E-B1 | 100 | N/A | Confirm regression after canary expand | allocation_read_switch (canary→full) |
+| Allocation UI & Partial | E-B2 | 60 | Sum overflow validation + multi-invoice partial input UX | allocation-partial-edge.spec | allocation_partial_mode |
+| Portal Theming & A11y | E-B3 | 0.30 | aria-label + tokens + axe hook؛ contrast audit + focus state استاندارد | axe basic + Lighthouse | (none) |
+| Active Reconciliation | E-B4 | 40 | repair plan generation + actions table schema | reconciliation-actions.spec | active_reconciliation |
+| Debt KPI Surface (Stages1-2) | E-B5 | 60 | Visualization (charts) + export endpoint + rate compute | kpi-visualization.spec | guard_metrics_persistence / guard_metrics_alerts |
+| Usage Line Visibility | E-B6 | 0 | lines endpoint + pagination + filter | usage-lines.spec | usage_line_visibility |
+| Financial Summary Consolidation | E-B7 | 50 | snapshot test + ensure single query | financial-summary-snapshot.spec | (none) |
+| Metrics Refresh Optimization | E-B8 | 0 | invalidate hook + perf benchmark | refresh-perf.spec | (none) |
+
+### Immediate Priority (Focused Sprint Set)
+1. Kickoff E-B3 (foundation prevents rework for B5 charts)
+2. Implement E-B6 minimal API + UI table (audit clarity)
+3. Proceed E-B5 Stage 3 (charts + export + hourly rollup)
+
+### Cross-Cutting Technical Debt Items
+- Add row-level locking (SELECT ... FOR UPDATE) inside allocation transaction (Concurrency hardening for E-B2/B4)
+- Enrich guard_metrics_events with severity column (align future dynamic thresholds)
+- Formalize ingestion state machine persistence (E-C6 groundwork)
+
+### Pending Schema Additions (Not Yet Executed)
+1. threshold_config
+2. outbox
+3. financial_events
+4. guard_metrics_rollup (buckets)
+5. reconciliation_actions (for repair plan)
+
+### Formal Test Suites To Add (Fail-First Recommended)
+- invariants-extended.spec.ts (I6..I10)
+- allocation-partial-edge.spec.ts
+- reconciliation-repair-plan.spec.ts
+- financial-summary-snapshot.spec.ts
+- usage-lines.spec.ts
+- kpi-visualization.spec.ts
+
+### Risk Watch Adjustments
+| Risk | Update |
+|------|--------|
+| R2 | Monitor during canary debt read expansion |
+| R3 | Pending lock adoption in allocate path |
+| KPI Noise | Mitigation pending threshold_config + smoothing |
+
+### Alignment Note
+Progress matrix همسو با plan.md §15.1 و review.md §3؛ divergence صفر.

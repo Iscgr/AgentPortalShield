@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PartialAllocationModal } from '@/components/partial-allocation-modal';
+import { UsageLinesModal } from '@/components/usage-lines-modal';
 import { 
   Table, 
   TableBody, 
@@ -237,6 +238,12 @@ export default function Representatives() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [partialAllocateOpen, setPartialAllocateOpen] = useState(false);
   const [paymentForPartial, setPaymentForPartial] = useState<any>(null);
+  const [usageLinesModalOpen, setUsageLinesModalOpen] = useState(false);
+  const [usageLinesTarget, setUsageLinesTarget] = useState<{
+    type: 'representative' | 'payment' | 'invoice';
+    id: number;
+    title: string;
+  } | null>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [isPaymentDeleteConfirmOpen, setIsPaymentDeleteConfirmOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
@@ -891,41 +898,59 @@ export default function Representatives() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => handleSort('code')}
-                  >
-                    کد {getSortIcon('code')}
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full text-right"
+                      onClick={() => handleSort('code')}
+                      aria-label={`مرتب‌سازی بر اساس کد ${sortBy === 'code' ? (sortOrder === 'asc' ? 'نزولی' : 'صعودی') : ''}`}
+                    >
+                      کد {getSortIcon('code')}
+                    </button>
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => handleSort('name')}
-                  >
-                    نام فروشگاه {getSortIcon('name')}
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full text-right"
+                      onClick={() => handleSort('name')}
+                      aria-label={`مرتب‌سازی بر اساس نام فروشگاه ${sortBy === 'name' ? (sortOrder === 'asc' ? 'نزولی' : 'صعودی') : ''}`}
+                    >
+                      نام فروشگاه {getSortIcon('name')}
+                    </button>
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => handleSort('ownerName')}
-                  >
-                    مالک {getSortIcon('ownerName')}
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full text-right"
+                      onClick={() => handleSort('ownerName')}
+                      aria-label={`مرتب‌سازی بر اساس مالک ${sortBy === 'ownerName' ? (sortOrder === 'asc' ? 'نزولی' : 'صعودی') : ''}`}
+                    >
+                      مالک {getSortIcon('ownerName')}
+                    </button>
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => handleSort('isActive')}
-                  >
-                    وضعیت {getSortIcon('isActive')}
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full text-right"
+                      onClick={() => handleSort('isActive')}
+                      aria-label={`مرتب‌سازی بر اساس وضعیت ${sortBy === 'isActive' ? (sortOrder === 'asc' ? 'نزولی' : 'صعودی') : ''}`}
+                    >
+                      وضعیت {getSortIcon('isActive')}
+                    </button>
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => handleSort('totalSales')}
-                  >
-                    کل فروش {getSortIcon('totalSales')}
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full text-right"
+                      onClick={() => handleSort('totalSales')}
+                      aria-label={`مرتب‌سازی بر اساس کل فروش ${sortBy === 'totalSales' ? (sortOrder === 'asc' ? 'نزولی' : 'صعودی') : ''}`}
+                    >
+                      کل فروش {getSortIcon('totalSales')}
+                    </button>
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => handleSort('totalDebt')}
-                  >
-                    بدهی {getSortIcon('totalDebt')}
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-full text-right"
+                      onClick={() => handleSort('totalDebt')}
+                      aria-label={`مرتب‌سازی بر اساس بدهی ${sortBy === 'totalDebt' ? (sortOrder === 'asc' ? 'نزولی' : 'صعودی') : ''}`}
+                    >
+                      بدهی {getSortIcon('totalDebt')}
+                    </button>
                   </TableHead>
                   <TableHead>همکار فروش</TableHead>
                   <TableHead>عملیات</TableHead>
@@ -1261,6 +1286,24 @@ export default function Representatives() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setUsageLinesModalOpen(true);
+                                      setUsageLinesTarget({ 
+                                        type: 'invoice', 
+                                        id: invoice.id,
+                                        title: `فاکتور ${invoice.invoiceNumber}`
+                                      });
+                                    }}
+                                    className="h-8 px-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                    title="مشاهده تاریخچه تخصیص‌های این فاکتور"
+                                  >
+                                    <History className="w-4 h-4 ml-1" />
+                                    تاریخچه
+                                  </Button>
+                                  
                                   <div className="flex gap-1">
                                     <Button
                                       variant="ghost"
@@ -1276,6 +1319,7 @@ export default function Representatives() {
                                       <Edit3 className="w-4 h-4" />
                                     </Button>
                                   </div>
+                                  
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1350,26 +1394,47 @@ export default function Representatives() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => handleDeletePayment(payment)}
-                                  className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white"
-                                  title="حذف پرداخت - همگام‌سازی کامل آمار مالی"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                                {!payment.isAllocated && (
+                                <div className="flex items-center gap-1">
                                   <Button
-                                    variant="secondary"
+                                    variant="outline"
                                     size="sm"
-                                    onClick={() => { setPaymentForPartial(payment); setPartialAllocateOpen(true); }}
-                                    className="ml-2 h-8 px-2"
-                                    title="تخصیص جزئی"
+                                    onClick={() => {
+                                      setUsageLinesModalOpen(true);
+                                      setUsageLinesTarget({ 
+                                        type: 'payment', 
+                                        id: payment.id,
+                                        title: `پرداخت ${formatCurrency(parseFloat(payment.amount))}`
+                                      });
+                                    }}
+                                    className="h-8 px-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                    title="مشاهده تاریخچه تخصیص‌های این پرداخت"
                                   >
-                                    جزئی
+                                    <History className="w-4 h-4 ml-1" />
+                                    تاریخچه
                                   </Button>
-                                )}
+                                  
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDeletePayment(payment)}
+                                    className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white"
+                                    title="حذف پرداخت - همگام‌سازی کامل آمار مالی"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                  
+                                  {!payment.isAllocated && (
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => { setPaymentForPartial(payment); setPartialAllocateOpen(true); }}
+                                      className="h-8 px-2"
+                                      title="تخصیص جزئی"
+                                    >
+                                      جزئی
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1642,6 +1707,16 @@ export default function Representatives() {
           }}
         />
       )}
+
+      {/* Usage Lines Modal */}
+      <UsageLinesModal
+        open={usageLinesModalOpen}
+        onOpenChange={setUsageLinesModalOpen}
+        paymentId={usageLinesTarget?.type === 'payment' ? usageLinesTarget.id : undefined}
+        invoiceId={usageLinesTarget?.type === 'invoice' ? usageLinesTarget.id : undefined}
+        representativeId={usageLinesTarget?.type === 'representative' ? usageLinesTarget.id : undefined}
+        title={usageLinesTarget?.title}
+      />
     </div>
   );
 }

@@ -58,6 +58,7 @@ import { registerUnifiedStatisticsRoutes } from "./routes/unified-statistics-rou
 // Register unified financial routes
 import { registerUnifiedFinancialRoutes } from "./routes/unified-financial-routes.js";
 import { registerShadowAllocationRoutes } from './routes/shadow-allocation-routes';
+import { registerUsageLineRoutes } from './routes/usage-line-routes';
 import { isCanaryRepresentative } from './services/allocation-canary-helper';
 
 // Import database optimization routes registration
@@ -221,6 +222,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerUnifiedFinancialRoutes(app, authMiddleware);
   // Phase A - Iteration 3: Shadow allocation observation endpoint
   registerShadowAllocationRoutes(app, authMiddleware);
+  registerUsageLineRoutes(app, authMiddleware);
+  
+  // E-B5 Stage 3: KPI Metrics routes
+  const kpiMetricsRoutes = (await import('./routes/kpi-metrics-routes.js')).default;
+  app.use('/api/allocations', kpiMetricsRoutes);
+  console.log('✅ E-B5 Stage 3: KPI Metrics routes registered');
 
   // Phase A - Iteration 5: Cache metrics endpoint (invoice_balance_cache vs ledger aggregates)
   app.get('/api/allocations/cache-metrics', authMiddleware, async (req: Request, res: Response) => {
@@ -571,102 +578,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("📊 SHERLOCK v32.0: Dashboard request received");
       console.log("🔍 SHERLOCK v32.0: Starting dashboard data collection...");
 
-      // Test database connection first
+      // E-B7: Single Consolidated Query Implementation
+      // Replacing multiple separate queries with unified financial summary service
+      console.log("🚀 E-B7: Executing consolidated financial summary query...");
+      
+      let consolidatedData;
       try {
-        await db.execute(sql`SELECT 1 as test`);
-        console.log("✅ SHERLOCK v32.0: Database connection verified");
-      } catch (dbError) {
-        console.error("❌ SHERLOCK v32.0: Database connection failed:", dbError);
-        throw new Error("Database connection failed");
+        // Import consolidated service dynamically to avoid circular dependencies
+        const { ConsolidatedFinancialSummaryService } = await import('./services/consolidated-financial-summary.js');
+        
+        // Execute single consolidated query instead of multiple separate queries
+        consolidatedData = await ConsolidatedFinancialSummaryService.calculateConsolidatedSummary();
+        
+        console.log(`✅ E-B7: Consolidated query completed in ${consolidatedData.queryTimeMs}ms`);
+        
+        // Performance validation for E-B7 KPI
+        if (consolidatedData.queryTimeMs > 120) {
+          console.warn(`⚠️ E-B7: Query time ${consolidatedData.queryTimeMs}ms exceeds P95 target of 120ms`);
+        }
+        
+      } catch (consolidatedError) {
+        console.error("❌ E-B7: Consolidated query failed:", consolidatedError);
+        
+        // Fallback to legacy unifiedFinancialEngine for graceful degradation
+        console.log("🔄 E-B7: Falling back to legacy financial engine...");
+        try {
+          const legacySummary = await unifiedFinancialEngine.calculateGlobalSummary();
+          
+          // Convert legacy format to consolidated format for consistency
+          consolidatedData = {
+            totalRevenue: legacySummary.totalRevenue || 0,
+            totalDebt: legacySummary.totalDebt || 0,
+            totalCredit: legacySummary.totalCredit || 0,
+            totalOutstanding: legacySummary.totalOutstanding || 0,
+            totalRepresentatives: 0, // Will be populated below if needed
+            activeRepresentatives: legacySummary.activeSalesPartners || 0,
+            inactiveRepresentatives: 0,
+            totalInvoices: 0,
+            paidInvoices: 0,
+            unpaidInvoices: 0,
+            overdueInvoices: 0,
+            totalPayments: 0,
+            totalPaymentAmount: 0,
+            unallocatedPaymentAmount: 0,
+            systemIntegrityScore: legacySummary.systemIntegrityScore || 0,
+            lastUpdated: new Date().toISOString(),
+            queryTimeMs: 999, // Indicate fallback mode
+            cacheStatus: 'UNAVAILABLE' as const
+          };
+        } catch (legacyError) {
+          console.error("❌ E-B7: Legacy fallback also failed:", legacyError);
+          throw new Error("Both consolidated and legacy financial calculations failed");
+        }
       }
 
-      // Calculate global summary with error handling
-      let summary;
-      try {
-        summary = await unifiedFinancialEngine.calculateGlobalSummary();
-        console.log("✅ SHERLOCK v32.0: Global summary calculated successfully");
-      } catch (summaryError) {
-        console.error("❌ SHERLOCK v32.0: Global summary calculation failed:", summaryError);
-        throw new Error("Failed to calculate financial summary");
-      }
-
-      // Get total representatives with error handling
-      let repsResult;
-      try {
-        repsResult = await db.select({
-          total: sql<number>`COUNT(*)`,
-          active: sql<number>`SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END)`
-        }).from(representatives);
-        console.log("✅ SHERLOCK v32.0: Representatives data collected");
-      } catch (repsError) {
-        console.error("❌ SHERLOCK v32.0: Representatives query failed:", repsError);
-        throw new Error("Failed to get representatives data");
-      }
-
-      // Get invoice statistics with error handling
-      let invoiceStats;
-      try {
-        invoiceStats = await db.select({
-          total: sql<number>`COUNT(*)`,
-          paid: sql<number>`SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END)`,
-          unpaid: sql<number>`SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END)`,
-          overdue: sql<number>`SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END)`
-        }).from(invoices);
-        console.log("✅ SHERLOCK v32.0: Invoice statistics collected");
-      } catch (invoiceError) {
-        console.error("❌ SHERLOCK v32.0: Invoice statistics query failed:", invoiceError);
-        throw new Error("Failed to get invoice statistics");
-      }
-
-      // Combine all data into the response object
+      // Construct optimized response using consolidated data
       const dashboardData = {
         success: true,
         data: {
-          summary: summary || {
-            totalRevenue: 0,
-            totalDebt: 0,
-            totalCredit: 0,
-            totalOutstanding: 0,
-            riskRepresentatives: 0,
-            unsentTelegramInvoices: 0,
-            totalSalesPartners: 0,
-            activeSalesPartners: 0,
-            systemIntegrityScore: 0,
-            lastReconciliationDate: null,
-            problematicRepresentativesCount: 0,
-            responseTime: 0,
-            cacheStatus: "UNAVAILABLE",
-            lastUpdated: null
+          // Primary financial summary (from consolidated query)
+          summary: {
+            totalRevenue: consolidatedData.totalRevenue,
+            totalDebt: consolidatedData.totalDebt,
+            totalCredit: consolidatedData.totalCredit,
+            totalOutstanding: consolidatedData.totalOutstanding,
+            riskRepresentatives: consolidatedData.inactiveRepresentatives, // Map to existing field
+            unsentTelegramInvoices: consolidatedData.overdueInvoices, // Map to existing field
+            totalSalesPartners: consolidatedData.totalRepresentatives,
+            activeSalesPartners: consolidatedData.activeRepresentatives,
+            systemIntegrityScore: consolidatedData.systemIntegrityScore,
+            lastReconciliationDate: consolidatedData.lastUpdated,
+            problematicRepresentativesCount: consolidatedData.inactiveRepresentatives,
+            responseTime: consolidatedData.queryTimeMs,
+            cacheStatus: consolidatedData.cacheStatus,
+            lastUpdated: consolidatedData.lastUpdated
           },
+          
+          // Representative metrics (from consolidated query)
           representatives: {
-            total: repsResult?.[0]?.total || 0,
-            active: repsResult?.[0]?.active || 0,
-            inactive: (repsResult?.[0]?.total || 0) - (repsResult?.[0]?.active || 0)
+            total: consolidatedData.totalRepresentatives,
+            active: consolidatedData.activeRepresentatives,
+            inactive: consolidatedData.inactiveRepresentatives
           },
+          
+          // Invoice metrics (from consolidated query)
           invoices: {
-            total: invoiceStats?.[0]?.total || 0,
-            paid: invoiceStats?.[0]?.paid || 0,
-            unpaid: invoiceStats?.[0]?.unpaid || 0,
-            overdue: invoiceStats?.[0]?.overdue || 0
+            total: consolidatedData.totalInvoices,
+            paid: consolidatedData.paidInvoices,
+            unpaid: consolidatedData.unpaidInvoices,
+            overdue: consolidatedData.overdueInvoices
           },
-          // Add placeholders for other potential dashboard metrics
+          
+          // Payment metrics (from consolidated query)
           payments: {
-            totalAmount: 0,
-            unallocatedAmount: 0
+            totalAmount: consolidatedData.totalPaymentAmount,
+            unallocatedAmount: consolidatedData.unallocatedPaymentAmount,
+            totalCount: consolidatedData.totalPayments
           },
+          
+          // Sales partners (alias for representatives for backward compatibility)
           salesPartners: {
-            total: 0,
-            active: 0
+            total: consolidatedData.totalRepresentatives,
+            active: consolidatedData.activeRepresentatives
           },
+          
+          // System status
           systemStatus: {
-            integrityScore: 0,
-            lastUpdate: new Date().toISOString()
+            integrityScore: consolidatedData.systemIntegrityScore,
+            lastUpdate: consolidatedData.lastUpdated,
+            cacheStatus: consolidatedData.cacheStatus
           }
         },
+        
+        // Enhanced metadata for E-B7 monitoring
         meta: {
           timestamp: new Date().toISOString(),
-          cacheStatus: "STALE", // Placeholder, actual cache status would be more complex
-          queryTimeMs: 0 // Placeholder, actual calculation would be needed
+          cacheStatus: consolidatedData.cacheStatus,
+          queryTimeMs: consolidatedData.queryTimeMs,
+          version: "E-B7-Consolidated",
+          queryOptimization: {
+            enabled: true,
+            queryCount: 1, // Single consolidated query
+            performanceTarget: "P95 < 120ms",
+            achieved: consolidatedData.queryTimeMs <= 120
+          }
         }
       };
 

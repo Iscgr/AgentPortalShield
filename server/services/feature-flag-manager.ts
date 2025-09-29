@@ -137,10 +137,10 @@ class FeatureFlagManager {
         description: 'گاردهای زمان اجرای تخصیص برای جلوگیری از over-allocation (I6/I7)'
       },
       usage_line_visibility: {
-        state: 'off',
+        state: 'on',
         allowed: ['off','on'],
         lastModified: new Date().toISOString(),
-        modifiedBy: 'init',
+        modifiedBy: 'E-B6-implementation',
         description: 'نمایش خطوط تخصیص و usage برای شفافیت (E-B6)'
       },
       allocation_partial_mode: {

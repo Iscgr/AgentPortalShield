@@ -24,6 +24,7 @@ import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import UnifiedAuth from "@/pages/unified-auth";
 import AllocationManagement from "@/pages/allocation-management";
+import KpiDashboard from "@/pages/kpi-dashboard";
 
 function AuthenticatedRouter() {
   const { isAuthenticated: adminAuthenticated, isLoading: adminIsLoading, user: adminUser } = useUnifiedAuth(); // Use unified auth hook
@@ -91,6 +92,7 @@ function AuthenticatedRouter() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
+        <Route path="/kpi-dashboard" component={KpiDashboard} />
         <Route path="/representatives" component={Representatives} />
         <Route path="/invoices" component={Invoices} />
         <Route path="/invoice-management" component={InvoiceManagement} />
