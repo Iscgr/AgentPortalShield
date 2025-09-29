@@ -74,6 +74,17 @@ class GuardMetricsPersistenceServiceClass {
     return out;
   }
 
+  /**
+   * بازگرداندن شمارش چندگانه برای پنجره‌های مختلف در یک round-trip
+   */
+  async getMultiWindowSummary(windowsMinutes: number[]) {
+    const result: Record<number, Record<string, number>> = {};
+    for (const w of windowsMinutes) {
+      result[w] = await this.getSummary(w);
+    }
+    return result;
+  }
+
   getLastFlushError() { return this.lastFlushError; }
 }
 

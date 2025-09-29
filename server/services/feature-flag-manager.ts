@@ -31,7 +31,7 @@ export interface MultiStageFlag {
   description?: string;
 }
 
-type MultiStageFlagKey = 'allocation_dual_write' | 'ledger_backfill_mode' | 'allocation_read_switch' | 'active_reconciliation' | 'outbox_enabled' | 'allocation_runtime_guards' | 'usage_line_visibility' | 'allocation_partial_mode' | 'guard_metrics_persistence';
+type MultiStageFlagKey = 'allocation_dual_write' | 'ledger_backfill_mode' | 'allocation_read_switch' | 'active_reconciliation' | 'outbox_enabled' | 'allocation_runtime_guards' | 'usage_line_visibility' | 'allocation_partial_mode' | 'guard_metrics_persistence' | 'guard_metrics_alerts';
 
 class FeatureFlagManager {
   private flags: FeatureFlagConfig;
@@ -156,6 +156,13 @@ class FeatureFlagManager {
         lastModified: new Date().toISOString(),
         modifiedBy: 'init',
         description: 'Persist رویدادهای Guard Metrics (E-B5 مرحله 1)'
+      },
+      guard_metrics_alerts: {
+        state: 'off',
+        allowed: ['off','on'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'فعال کردن تحلیل Threshold و اعلان داخلی داشبورد متریک گارد (E-B5 مرحله 2)'
       }
     };
     console.log('🚩 ATOMOS Feature Flag Manager v1.0 initialized with safe defaults');

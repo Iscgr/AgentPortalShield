@@ -19,6 +19,10 @@ interface GuardMetricsApiResponse extends GuardMetricsSnapshot {
       lastDay: Record<string, number>;
     } | null;
   };
+  alerts?: {
+    state: string;
+    items: { type: string; countLastHour: number; level: 'warn' | 'critical'; threshold: number }[];
+  };
 }
 
 // کوچک نگه داشتن اندازه نمایش برای جلوگیری از سنگینی UI
@@ -29,11 +33,11 @@ export const GuardMetricsPanel: React.FC = () => {
     queryKey: ['/api/allocations/guard-metrics'],
     queryFn: async () => {
       const res:any = await apiRequest('/allocations/guard-metrics');
-      // پاسخ جدید: { success, data: snapshot, persistence }
-      if (res?.data && res?.persistence) {
-        return { ...res.data, persistence: res.persistence };
+      // پاسخ جدید: { success, data: snapshot, persistence, alerts }
+      if (res?.data) {
+        return { ...res.data, persistence: res.persistence, alerts: res.alerts };
       }
-      return res?.data || res;
+      return res;
     },
     refetchInterval: 30000, // هر ۳۰ ثانیه بروزرسانی خودکار سبک
     staleTime: 15000
@@ -49,7 +53,7 @@ export const GuardMetricsPanel: React.FC = () => {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium flex items-center">
           <ShieldAlert className="w-4 h-4 ml-2 text-purple-600 dark:text-purple-300" />
-          متریک‌های نگهبان تخصیص (Slice 5/6)
+          متریک‌های نگهبان تخصیص (Slice 5/6/7)
         </CardTitle>
         <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={`w-4 h-4 ml-1 ${isFetching ? 'animate-spin' : ''}`} />
@@ -138,8 +142,24 @@ export const GuardMetricsPanel: React.FC = () => {
                   </div>
                 </div>
               )}
+              {data.alerts && data.alerts.state === 'on' && (
+                <div className="p-2 rounded bg-white/60 dark:bg-white/5 border">
+                  <div className="text-[11px] font-semibold mb-2">Alert ها (۱ ساعت اخیر)</div>
+                  {data.alerts.items.length === 0 && (
+                    <div className="text-[10px] text-gray-500">هیچ Alert فعالی موجود نیست.</div>
+                  )}
+                  <div className="space-y-1 max-h-40 overflow-auto">
+                    {data.alerts.items.map(a => (
+                      <div key={a.type} className={`flex justify-between text-[11px] rounded px-2 py-1 border ${a.level === 'critical' ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300' : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300'}`}> 
+                        <span className="truncate" title={a.type}>{a.type}</span>
+                        <span className="font-mono" dir="ltr">{a.countLastHour}/{a.threshold}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="text-[10px] text-gray-400">
-                در حالت off فقط داده در حافظه؛ shadow ذخیره در DB بدون summary؛ enforce شامل summary.
+                Persistence: off→in-memory | shadow→persist بدون summary | enforce→summary + (اگر alerts:on) تحلیل آستانه.
               </div>
             </div>
           </>
