@@ -24,13 +24,14 @@ function parseArgs() {
   const args = process.argv.slice(2);
   return {
     apply: args.includes('--apply'),
+    finalize: args.includes('--finalize'),
     limit: (() => { const i = args.indexOf('--limit'); return i>=0 ? Number(args[i+1]) : undefined; })(),
     verbose: args.includes('--verbose')
   };
 }
 
 async function main() {
-  const { apply, limit, verbose } = parseArgs();
+  const { apply, finalize, limit, verbose } = parseArgs();
   const stats: CastStats = { total:0, alreadyDecimal:0, converted:0, wouldConvert:0, invalid:0, sumText:0, sumDecimal:0, sumDiffAbs:0 };
 
   const rows = await db.execute(sql`
@@ -69,18 +70,33 @@ async function main() {
   }
   stats.sumDiffAbs = Math.abs(stats.sumText - stats.sumDecimal);
 
-  const tolerance = 0.0001; // در فاز A: اختلاف مجموع باید نزدیک صفر باشد
-  const withinTolerance = stats.sumDecimal === 0 ? true : (stats.sumDiffAbs / Math.max(stats.sumDecimal,1)) < tolerance;
+  const tolerance = 0.0001; // در فاز A: اختلاف مجموع باید نزدیک صفر باشد (0.01%)
+  const diffRatio = stats.sumDecimal === 0 ? 0 : (stats.sumDiffAbs / Math.max(stats.sumDecimal,1));
+  const withinTolerance = stats.sumDecimal === 0 ? true : diffRatio < tolerance;
+
+  // مرحله نهایی: فقط اگر finalize و بدون apply اجرا شود عمل «علامت آماده‌سازی» را ثبت می‌کنیم.
+  // (اختیاری: در آینده می‌توان rename ستون اصلی را نیز اینجا انجام داد)
+  if (finalize) {
+    if (!withinTolerance) {
+      console.error('❌ نمی‌توان finalize کرد: اختلاف مجموع خارج از تلورانس است.');
+      process.exit(2);
+    }
+    // در این نسخه تنها پیام علامت نهایی چاپ می‌شود؛ مهاجرت rename واقعی ممکن است به migration جدا منتقل شود.
+  }
 
   const report = {
-    mode: apply ? 'APPLY' : 'DRY_RUN',
+    mode: finalize ? 'FINALIZE' : (apply ? 'APPLY' : 'DRY_RUN'),
     ...stats,
     tolerance,
+    diffRatio,
     withinTolerance
   };
   console.log(JSON.stringify(report,null,2));
   if (!withinTolerance && apply) {
     console.warn('⚠️ مجموع اختلاف از تلورانس بالاتر است – بررسی دستی لازم.');
+  }
+  if (finalize && withinTolerance) {
+    console.log('✅ CAST migration validated. Ready for column swap migration (follow-up DDL required).');
   }
 }
 

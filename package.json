@@ -14,6 +14,7 @@
     ,"backfill:dry": "tsx scripts/backfill-dry-run.ts"
     ,"cast:payments:dry": "tsx scripts/payments-cast-shadow.ts --dry-run"
     ,"cast:payments:apply": "tsx scripts/payments-cast-shadow.ts --apply"
+    ,"cast:payments:validate": "tsx scripts/payments-cast-validate.ts"
     ,"ingest:dry": "tsx scripts/ingest-real-sample.ts --dry-run"
     ,"ingest:apply": "tsx scripts/ingest-real-sample.ts --apply"
   },
@@ -96,6 +97,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@axe-core/react": "^4.8.4",
     "@replit/vite-plugin-cartographer": "^0.2.7",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",

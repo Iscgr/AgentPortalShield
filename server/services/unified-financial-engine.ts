@@ -1,14 +1,16 @@
 /**
- * SHERLOCK v23.0 UNIFIED FINANCIAL ENGINE - CORRECTED CALCULATIONS
+ * SHERLOCK v23.0 UNIFIED FINANCIAL ENGINE - ENHANCED WITH PYTHON
  *
- * تنها سیستم محاسباتی مالی - با منطق صحیح محاسبات
+ * تنها سیستم محاسباتی مالی - با منطق صحیح محاسبات + Python integration
  * Real-time calculations with 100% accuracy guarantee
  */
 
-import { db } from '../db.js';
-import { representatives, invoices, payments } from '../../shared/schema.js';
+import { db } from '../database-manager';
+import { representatives, invoices, payments } from '@shared/schema';
 import { eq, sql, desc, and } from 'drizzle-orm';
-import { performance } from 'perf_hooks'; // Import performance for timing
+import { performance } from 'perf_hooks';
+import { pythonFinancialClient } from './python-financial-client';
+import { featureFlagManager } from './feature-flag-manager';
 
 // Define RepresentativeFinancialData interface based on the new calculation logic
 interface RepresentativeFinancialData {
@@ -95,6 +97,20 @@ export class UnifiedFinancialEngine {
 
   constructor(storage: any) { // Inject storage dependency
     this.storage = storage;
+  }
+
+  /**
+   * PYTHON INTEGRATION: Determine computation method based on volume
+   */
+  private async shouldUsePythonService(recordCount: number): Promise<boolean> {
+    // Use Python service for bulk calculations (>50 records) or when feature flag enabled
+    const bulkThreshold = 50;
+    const pythonIntegrationEnabled = await featureFlagManager.isEnabled(
+      'PYTHON_FINANCIAL_CALCULATIONS',
+      { requestId: 'bulk-calculation' }
+    );
+    
+    return pythonIntegrationEnabled && recordCount >= bulkThreshold;
   }
 
   /**
@@ -295,6 +311,23 @@ export class UnifiedFinancialEngine {
 
   // ✅ ADMIN PANEL OPTIMIZATION: Debt query cache to reduce repeated queries
   private static debtQueryCache = new Map<number, { debt: any; timestamp: number }>(); // Changed 'any' to 'UnifiedFinancialData[]' for clarity
+
+  /**
+   * سیستم پاکسازی کامل همه کش‌های داخلی موتور مالی
+   * استفاده در سناریوهای destructive مانند reset-data یا مهاجرت‌های عمده
+   */
+  static clearAllCaches(reason: string = 'manual_reset') {
+    try {
+      const qSize = this.queryCache.size;
+      const dSize = this.debtQueryCache.size;
+      this.queryCache.clear();
+      this.debtQueryCache.clear();
+      this.invalidationQueue.clear();
+      console.log(`🧹 UnifiedFinancialEngine caches cleared (${qSize} query, ${dSize} debt) :: reason=${reason}`);
+    } catch (err) {
+      console.warn('⚠️ Failed to clear UnifiedFinancialEngine caches:', err);
+    }
+  }
   private static readonly DEBT_CACHE_TTL = 30 * 1000; // 30 seconds for debt queries
 
   static async calculateBatch(representativeIds: number[]): Promise<Map<number, any>> {
@@ -337,8 +370,33 @@ export class UnifiedFinancialEngine {
       return cached.data;
     }
 
-    // Calculate fresh data
-    const freshData = await this.calculateAllRepresentatives();
+    // Get all representatives first to check if Python service is needed
+    const repCount = await db.select({ count: sql<number>`COUNT(*)` }).from(representatives);
+    const recordCount = repCount[0].count;
+
+    // Check if we should use Python service for bulk calculations
+    const usePython = await this.shouldUsePythonService(recordCount);
+
+    let freshData;
+    if (usePython) {
+      console.log(`🐍 PYTHON INTEGRATION: Using Python service for ${recordCount} representatives`);
+      try {
+        // Get all representative IDs for bulk processing
+        const allReps = await db.select({ id: representatives.id }).from(representatives);
+        const repIds = allReps.map(rep => rep.id);
+
+        // Call Python service for bulk calculation
+        const pythonResults = await pythonFinancialClient.calculateBulkDebt(repIds);
+        
+        // Transform Python results to UnifiedFinancialData format
+        freshData = await this.transformPythonResults(pythonResults, repIds);
+      } catch (error) {
+        console.warn('⚠️ Python service failed, falling back to Node.js calculations:', error);
+        freshData = await this.calculateAllRepresentatives();
+      }
+    } else {
+      freshData = await this.calculateAllRepresentatives();
+    }
 
     // Map RepresentativeFinancialData -> UnifiedFinancialData shape for compatibility
     const unifiedData: UnifiedFinancialData[] = freshData.map((rep: any) => ({
@@ -365,6 +423,38 @@ export class UnifiedFinancialEngine {
     });
 
     return unifiedData;
+  }
+
+  /**
+   * Transform Python service results to RepresentativeFinancialData format
+   */
+  private async transformPythonResults(pythonResults: any[], representativeIds: number[]): Promise<any[]> {
+    const representativeData = await db.select({
+      id: representatives.id,
+      name: representatives.name,
+      code: representatives.code
+    }).from(representatives).where(sql`${representatives.id} = ANY(${representativeIds})`);
+
+    const repMap = new Map<number, { name: string; code: string }>(
+      representativeData.map(rep => [rep.id, { name: rep.name, code: rep.code }])
+    );
+
+    return pythonResults.map(result => {
+      const repInfo = repMap.get(result.representative_id);
+      return {
+        id: result.representative_id,
+        name: repInfo?.name || 'Unknown',
+        code: repInfo?.code || 'N/A',
+        totalSales: result.total_sales,
+        totalPaid: result.total_paid,
+        totalDebt: result.total_debt,
+        debtLevel: result.debt_level,
+        invoiceCount: result.invoice_count || 0,
+        paymentCount: result.payment_count || 0,
+        lastInvoiceDate: result.last_invoice_date,
+        lastPaymentDate: result.last_payment_date
+      };
+    });
   }
 
   /**
@@ -459,12 +549,30 @@ export class UnifiedFinancialEngine {
   }
 
   /**
-   * ✅ محاسبه بدهی همه نمایندگان با منطق صحیح
+   * ✅ محاسبه بدهی همه نمایندگان با منطق صحیح و Python integration
    */
   private async calculateAllRepresentativesDebt(): Promise<Array<{id: number, actualDebt: number}>> {
     const allReps = await db.select({
       id: representatives.id
     }).from(representatives);
+
+    const recordCount = allReps.length;
+    const usePython = await this.shouldUsePythonService(recordCount);
+
+    if (usePython) {
+      console.log(`🐍 PYTHON INTEGRATION: Using Python service for debt calculation of ${recordCount} representatives`);
+      try {
+        const repIds = allReps.map(rep => rep.id);
+        const pythonResults = await pythonFinancialClient.calculateBulkDebt(repIds);
+        
+        return pythonResults.map(result => ({
+          id: result.representative_id,
+          actualDebt: result.total_debt
+        }));
+      } catch (error) {
+        console.warn('⚠️ Python service failed for debt calculation, falling back to Node.js:', error);
+      }
+    }
 
     const results = await Promise.all(
       allReps.map(async (rep) => {
@@ -584,6 +692,24 @@ export class UnifiedFinancialEngine {
 
     const repIds = representativesData.map(rep => rep.id);
     console.log(`🔍 ATOMOS-OPTIMIZED: Processing ${representativesData.length} representatives with batch queries...`);
+
+    // Check if we should use Python service for bulk calculations
+    const usePython = await this.shouldUsePythonService(representativesData.length);
+
+    if (usePython) {
+      console.log(`🐍 PYTHON INTEGRATION: Using Python service for ${representativesData.length} representatives`);
+      try {
+        const pythonResults = await pythonFinancialClient.calculateBulkDebt(repIds);
+        const pythonTransformed = await this.transformPythonResults(pythonResults, repIds);
+        
+        const endTime = performance.now();
+        console.log(`✅ PYTHON BULK CALCULATION completed in ${Math.round(endTime - startTime)}ms`);
+        
+        return pythonTransformed;
+      } catch (error) {
+        console.warn('⚠️ Python service failed, falling back to Node.js calculations:', error);
+      }
+    }
 
     // ✅ PHASE 9 FIX: Handle large datasets by chunking
     if (repIds.length > 1000) {

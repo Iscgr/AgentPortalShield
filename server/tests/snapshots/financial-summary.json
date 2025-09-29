@@ -1,0 +1,8 @@
+{
+  "totalRevenue": 150000,
+  "totalDebt": 150000,
+  "activeRepresentatives": 2,
+  "totalRepresentatives": 2,
+  "overdueInvoices": 1,
+  "cacheStatus": "HEALTHY"
+}

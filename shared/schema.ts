@@ -37,6 +37,24 @@ export const salesPartners = pgTable("sales_partners", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+// Reconciliation Actions (اقدامات اصلاحی drift)
+// هدف: ثبت plan های تولیدشده توسط Active Reconciliation Engine برای اصلاح انحرافات مالی
+export const reconciliationActions = pgTable("reconciliation_actions", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").references(() => reconciliationRuns.id).notNull(),
+  representativeId: integer("representative_id").references(() => representatives.id),
+  actionType: text("action_type").notNull(), // 'ADJUST_DEBT', 'RECALCULATE_BALANCE', 'SYNC_CACHE'
+  targetEntity: text("target_entity").notNull(), // 'representative', 'invoice', 'payment'
+  targetId: integer("target_id").notNull(),
+  currentValue: decimal("current_value", { precision: 15, scale: 2 }),
+  expectedValue: decimal("expected_value", { precision: 15, scale: 2 }),
+  adjustmentAmount: decimal("adjustment_amount", { precision: 15, scale: 2 }),
+  status: text("status").notNull().default("PENDING"), // 'PENDING', 'APPLIED', 'FAILED', 'SKIPPED'
+  reason: text("reason"),
+  appliedAt: timestamp("applied_at"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
 // Invoice Usage Items (ریزجزئیات مصرف در فایل‌های هفتگی JSON)
 // هدف: نگهداری خطوط خام (event) مرتبط با هر فاکتور برای Traceability و نمایش در پرتال عمومی.
 // رابطه: هر رکورد متعلق به یک invoice است (one-to-many). در فاز فعلی از invoiceNumber برای اتصال ساده استفاده می‌شود.
@@ -224,11 +242,41 @@ export const reconciliationRuns = pgTable('reconciliation_runs', {
   scope: text('scope').notNull(), // representative:<id> یا global
   diffAbs: decimal('diff_abs', { precision: 15, scale: 2 }).notNull(),
   diffRatio: decimal('diff_ratio', { precision: 12, scale: 6 }).notNull(),
-  status: text('status').notNull(), // OK | WARN | FAIL
+  status: text('status').notNull(), // PENDING | RUNNING | COMPLETED | COMPLETED_WITH_WARNINGS | FAILED | CANCELLED
+  mode: text('mode').notNull().default('dry'), // dry | enforce
+  startedAt: timestamp('started_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+  summary: json('summary').default('{}'),
   meta: json('meta'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
+// Guard Metrics Events (Phase B - E-B5 Persistence مرحله 1)
+// هدف: ذخیره رویدادهای ثبت‌شده توسط GuardMetricsService برای تحلیل زمانی و KPI
+export const guardMetricsEvents = pgTable('guard_metrics_events', {
+  id: serial('id').primaryKey(),
+  eventType: text('event_type').notNull(), // همان type در record()
+  // level بالقوه برای آینده (warn/enforce) - فعلاً nullable
+  level: text('level'),
+  // اختیاری: شناسه نماینده یا موجودیت در context (Json فیلد)
+  context: json('context'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+// ==================== RELIABILITY TABLES (Phase C) ====================
+// Telegram Outbox Pattern (E-C1)
+// هدف: تضمین تحویل پیام‌های تلگرام با retry mechanism و KPI tracking
+export const outbox = pgTable('outbox', {
+  id: serial('id').primaryKey(),
+  type: text('type').notNull(), // 'TELEGRAM_MESSAGE', 'EMAIL', 'WEBHOOK'
+  payload: json('payload').notNull(), // محتوای پیام شامل recipient، message، options
+  status: text('status').notNull().default('PENDING'), // PENDING | PROCESSING | SENT | FAILED | CANCELLED
+  retryCount: integer('retry_count').notNull().default(0),
+  nextRetryAt: timestamp('next_retry_at'),
+  errorLast: text('error_last'), // آخرین خطای مواجه شده
+  processedAt: timestamp('processed_at'),
+  createdAt: timestamp('created_at').defaultNow()
+});
 
 // Data Integrity Constraints (محدودیت‌های یکپارچگی داده) - Clock's Precision Mechanism
 export const dataIntegrityConstraints = pgTable("data_integrity_constraints", {
@@ -931,6 +979,10 @@ export const insertTechnicalReportSchema = omitInsert(createInsertSchema(technic
 
 export const insertDailyReportSchema = omitInsert(createInsertSchema(dailyReports), "id", "createdAt");
 
+export const insertReconciliationActionSchema = omitInsert(createInsertSchema(reconciliationActions), "id", "createdAt", "appliedAt");
+
+export const insertOutboxSchema = omitInsert(createInsertSchema(outbox), "id", "createdAt");
+
 // ==================== TYPES ====================
 
 export type Employee = typeof employees.$inferSelect;
@@ -953,3 +1005,6 @@ export type InsertTechnicalReport = z.infer<typeof insertTechnicalReportSchema>;
 
 export type DailyReport = typeof dailyReports.$inferSelect;
 export type InsertDailyReport = z.infer<typeof insertDailyReportSchema>;
+
+export type Outbox = typeof outbox.$inferSelect;
+export type InsertOutbox = z.infer<typeof insertOutboxSchema>;

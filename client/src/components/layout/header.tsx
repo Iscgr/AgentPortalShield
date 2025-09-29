@@ -16,10 +16,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden text-white hover:bg-white/10"
+              aria-label="باز کردن منوی ناوبری"
+              title="باز کردن منوی ناوبری"
+              className="lg:hidden text-white hover:bg-white/10 focus-ring-base"
               onClick={onMenuClick}
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-5 h-5" aria-hidden="true" />
             </Button>
 
             <div>

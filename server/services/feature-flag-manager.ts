@@ -19,6 +19,7 @@ export interface FeatureFlagConfig {
   CACHE_OPTIMIZATION: FeatureFlag;
   REAL_TIME_SYNC: FeatureFlag;
   PERFORMANCE_MONITORING: FeatureFlag;
+  PYTHON_FINANCIAL_CALCULATIONS: FeatureFlag;
 }
 
 // تعریف پرچم‌های چندمرحله‌ای برای گذارهای حساس (ledger و reconciliation)
@@ -30,7 +31,7 @@ export interface MultiStageFlag {
   description?: string;
 }
 
-type MultiStageFlagKey = 'allocation_dual_write' | 'ledger_backfill_mode' | 'allocation_read_switch' | 'active_reconciliation' | 'outbox_enabled' | 'allocation_runtime_guards';
+type MultiStageFlagKey = 'allocation_dual_write' | 'ledger_backfill_mode' | 'allocation_read_switch' | 'active_reconciliation' | 'outbox_enabled' | 'allocation_runtime_guards' | 'usage_line_visibility' | 'allocation_partial_mode' | 'guard_metrics_persistence' | 'guard_metrics_alerts';
 
 class FeatureFlagManager {
   private flags: FeatureFlagConfig;
@@ -78,6 +79,14 @@ class FeatureFlagManager {
         conditions: [],
         lastModified: new Date().toISOString(),
         modifiedBy: 'system_init'
+      },
+
+      PYTHON_FINANCIAL_CALCULATIONS: {
+        enabled: true,  // Python integration for bulk calculations
+        percentage: 100,
+        conditions: [],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'e_d5_python_integration'
       }
     };
 
@@ -126,6 +135,34 @@ class FeatureFlagManager {
         lastModified: new Date().toISOString(),
         modifiedBy: 'init',
         description: 'گاردهای زمان اجرای تخصیص برای جلوگیری از over-allocation (I6/I7)'
+      },
+      usage_line_visibility: {
+        state: 'on',
+        allowed: ['off','on'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'E-B6-implementation',
+        description: 'نمایش خطوط تخصیص و usage برای شفافیت (E-B6)'
+      },
+      allocation_partial_mode: {
+        state: 'off',
+        allowed: ['off','allow','enforce'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'فعال‌سازی تخصیص جزئی پرداخت‌ها (E-B2)'      
+      },
+      guard_metrics_persistence: {
+        state: 'off',
+        allowed: ['off','shadow','enforce'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'Persist رویدادهای Guard Metrics (E-B5 مرحله 1)'
+      },
+      guard_metrics_alerts: {
+        state: 'off',
+        allowed: ['off','on'],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'init',
+        description: 'فعال کردن تحلیل Threshold و اعلان داخلی داشبورد متریک گارد (E-B5 مرحله 2)'
       }
     };
     console.log('🚩 ATOMOS Feature Flag Manager v1.0 initialized with safe defaults');
