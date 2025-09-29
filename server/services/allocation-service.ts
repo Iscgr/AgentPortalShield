@@ -156,4 +156,17 @@ export class AllocationService {
       return { legacyUpdated: !!updatedPayment, ledgerInserted, mode, messages };
     });
   }
+
+  static async calculateDebt(representativeId) {
+    const readSwitchState = featureFlagManager.getMultiStageFlagState('allocation_read_switch');
+    const useLedger = readSwitchState === 'full' || (readSwitchState === 'canary' && isCanaryRepresentative(representativeId, 5));
+    if (useLedger) {
+      // خواندن از cache با متد مناسب
+      return await InvoiceBalanceCacheService.getRepresentativeDebt(representativeId);
+    } else {
+      // fallback قدیمی
+      const invoiceBalance = await db.execute(sql`SELECT COALESCE(SUM(amount), 0) as balance FROM invoices WHERE representative_id = ${representativeId}`);
+      return Number((invoiceBalance as any).rows?.[0]?.balance || 0);
+    }
+  }
 }

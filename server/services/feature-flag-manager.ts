@@ -19,6 +19,7 @@ export interface FeatureFlagConfig {
   CACHE_OPTIMIZATION: FeatureFlag;
   REAL_TIME_SYNC: FeatureFlag;
   PERFORMANCE_MONITORING: FeatureFlag;
+  PYTHON_FINANCIAL_CALCULATIONS: FeatureFlag;
 }
 
 // تعریف پرچم‌های چندمرحله‌ای برای گذارهای حساس (ledger و reconciliation)
@@ -78,6 +79,14 @@ class FeatureFlagManager {
         conditions: [],
         lastModified: new Date().toISOString(),
         modifiedBy: 'system_init'
+      },
+
+      PYTHON_FINANCIAL_CALCULATIONS: {
+        enabled: true,  // Python integration for bulk calculations
+        percentage: 100,
+        conditions: [],
+        lastModified: new Date().toISOString(),
+        modifiedBy: 'e_d5_python_integration'
       }
     };
 

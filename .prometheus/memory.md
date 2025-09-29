@@ -1,8 +1,8 @@
 # Memory Spine (حافظه عملیاتی فاز ۲)
-آخرین بروزرسانی: Iteration7-LoggingAndHealthHardening
+آخرین بروزرسانی: E-D5-PythonIntegrationCompleted
 
 ## 1. مأموریت (Mission Statement)
-پیاده‌سازی امن، مرحله‌ای و بدون کاهش دامنه‌ی مسئله برای: (۱) ایجاد زیرلجر تخصیص پرداخت‌ها، (۲) مهاجرت نوع مبلغ، (۳) ایجاد کش تراز فاکتور، (۴) ابزار پایش Drift و (۵) بسترسازی برای UI تخصیص جزئی و سازوکار آتی تطبیقی—all بدون نقض اصل «Enhance Not Eliminate».
+پیاده‌سازی امن، مرحله‌ای و بدون کاهش دامنه‌ی مسئله برای: (۱) ایجاد زیرلجر تخصیص پرداخت‌ها، (۲) مهاجرت نوع مبلغ، (۳) ایجاد کش تراز فاکتور، (۴) ابزار پایش Drift، (۵) بسترسازی برای UI تخصیص جزئی، (۶) ادغام Python برای محاسبات حجمی و سازوکار آتی تطبیقی—all بدون نقض اصل «Enhance Not Eliminate».
 
 ## 2. اصول راهنما (Guiding Invariants)
 Ref: plan.md §0 و §16.
@@ -11,7 +11,16 @@ Ref: plan.md §0 و §16.
 - GI3: همه مهاجرت‌ها با مسیر Rollback تعریف‌شده.
 - GI4: Traceability → هر آیتم دارای شناسه قابل نگاشت.
 - GI5: Feature Flags = گیت‌های ایمنی.
-- GI6: Concurrency کنترل‌شده با تراکنش + قفل سطح ردیف.
+- GI6: Concurrency کنترل‌شده با تراکنش + قفل سطر ردیف.
+- GI7: Python Integration = بهینه‌سازی محاسبات حجمی با fallback JavaScript.
+
+## 2.1. Python Integration Decisions (E-D5)
+- Architecture: FastAPI microservice approach (port 8001)
+- Communication: HTTP API calls with JSON payload
+- Precision: Python Decimal library for financial calculations
+- Failover: Automatic fallback to Node.js on Python service failure
+- Threshold: Python service activated for >50 records bulk calculations
+- Feature Flag: 'PYTHON_FINANCIAL_CALCULATIONS' controls integration
 
 ## 3. اینورینت‌های مالی (Financial Invariants)
 I1..I5 (پایه) و I6..I10 (افزوده در plan.md §16.7). تست‌ها باید ساختار زیر را پوشش دهند:
@@ -46,6 +55,8 @@ TODO: افزودن I11 در آینده (Cross-period integrity بعد از Parti
 | D10 | iter6 | CAST Dry-Run Validation (amount_dec) | Swap فوری ستون، حذف TEXT | سنجش بدون ریسک → populate تدریجی | آماده‌سازی مرحله Rename | بعد از تثبیت drift |
 | D11 | iter7 | Ingestion Grouping by contiguous admin_username + invoice_usage_items table | یک invoice به ازای هر رکورد، عدم ذخیره جزئیات | انطباق با ساختار واقعی فایل هفتگی، کاهش انفجار رکورد | Traceability ریزمصرف + کاهش پیچیدگی CAST | بعد از فاز B بازبینی نیاز partition |
 | D12 | iter7 | Logging ESM Patch + Redis Health Noise Mitigation + Session Table Migration | حذف کامل health checker یا خاموشی موقت | حفظ observability بدون کاهش دامنه | کاهش نویز بحرانی و آماده‌سازی برای drift metrics پایدار | بازبینی هنگام ورود real Redis |
+| D13 | iter8 | Ledger Read Switch با flag canary/full | direct fallback | کاهش ریسک drift با گذار تدریجی | نیاز به monitoring | بعد از Phase B |
+| D14 | iter8 | Fix allocation-service calculateDebt | SQL مستقیم یا فرضیه | استفاده از cache با متد getRepresentativeDebt | پایه سلامت ledger read | monitoring drift بعدی |
 
 ## 6. ریفرنس Trace IDs (Mapping Skeleton)
 Draft JSON (تولید بعد):
@@ -195,6 +206,9 @@ Suites:
 | T42 | Session Table Migration Added | جدول session موجود و خطای pruning حذف | کاهش نویز دیتابیس |
 | T43 | Redis Health Noise Mitigated | پرچم SKIP_REDIS_HEALTH + downgrade dev | baseline سلامت بدون CRITICAL کاذب |
 | T44 | Debt Compare Endpoint Added | /api/allocations/debt-compare (legacy vs ledger vs cache) | پایه رصد drift قبل canary read |
+| T45 | Ledger Read Switch Implemented | flag فعال، تست invariants سبز | بروزرسانی plan.md برای Phase B |
+| T46 | Allocation Cache Service Enhanced | متد getRepresentativeDebt اضافه شد | تست E-B1 complete |
+| T47 | Invariants I1-I5 Verified | تست‌های پایه سبز پس از db:push | آماده Phase C یا ادامه B |
 
 ## 14. مسیرهای بعدی (Next Anticipated Steps)
 ~~Phase A / Iteration 5 (پیشنهادی):~~

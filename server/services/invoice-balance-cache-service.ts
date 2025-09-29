@@ -101,4 +101,31 @@ export class InvoiceBalanceCacheService {
     }
     return { processed, batches, errors };
   }
+
+  /**
+   * محاسبه مجموع بدهی یک نماینده از cache
+   */
+  static async getRepresentativeDebt(representativeId: number): Promise<number> {
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(ibc.remaining_amount), 0) as total_debt
+      FROM invoice_balance_cache ibc 
+      JOIN invoices i ON i.id = ibc.invoice_id 
+      WHERE i.representative_id = ${representativeId}
+    `);
+    return Number((result as any).rows?.[0]?.total_debt || 0);
+  }
+
+  /**
+   * دریافت تمام رکوردهای cache برای یک نماینده
+   */
+  static async getRepresentativeBalances(representativeId: number) {
+    const result = await db.execute(sql`
+      SELECT ibc.invoice_id, ibc.allocated_total, ibc.remaining_amount, ibc.status_cached, i.amount as invoice_amount
+      FROM invoice_balance_cache ibc 
+      JOIN invoices i ON i.id = ibc.invoice_id 
+      WHERE i.representative_id = ${representativeId}
+      ORDER BY i.issue_date DESC
+    `);
+    return (result as any).rows || [];
+  }
 }

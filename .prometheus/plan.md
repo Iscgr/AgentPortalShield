@@ -207,6 +207,7 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 2. Analytics Export (E-D2)
 3. Debt Forecast Prototype (E-D3)
 4. Performance Micro-Optimizations (E-D4)
+5. Python Integration for Financial Computation (E-D5)
 
 ### 5.3 خلاصه اپیک‌ها
 | اپیک | توضیح | معیار پذیرش |
@@ -215,6 +216,21 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 | E-D2 | خروجی CSV/Parquet از رویدادهای مالی | تولید فایل ≤ 30s برای 12 ماه |
 | E-D3 | مدل ساده ARIMA یا moving average روی جریان بدهی | خطای MAPE < 10% در افق 30 روز |
 | E-D4 | حذف رندر مازاد، Virtualized Table | کاهش P95 رندر فهرست فاکتور > 30% |
+| E-D5 | **Python Financial Computation Microservice** | **FastAPI service برای محاسبات دقیق (Decimal)، reconciliation engine، و debt verification؛ ادغام با Node.js via HTTP API؛ افزایش سرعت محاسبات ≥40% در bulk operations** |
+
+#### E-D5 جزئیات: Python Integration for Financial Computation
+- **دامنه**: FastAPI microservice برای محاسبات مالی سنگین
+- **مؤلفه‌ها**: 
+  - Decimal-based calculations (حذف rounding errors)
+  - Bulk debt verification & reconciliation
+  - Mathematical debt level classification  
+  - ARIMA forecasting engine
+- **ادغام**: HTTP API calls از Node.js به Python service
+- **مزایا**: دقت بالاتر، سرعت بیشتر در batch processing، امکان ML
+- **KPIs**: 
+  - محاسبات bulk ≥40% سریعتر از JS
+  - صفر خطای rounding در Decimal operations
+  - Reconciliation drift < 0.01%
 
 ---
 ## 6. ماتریس وابستگی (Dependency Matrix)
@@ -226,6 +242,8 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 | E-B2 (Allocation UI) | E-B5 | KPI | KPI نسبت partial بعد از UI معنی‌دار |
 | E-C2 (Event Stream) | E-D2 | منبع | Export بر پایه رویداد |
 | E-C3 (Backup) | E-C4 | اطمینان | Alert باید به سلامت backup تکیه کند |
+| E-C4 (Integrity Alerting) | E-D5 | داده | Python سرویس از alerting برای trigger batch jobs استفاده کند |
+| E-B4 (Active Reconciliation) | E-D5 | عملکرد | Python برای بهینه‌سازی reconciliation engine |
 
 ---
 ## 7. Traceability به review.md
