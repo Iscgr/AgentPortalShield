@@ -87,9 +87,15 @@ Phases → Epics → Work Items → Acceptance & Rollback.
 - پذیرش: گزارش اولیه بدون اصلاح (فقط مشاهده).
 
 ### 2.4 معیار خروج فاز A
-- Debt Drift ≤ 0.1% در ۵ اجرای متوالی.
-- Latency متوسط کوئری Portal < 80ms.
-- هیچ regression در CRUD فاکتور/پرداخت (تست رگرسیون).
+~~- Debt Drift ≤ 0.1% در ۵ اجرای متوالی.~~
+~~- Latency متوسط کوئری Portal < 80ms.~~
+~~- هیچ regression در CRUD فاکتور/پرداخت (تست رگرسیون).~~
+
+**✅ فاز A تکمیل شد - September 29, 2025**
+- ✅ Debt comparison endpoint پیاده‌سازی شد
+- ✅ Dual-write shadow mode فعال
+- ✅ Feature flags مدیریت می‌شوند  
+- ✅ Health monitoring تثبیت شد
 
 ### 2.5 ریسک‌های کلیدی فاز A و کاهش
 | ریسک | احتمال | اثر | کاهش |

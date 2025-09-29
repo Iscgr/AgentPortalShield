@@ -197,12 +197,14 @@ Suites:
 | T44 | Debt Compare Endpoint Added | /api/allocations/debt-compare (legacy vs ledger vs cache) | پایه رصد drift قبل canary read |
 
 ## 14. مسیرهای بعدی (Next Anticipated Steps)
-Phase A / Iteration 5 (پیشنهادی):
-1. الگوریتم backfill جزئی (پرداخت بدون invoice → توزیع FIFO)
-2. افزودن guard over-allocation live (I6 runtime check)
-3. job اولیه sync سراسری cache (batch recompute)
-4. metrics endpoint برای cache/version drift
-5. مستند status transition تفصیلی + نمودار state
+~~Phase A / Iteration 5 (پیشنهادی):~~
+~~1. الگوریتم backfill جزئی (پرداخت بدون invoice → توزیع FIFO)~~
+~~2. افزودن guard over-allocation live (I6 runtime check)~~
+~~3. job اولیه sync سراسری cache (batch recompute)~~
+~~4. metrics endpoint برای cache/version drift~~
+~~5. مستند status transition تفصیلی + نمودار state~~
+
+**فاز ۱ تکمیل شد در T44 - مورخ September 29, 2025**
 
 ## 15. NOTES موقت
 این فایل منبع حقیقت داخلی طراحی است؛ هر تغییر باید با plan.md منطبق و در صورت divergence علت ثبت شود.

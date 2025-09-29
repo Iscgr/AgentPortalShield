@@ -68,7 +68,6 @@ import { registerBatchRollbackRoutes } from './routes/batch-rollback-routes.js';
 // Import Debt Verification Routes
 import debtVerificationRoutes from './routes/debt-verification-routes.js';
 import { featureFlagManager } from './services/feature-flag-manager';
-import multistageFlagRoutes from './routes/multistage-flag-routes';
 
 // --- Interfaces for Authentication Middleware ---
 interface AuthSession {
@@ -219,8 +218,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerUnifiedFinancialRoutes(app, authMiddleware);
   // Phase A - Iteration 3: Shadow allocation observation endpoint
   registerShadowAllocationRoutes(app, authMiddleware);
-  // Phase A - Iteration 7+: Multi-stage flag management (centralized)
-  app.use('/api/multistage-flags', multistageFlagRoutes);
 
   // Phase A - Iteration 5: Cache metrics endpoint (invoice_balance_cache vs ledger aggregates)
   app.get('/api/allocations/cache-metrics', authMiddleware, async (req: Request, res: Response) => {
